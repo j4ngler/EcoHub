@@ -1,0 +1,639 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUM DEFINITIONS
+// ============================================
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+}
+
+enum RoleName {
+  super_admin
+  admin
+  staff
+  customer
+}
+
+enum ChannelStatus {
+  connected
+  disconnected
+  error
+}
+
+enum CarrierStatus {
+  active
+  inactive
+}
+
+enum ProductStatus {
+  active
+  inactive
+  out_of_stock
+}
+
+enum OrderStatus {
+  pending
+  confirmed
+  packing
+  packed
+  shipping
+  delivered
+  completed
+  cancelled
+  returned
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  refunded
+}
+
+enum VideoProcessingStatus {
+  uploaded
+  processing
+  completed
+  failed
+}
+
+enum TrackingCodePosition {
+  top_left
+  top_right
+  bottom_left
+  bottom_right
+}
+
+enum ComparisonStatus {
+  pending
+  matched
+  mismatched
+  disputed
+}
+
+enum ReturnReason {
+  damaged
+  wrong_item
+  defective
+  not_as_described
+  other
+}
+
+enum ReturnStatus {
+  pending
+  approved
+  rejected
+  processing
+  completed
+}
+
+enum TransactionType {
+  in
+  out
+  adjustment
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+model User {
+  id              String      @id @default(uuid())
+  username        String      @unique
+  email           String      @unique
+  passwordHash    String      @map("password_hash")
+  fullName        String      @map("full_name")
+  phone           String?
+  avatarUrl       String?     @map("avatar_url")
+  status          UserStatus  @default(active)
+  emailVerified   Boolean     @default(false) @map("email_verified")
+  lastLoginAt     DateTime?   @map("last_login_at")
+  createdAt       DateTime    @default(now()) @map("created_at")
+  updatedAt       DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  userRoles             UserRole[]
+  assignedRoles         UserRole[]          @relation("AssignedBy")
+  ownedShops            Shop[]
+  createdProducts       Product[]
+  createdOrders         Order[]
+  orderStatusHistory    OrderStatusHistory[]
+  packageVideos         PackageVideo[]      @relation("RecordedBy")
+  approvedVideos        PackageVideo[]      @relation("ApprovedBy")
+  receivingVideos       ReceivingVideo[]
+  returnRequests        ReturnRequest[]     @relation("CustomerReturns")
+  reviewedReturns       ReturnRequest[]     @relation("ReviewedBy")
+  inventoryTransactions InventoryTransaction[]
+  notifications         Notification[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String    @id @default(uuid())
+  name        RoleName  @unique
+  description String?
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  userRoles   UserRole[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model UserRole {
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  roleId     String    @map("role_id")
+  shopId     String?   @map("shop_id")
+  assignedBy String?   @map("assigned_by")
+  assignedAt DateTime  @default(now()) @map("assigned_at")
+
+  // Relations
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  shop       Shop?     @relation(fields: [shopId], references: [id])
+  assigner   User?     @relation("AssignedBy", fields: [assignedBy], references: [id])
+
+  @@unique([userId, roleId, shopId])
+  @@map("user_roles")
+}
+
+model Permission {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  module      String
+
+  // Relations
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String @map("role_id")
+  permissionId String @map("permission_id")
+
+  // Relations
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@map("role_permissions")
+}
+
+// ============================================
+// SHOP MANAGEMENT
+// ============================================
+
+model Shop {
+  id        String      @id @default(uuid())
+  name      String
+  code      String      @unique
+  ownerId   String      @map("owner_id")
+  address   String?
+  phone     String?
+  email     String?
+  logoUrl   String?     @map("logo_url")
+  status    UserStatus  @default(active)
+  createdAt DateTime    @default(now()) @map("created_at")
+  updatedAt DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  owner              User                    @relation(fields: [ownerId], references: [id])
+  userRoles          UserRole[]
+  channelConnections ShopChannelConnection[]
+  carrierSettings    ShopCarrierSetting[]
+  categories         ProductCategory[]
+  products           Product[]
+  orders             Order[]
+  warehouses         Warehouse[]
+
+  @@map("shops")
+}
+
+// ============================================
+// SALES CHANNELS
+// ============================================
+
+model SalesChannel {
+  id         String        @id @default(uuid())
+  name       String
+  code       String        @unique
+  apiBaseUrl String?       @map("api_base_url")
+  status     CarrierStatus @default(active)
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  connections ShopChannelConnection[]
+  orders      Order[]
+
+  @@map("sales_channels")
+}
+
+model ShopChannelConnection {
+  id             String        @id @default(uuid())
+  shopId         String        @map("shop_id")
+  channelId      String        @map("channel_id")
+  channelShopId  String?       @map("channel_shop_id")
+  accessToken    String?       @map("access_token")
+  refreshToken   String?       @map("refresh_token")
+  tokenExpiresAt DateTime?     @map("token_expires_at")
+  status         ChannelStatus @default(connected)
+  lastSyncAt     DateTime?     @map("last_sync_at")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  shop    Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  channel SalesChannel @relation(fields: [channelId], references: [id])
+
+  @@unique([shopId, channelId])
+  @@map("shop_channel_connections")
+}
+
+// ============================================
+// SHIPPING CARRIERS
+// ============================================
+
+model ShippingCarrier {
+  id              String        @id @default(uuid())
+  code            String        @unique
+  name            String
+  logoUrl         String?       @map("logo_url")
+  baseShippingFee Decimal       @default(0) @map("base_shipping_fee") @db.Decimal(10, 2)
+  apiBaseUrl      String?       @map("api_base_url")
+  status          CarrierStatus @default(active)
+  isBulkySupported Boolean      @default(false) @map("is_bulky_supported")
+  createdAt       DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  shopSettings ShopCarrierSetting[]
+  orders       Order[]
+
+  @@map("shipping_carriers")
+}
+
+model ShopCarrierSetting {
+  id            String        @id @default(uuid())
+  shopId        String        @map("shop_id")
+  carrierId     String        @map("carrier_id")
+  apiKey        String?       @map("api_key")
+  apiSecret     String?       @map("api_secret")
+  shopCarrierId String?       @map("shop_carrier_id")
+  isDefault     Boolean       @default(false) @map("is_default")
+  status        CarrierStatus @default(active)
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  shop    Shop            @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  carrier ShippingCarrier @relation(fields: [carrierId], references: [id])
+
+  @@unique([shopId, carrierId])
+  @@map("shop_carrier_settings")
+}
+
+// ============================================
+// PRODUCTS
+// ============================================
+
+model ProductCategory {
+  id        String    @id @default(uuid())
+  shopId    String    @map("shop_id")
+  name      String
+  parentId  String?   @map("parent_id")
+  level     Int       @default(1)
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  shop     Shop               @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  parent   ProductCategory?   @relation("CategoryHierarchy", fields: [parentId], references: [id])
+  children ProductCategory[]  @relation("CategoryHierarchy")
+  products Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id            String        @id @default(uuid())
+  shopId        String        @map("shop_id")
+  categoryId    String?       @map("category_id")
+  sku           String
+  name          String
+  description   String?
+  price         Decimal       @db.Decimal(15, 2)
+  costPrice     Decimal?      @map("cost_price") @db.Decimal(15, 2)
+  weight        Decimal?      @db.Decimal(10, 3)
+  length        Decimal?      @db.Decimal(10, 2)
+  width         Decimal?      @db.Decimal(10, 2)
+  height        Decimal?      @db.Decimal(10, 2)
+  stockQuantity Int           @default(0) @map("stock_quantity")
+  minStockLevel Int           @default(0) @map("min_stock_level")
+  barcode       String?
+  images        Json?
+  status        ProductStatus @default(active)
+  createdBy     String?       @map("created_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  shop                  Shop                   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  category              ProductCategory?       @relation(fields: [categoryId], references: [id])
+  creator               User?                  @relation(fields: [createdBy], references: [id])
+  orderItems            OrderItem[]
+  inventoryTransactions InventoryTransaction[]
+
+  @@unique([shopId, sku])
+  @@map("products")
+}
+
+// ============================================
+// ORDERS
+// ============================================
+
+model Order {
+  id               String        @id @default(uuid())
+  shopId           String        @map("shop_id")
+  orderCode        String        @unique @map("order_code")
+  channelId        String?       @map("channel_id")
+  channelOrderId   String?       @map("channel_order_id")
+  
+  // Customer info
+  customerId       String?       @map("customer_id")
+  customerName     String        @map("customer_name")
+  customerPhone    String        @map("customer_phone")
+  customerEmail    String?       @map("customer_email")
+  
+  // Shipping address
+  shippingAddress  String        @map("shipping_address")
+  shippingProvince String?       @map("shipping_province")
+  shippingDistrict String?       @map("shipping_district")
+  shippingWard     String?       @map("shipping_ward")
+  
+  // Shipping info
+  carrierId        String?       @map("carrier_id")
+  trackingCode     String?       @map("tracking_code")
+  shippingFee      Decimal       @default(0) @map("shipping_fee") @db.Decimal(10, 2)
+  codAmount        Decimal       @default(0) @map("cod_amount") @db.Decimal(15, 2)
+  
+  // Order value
+  subtotal         Decimal       @map("subtotal") @db.Decimal(15, 2)
+  discountAmount   Decimal       @default(0) @map("discount_amount") @db.Decimal(15, 2)
+  totalAmount      Decimal       @map("total_amount") @db.Decimal(15, 2)
+  
+  // Status
+  status           OrderStatus   @default(pending)
+  paymentStatus    PaymentStatus @default(pending) @map("payment_status")
+  paymentMethod    String?       @map("payment_method")
+  
+  // Timestamps
+  confirmedAt      DateTime?     @map("confirmed_at")
+  packedAt         DateTime?     @map("packed_at")
+  shippedAt        DateTime?     @map("shipped_at")
+  deliveredAt      DateTime?     @map("delivered_at")
+  completedAt      DateTime?     @map("completed_at")
+  cancelledAt      DateTime?     @map("cancelled_at")
+  
+  notes            String?
+  createdBy        String?       @map("created_by")
+  createdAt        DateTime      @default(now()) @map("created_at")
+  updatedAt        DateTime      @updatedAt @map("updated_at")
+
+  // Relations
+  shop           Shop                 @relation(fields: [shopId], references: [id])
+  channel        SalesChannel?        @relation(fields: [channelId], references: [id])
+  carrier        ShippingCarrier?     @relation(fields: [carrierId], references: [id])
+  creator        User?                @relation(fields: [createdBy], references: [id])
+  items          OrderItem[]
+  statusHistory  OrderStatusHistory[]
+  packageVideos  PackageVideo[]
+  receivingVideos ReceivingVideo[]
+  returnRequests ReturnRequest[]
+
+  @@index([shopId])
+  @@index([trackingCode])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id          String   @id @default(uuid())
+  orderId     String   @map("order_id")
+  productId   String?  @map("product_id")
+  productName String   @map("product_name")
+  productSku  String?  @map("product_sku")
+  quantity    Int
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(15, 2)
+  totalPrice  Decimal  @map("total_price") @db.Decimal(15, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderStatusHistory {
+  id        String   @id @default(uuid())
+  orderId   String   @map("order_id")
+  status    String
+  note      String?
+  changedBy String?  @map("changed_by")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  order  Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  changer User? @relation(fields: [changedBy], references: [id])
+
+  @@map("order_status_history")
+}
+
+// ============================================
+// VIDEOS
+// ============================================
+
+model PackageVideo {
+  id                    String                 @id @default(uuid())
+  orderId               String                 @map("order_id")
+  trackingCode          String                 @map("tracking_code")
+  
+  // Original video
+  originalVideoUrl      String                 @map("original_video_url")
+  originalVideoSize     BigInt?                @map("original_video_size")
+  originalDuration      Int?                   @map("original_duration")
+  
+  // Processed video
+  processedVideoUrl     String?                @map("processed_video_url")
+  processedVideoSize    BigInt?                @map("processed_video_size")
+  thumbnailUrl          String?                @map("thumbnail_url")
+  
+  // Processing status
+  processingStatus      VideoProcessingStatus  @default(uploaded) @map("processing_status")
+  processingError       String?                @map("processing_error")
+  
+  // Tracking code overlay settings
+  trackingCodePosition  TrackingCodePosition   @default(bottom_right) @map("tracking_code_position")
+  trackingCodeStartTime Int                    @default(0) @map("tracking_code_start_time")
+  trackingCodeEndTime   Int?                   @map("tracking_code_end_time")
+  
+  // Personnel
+  recordedBy            String                 @map("recorded_by")
+  approvedBy            String?                @map("approved_by")
+  approvedAt            DateTime?              @map("approved_at")
+  
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+
+  // Relations
+  order           Order            @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  recorder        User             @relation("RecordedBy", fields: [recordedBy], references: [id])
+  approver        User?            @relation("ApprovedBy", fields: [approvedBy], references: [id])
+  receivingVideos ReceivingVideo[]
+
+  @@index([orderId])
+  @@index([trackingCode])
+  @@map("package_videos")
+}
+
+model ReceivingVideo {
+  id               String           @id @default(uuid())
+  orderId          String           @map("order_id")
+  customerId       String           @map("customer_id")
+  trackingCode     String           @map("tracking_code")
+  
+  videoUrl         String           @map("video_url")
+  videoSize        BigInt?          @map("video_size")
+  duration         Int?
+  thumbnailUrl     String?          @map("thumbnail_url")
+  
+  // Comparison
+  packageVideoId   String?          @map("package_video_id")
+  comparisonStatus ComparisonStatus @default(pending) @map("comparison_status")
+  comparisonNotes  String?          @map("comparison_notes")
+  
+  recordedAt       DateTime?        @map("recorded_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  // Relations
+  order        Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  customer     User          @relation(fields: [customerId], references: [id])
+  packageVideo PackageVideo? @relation(fields: [packageVideoId], references: [id])
+
+  @@map("receiving_videos")
+}
+
+// ============================================
+// RETURNS
+// ============================================
+
+model ReturnRequest {
+  id           String       @id @default(uuid())
+  orderId      String       @map("order_id")
+  customerId   String       @map("customer_id")
+  
+  reason       ReturnReason
+  description  String?
+  images       Json?
+  
+  status       ReturnStatus @default(pending)
+  
+  reviewedBy   String?      @map("reviewed_by")
+  reviewedAt   DateTime?    @map("reviewed_at")
+  reviewNotes  String?      @map("review_notes")
+  
+  refundAmount Decimal?     @map("refund_amount") @db.Decimal(15, 2)
+  refundedAt   DateTime?    @map("refunded_at")
+  
+  createdAt    DateTime     @default(now()) @map("created_at")
+  updatedAt    DateTime     @updatedAt @map("updated_at")
+
+  // Relations
+  order    Order @relation(fields: [orderId], references: [id])
+  customer User  @relation("CustomerReturns", fields: [customerId], references: [id])
+  reviewer User? @relation("ReviewedBy", fields: [reviewedBy], references: [id])
+
+  @@map("return_requests")
+}
+
+// ============================================
+// WAREHOUSE
+// ============================================
+
+model Warehouse {
+  id           String      @id @default(uuid())
+  shopId       String      @map("shop_id")
+  name         String
+  code         String
+  address      String?
+  contactPhone String?     @map("contact_phone")
+  isDefault    Boolean     @default(false) @map("is_default")
+  status       UserStatus  @default(active)
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  // Relations
+  shop         Shop                   @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  transactions InventoryTransaction[]
+
+  @@unique([shopId, code])
+  @@map("warehouses")
+}
+
+model InventoryTransaction {
+  id              String          @id @default(uuid())
+  warehouseId     String          @map("warehouse_id")
+  productId       String          @map("product_id")
+  transactionType TransactionType @map("transaction_type")
+  quantity        Int
+  referenceType   String?         @map("reference_type")
+  referenceId     String?         @map("reference_id")
+  note            String?
+  createdBy       String?         @map("created_by")
+  createdAt       DateTime        @default(now()) @map("created_at")
+
+  // Relations
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+  product   Product   @relation(fields: [productId], references: [id])
+  creator   User?     @relation(fields: [createdBy], references: [id])
+
+  @@map("inventory_transactions")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id            String    @id @default(uuid())
+  userId        String    @map("user_id")
+  title         String
+  message       String
+  type          String
+  referenceType String?   @map("reference_type")
+  referenceId   String?   @map("reference_id")
+  isRead        Boolean   @default(false) @map("is_read")
+  readAt        DateTime? @map("read_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+  @@map("notifications")
+}
