@@ -33,5 +33,13 @@ export const refreshTokenSchema = z.object({
   }),
 });
 
+export const assumeShopSchema = z.object({
+  body: z.object({
+    // null/undefined => thoát chế độ quản lý shop
+    shopId: z.string().uuid().nullable().optional(),
+  }),
+});
+
 export type RegisterDto = z.infer<typeof registerSchema>['body'];
 export type LoginDto = z.infer<typeof loginSchema>['body'];
+export type AssumeShopDto = z.infer<typeof assumeShopSchema>['body'];

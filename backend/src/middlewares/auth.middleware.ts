@@ -8,6 +8,8 @@ export interface JwtPayload {
   userId: string;
   email: string;
   roles: RoleName[];
+  shopId?: string | null;
+  impersonating?: boolean;
 }
 
 export interface AuthRequest extends Request {
@@ -51,7 +53,9 @@ export const authenticate = async (
       req.user = {
         userId: user.id,
         email: user.email,
-        roles: user.userRoles.map(ur => ur.role.name),
+        roles: decoded.roles || user.userRoles.map(ur => ur.role.name),
+        shopId: decoded.shopId ?? null,
+        impersonating: decoded.impersonating ?? false,
       };
 
       next();
@@ -96,14 +100,19 @@ export const authorizePermission = (...requiredPermissions: string[]) => {
         throw unauthorized('Chưa xác thực');
       }
 
-      // Super admin has all permissions
-      if (req.user.roles.includes(RoleName.super_admin)) {
+      const activeShopId = req.user.shopId ?? null;
+
+      // Super admin has all permissions (trừ khi đang impersonate shop)
+      if (!req.user.impersonating && req.user.roles.includes(RoleName.super_admin)) {
         return next();
       }
 
       // Get user's permissions
       const userRoles = await prisma.userRole.findMany({
-        where: { userId: req.user.userId },
+        where: {
+          userId: req.user.userId,
+          ...(activeShopId ? { OR: [{ shopId: activeShopId }, { shopId: null }] } : {}),
+        },
         include: {
           role: {
             include: {

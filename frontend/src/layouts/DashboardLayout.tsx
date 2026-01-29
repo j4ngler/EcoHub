@@ -13,6 +13,7 @@ import {
   X,
   User as UserIcon,
   Bell,
+  Store,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '@/store/authStore';
@@ -45,6 +46,7 @@ export default function DashboardLayout() {
     { name: 'Quản lý hàng hóa', href: '/inventory', icon: Package, roles: ['admin', 'super_admin'] },
     { name: 'Người dùng', href: '/users', icon: Users, roles: ['super_admin'] },
     { name: 'Báo cáo', href: '/reports', icon: BarChart3, roles: ['admin', 'super_admin'] },
+    { name: 'Shop', href: '/shops', icon: Store, roles: ['super_admin'] },
     { name: 'Hồ sơ', href: '/profile', icon: Settings, roles: ['customer', 'staff', 'admin', 'super_admin'] },
   ].filter((item) => {
     if (!item.roles) return true;

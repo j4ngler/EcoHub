@@ -5,10 +5,21 @@ export const queryVideosSchema = z.object({
     page: z.string().optional(),
     limit: z.string().optional(),
     search: z.string().optional(),
-    orderId: z.string().uuid().optional(),
-    status: z.enum(['uploaded', 'processing', 'completed', 'failed']).optional(),
+    // Cho phép FE gửi chuỗi rỗng (vd: `status=`) nhưng sẽ được hiểu là "không lọc"
+    orderId: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.string().uuid().optional()
+    ),
+    status: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.enum(['uploaded', 'processing', 'completed', 'failed']).optional()
+    ),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
+    showDeleted: z.preprocess(
+      (v) => v === 'true' || v === true,
+      z.boolean().optional()
+    ),
   }),
 });
 

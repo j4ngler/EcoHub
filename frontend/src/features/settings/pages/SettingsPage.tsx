@@ -1,8 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Bell, Globe, Paintbrush } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Bell, Globe, Paintbrush, Mail, Plus, Trash2, Edit } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import Modal from '@/components/ui/Modal';
+import { settingsApi, ReportSubscription } from '@/api/settings.api';
+import { getErrorMessage } from '@/api/axios';
+import toast from 'react-hot-toast';
 
 type AppSettings = {
   notifications: boolean;
@@ -21,6 +28,51 @@ const STORAGE_KEY = 'ecohub-app-settings';
 export default function SettingsPage() {
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   const [saved, setSaved] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [editingSubscription, setEditingSubscription] = useState<ReportSubscription | null>(null);
+  const [emailForm, setEmailForm] = useState({
+    email: '',
+    reportType: 'both' as 'financial' | 'operational' | 'both',
+  });
+
+  const queryClient = useQueryClient();
+
+  const { data: subscriptions, isLoading: loadingSubscriptions } = useQuery({
+    queryKey: ['report-subscriptions'],
+    queryFn: settingsApi.getReportSubscriptions,
+  });
+
+  const createMutation = useMutation({
+    mutationFn: settingsApi.createReportSubscription,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['report-subscriptions'] });
+      toast.success('Đã thêm email nhận báo cáo');
+      setEmailModalOpen(false);
+      setEmailForm({ email: '', reportType: 'both' });
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      settingsApi.updateReportSubscription(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['report-subscriptions'] });
+      toast.success('Đã cập nhật cấu hình email');
+      setEmailModalOpen(false);
+      setEditingSubscription(null);
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: settingsApi.deleteReportSubscription,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['report-subscriptions'] });
+      toast.success('Đã xóa email nhận báo cáo');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
 
   useEffect(() => {
     try {
@@ -37,6 +89,35 @@ export default function SettingsPage() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
     setSaved(true);
     setTimeout(() => setSaved(false), 1500);
+  };
+
+  const handleOpenEmailModal = (sub?: ReportSubscription) => {
+    if (sub) {
+      setEditingSubscription(sub);
+      setEmailForm({
+        email: sub.email,
+        reportType: sub.reportType,
+      });
+    } else {
+      setEditingSubscription(null);
+      setEmailForm({ email: '', reportType: 'both' });
+    }
+    setEmailModalOpen(true);
+  };
+
+  const handleSubmitEmail = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingSubscription) {
+      updateMutation.mutate({
+        id: editingSubscription.id,
+        data: {
+          enabled: editingSubscription.enabled,
+          reportType: emailForm.reportType,
+        },
+      });
+    } else {
+      createMutation.mutate(emailForm);
+    }
   };
 
   return (
@@ -100,6 +181,86 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Email Report Subscriptions */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="w-5 h-5" />
+              Báo cáo định kỳ qua email
+            </CardTitle>
+            <Button onClick={() => handleOpenEmailModal()} size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Thêm email
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-6">
+          <p className="text-sm text-gray-500 mb-4">
+            Cấu hình danh sách email nhận báo cáo tự động hàng ngày lúc 18:00
+          </p>
+          {loadingSubscriptions ? (
+            <div className="text-center py-8 text-gray-500">Đang tải...</div>
+          ) : subscriptions && subscriptions.length > 0 ? (
+            <div className="space-y-3">
+              {subscriptions.map((sub) => (
+                <div
+                  key={sub.id}
+                  className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-gray-900">{sub.email}</p>
+                      {sub.enabled ? (
+                        <Badge variant="success">Đang bật</Badge>
+                      ) : (
+                        <Badge variant="danger">Đã tắt</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-1">
+                      Loại báo cáo:{' '}
+                      {sub.reportType === 'financial'
+                        ? 'Tài chính'
+                        : sub.reportType === 'operational'
+                        ? 'Vận hành'
+                        : 'Cả hai'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleOpenEmailModal(sub)}
+                      className="p-2 text-gray-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"
+                      title="Sửa"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (window.confirm('Xóa email này khỏi danh sách nhận báo cáo?')) {
+                          deleteMutation.mutate(sub.id);
+                        }
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50"
+                      title="Xóa"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <Mail className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+              <p>Chưa có email nào đăng ký nhận báo cáo</p>
+              <Button onClick={() => handleOpenEmailModal()} className="mt-4" size="sm">
+                Thêm email đầu tiên
+              </Button>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Card>
         <CardContent className="p-6 space-y-2">
           <p className="font-medium text-gray-900">Gợi ý dữ liệu mẫu</p>
@@ -113,6 +274,77 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Email Subscription Modal */}
+      <Modal
+        open={emailModalOpen}
+        onClose={() => {
+          setEmailModalOpen(false);
+          setEditingSubscription(null);
+          setEmailForm({ email: '', reportType: 'both' });
+        }}
+        title={editingSubscription ? 'Sửa cấu hình email' : 'Thêm email nhận báo cáo'}
+        size="md"
+      >
+        <form onSubmit={handleSubmitEmail} className="space-y-4">
+          <Input
+            label="Email"
+            type="email"
+            value={emailForm.email}
+            onChange={(e) => setEmailForm({ ...emailForm, email: e.target.value })}
+            required
+            disabled={!!editingSubscription}
+            helperText={editingSubscription ? 'Không thể thay đổi email' : 'Email sẽ nhận báo cáo hàng ngày'}
+          />
+          <Select
+            label="Loại báo cáo"
+            value={emailForm.reportType}
+            onChange={(e) =>
+              setEmailForm({
+                ...emailForm,
+                reportType: e.target.value as 'financial' | 'operational' | 'both',
+              })
+            }
+            options={[
+              { value: 'financial', label: 'Báo cáo Tài chính' },
+              { value: 'operational', label: 'Báo cáo Vận hành' },
+              { value: 'both', label: 'Cả hai loại' },
+            ]}
+          />
+          {editingSubscription && (
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="enabled"
+                checked={editingSubscription.enabled}
+                onChange={(e) =>
+                  setEditingSubscription({ ...editingSubscription, enabled: e.target.checked })
+                }
+                className="h-4 w-4"
+              />
+              <label htmlFor="enabled" className="text-sm text-gray-700">
+                Bật nhận báo cáo
+              </label>
+            </div>
+          )}
+          <div className="flex justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setEmailModalOpen(false);
+                setEditingSubscription(null);
+                setEmailForm({ email: '', reportType: 'both' });
+              }}
+            >
+              Hủy
+            </Button>
+            <Button type="submit" loading={createMutation.isPending || updateMutation.isPending}>
+              {editingSubscription ? 'Cập nhật' : 'Thêm'}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

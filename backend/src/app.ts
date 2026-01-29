@@ -1,4 +1,5 @@
 import express, { Application, Request, Response, NextFunction } from 'express';
+import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -15,6 +16,8 @@ import channelRoutes from './modules/channels/channels.routes';
 import reportRoutes from './modules/reports/reports.routes';
 import returnRoutes from './modules/returns/returns.routes';
 import metaRoutes from './modules/meta/meta.routes';
+import settingsRoutes from './modules/settings/settings.routes';
+import shopRoutes from './modules/shops/shops.routes';
 
 // Import middlewares
 import { errorHandler } from './middlewares/error.middleware';
@@ -40,6 +43,10 @@ app.use(morgan('dev'));
 // Body parsing
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Serve uploaded files (videos, thumbnails, ...)
+// FE will request: http://localhost:5173/uploads/<filename> (proxied to backend in dev)
+app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Rate limiting
 const limiter = rateLimit({
@@ -76,6 +83,8 @@ app.use('/api/channels', channelRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/returns', returnRoutes);
 app.use('/api/meta', metaRoutes);
+app.use('/api/settings', settingsRoutes);
+app.use('/api/shops', shopRoutes);
 
 // API Documentation
 app.get('/api/docs', (req: Request, res: Response) => {

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, LogOut, User, Settings, ChevronDown } from 'lucide-react';
+import { Menu, Bell, Search, LogOut, User, Settings, ChevronDown, Shield } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
+import { authApi } from '@/api/auth.api';
+import toast from 'react-hot-toast';
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -9,12 +11,36 @@ interface HeaderProps {
 
 export default function Header({ onMenuClick }: HeaderProps) {
   const navigate = useNavigate();
-  const { user, logout } = useAuthStore();
+  const { user, accessToken, setAuth, clearAuth, hasRole } = useAuthStore();
   const [showDropdown, setShowDropdown] = useState(false);
 
   const handleLogout = () => {
-    logout();
+    clearAuth();
     navigate('/login');
+  };
+
+  const isShopContext = (() => {
+    try {
+      if (!accessToken) return false;
+      const payload = JSON.parse(atob(accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return !!payload?.shopId;
+    } catch {
+      return false;
+    }
+  })();
+
+  const isSuperAdmin = hasRole('super_admin');
+
+  const handleBackToSuperAdmin = async () => {
+    try {
+      const res = await authApi.assumeShop(null);
+      setAuth(res.user as any, res.accessToken, res.refreshToken);
+      toast.success('Đã quay lại quyền Super Admin');
+      setShowDropdown(false);
+      navigate('/dashboard');
+    } catch (e: any) {
+      toast.error(e?.response?.data?.message || 'Không thể quay lại quyền Super Admin');
+    }
   };
 
   return (
@@ -85,6 +111,16 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     <p className="text-xs text-gray-500">{user?.email}</p>
                   </button>
                   <div className="p-1">
+                    {isSuperAdmin && isShopContext && (
+                      <button
+                        type="button"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                        onClick={handleBackToSuperAdmin}
+                      >
+                        <Shield className="w-4 h-4" />
+                        Về Super Admin
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"

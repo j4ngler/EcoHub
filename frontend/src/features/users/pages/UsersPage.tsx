@@ -11,8 +11,22 @@ import Modal from '@/components/ui/Modal';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import { formatDateTime } from '@/utils/format';
+import { useAuthStore } from '@/store/authStore';
 
 export default function UsersPage() {
+  const { user: currentUser } = useAuthStore();
+  const activeShop = currentUser?.activeShop || null;
+  const isShopContext = (() => {
+    try {
+      const token = useAuthStore.getState().accessToken;
+      if (!token) return false;
+      const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      return !!payload?.shopId;
+    } catch {
+      return false;
+    }
+  })();
+
   const [filters, setFilters] = useState({
     page: 1,
     limit: 10,
@@ -71,6 +85,13 @@ export default function UsersPage() {
     queryFn: metaApi.getShops,
   });
 
+  const allowedRoleOptions = useMemo(() => {
+    const list = roles || [];
+    if (!isShopContext && !activeShop) return list;
+    // Trong chế độ quản lý shop: chỉ cho chọn các role thuộc shop
+    return list.filter((r) => ['admin', 'staff', 'customer'].includes(r.name));
+  }, [roles, activeShop, isShopContext]);
+
   const createMutation = useMutation({
     mutationFn: () =>
       usersApi.create({
@@ -81,7 +102,7 @@ export default function UsersPage() {
         phone: createForm.phone?.trim() || undefined,
         status: createForm.status,
         roleId: createForm.roleId || undefined,
-        shopId: createForm.shopId || undefined,
+        shopId: activeShop ? activeShop.id : createForm.shopId || undefined,
       }),
     onSuccess: () => {
       toast.success('Tạo người dùng thành công');
@@ -163,10 +184,12 @@ export default function UsersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Người dùng</h1>
           <p className="text-gray-500">Quản lý tài khoản người dùng</p>
         </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Thêm người dùng
-        </Button>
+        {isShopContext && (
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Thêm nhân viên
+          </Button>
+        )}
       </div>
 
       {/* Filters */}
@@ -436,23 +459,40 @@ export default function UsersPage() {
               ]}
             />
             <Select
-              label="Vai trò (tùy chọn)"
+              label={
+                activeShop || isShopContext
+                  ? `Vai trò (bắt buộc${activeShop ? ` trong shop: ${activeShop.name}` : ''})`
+                  : 'Vai trò (tùy chọn)'
+              }
               value={createForm.roleId}
               onChange={(e) => setCreateForm({ ...createForm, roleId: e.target.value })}
+              required={!!activeShop || isShopContext}
               options={[
-                { value: '', label: 'Không gán vai trò' },
-                ...(roles || []).map((r) => ({ value: r.id, label: r.name })),
+                ...(activeShop || isShopContext ? [] : [{ value: '', label: 'Không gán vai trò' }]),
+                ...allowedRoleOptions.map((r) => ({ value: r.id, label: r.name })),
               ]}
             />
-            <Select
-              label="Shop (tùy chọn)"
-              value={createForm.shopId}
-              onChange={(e) => setCreateForm({ ...createForm, shopId: e.target.value })}
-              options={[
-                { value: '', label: 'Không gán shop' },
-                ...(shops || []).map((s) => ({ value: s.id, label: `${s.name} (${s.code})` })),
-              ]}
-            />
+            {activeShop || isShopContext ? (
+              <Input
+                label="Shop"
+                value={activeShop ? `${activeShop.name} (${activeShop.code})` : 'Đang quản lý shop'}
+                disabled
+              />
+            ) : (
+              <Select
+                label="Shop (bắt buộc)"
+                value={createForm.shopId}
+                onChange={(e) => setCreateForm({ ...createForm, shopId: e.target.value })}
+                required
+                options={[
+                  { value: '', label: 'Chọn shop...' },
+                  ...(shops || []).map((s) => ({
+                    value: s.id,
+                    label: `${s.name} (${s.code}) — ${s.phone || '-'} — ${s.email || '-'} — ${s.address || '-'}`,
+                  })),
+                ]}
+              />
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">

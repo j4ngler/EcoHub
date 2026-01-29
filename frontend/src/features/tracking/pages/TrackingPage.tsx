@@ -233,28 +233,28 @@ export default function TrackingPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
                     {videos.map((video: any) => (
-                      <div key={video.id} className="border rounded-lg overflow-hidden">
-                        <div className="aspect-video bg-gray-900 flex items-center justify-center">
-                          {video.thumbnailUrl ? (
-                            <img 
-                              src={video.thumbnailUrl} 
-                              alt="" 
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <Video className="w-12 h-12 text-gray-600" />
-                          )}
+                      <div
+                        key={video.id}
+                        className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2 bg-white"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
+                            <Video className="w-4 h-4 text-gray-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {video.trackingCode || order.trackingCode || order.orderCode}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Đóng gói lúc: {formatDateTime(video.createdAt)}
+                            </p>
+                          </div>
                         </div>
-                        <div className="p-3">
-                          <p className="text-sm text-gray-500">
-                            Đóng gói lúc: {formatDateTime(video.createdAt)}
-                          </p>
-                          <Button size="sm" className="w-full mt-2">
-                            Xem video
-                          </Button>
-                        </div>
+                        <Button size="sm" className="shrink-0">
+                          Xem video
+                        </Button>
                       </div>
                     ))}
                   </div>

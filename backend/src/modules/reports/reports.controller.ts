@@ -6,7 +6,7 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const getDashboard = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const dashboard = await reportService.getDashboard({
-      shopId: req.query.shopId as string,
+      shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
     });
@@ -19,7 +19,7 @@ export const getDashboard = async (req: AuthRequest, res: Response, next: NextFu
 export const getOrderReport = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const report = await reportService.getOrderReport({
-      shopId: req.query.shopId as string,
+      shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
       groupBy: (req.query.groupBy as string) || 'day',
@@ -33,7 +33,7 @@ export const getOrderReport = async (req: AuthRequest, res: Response, next: Next
 export const getVideoReport = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const report = await reportService.getVideoReport({
-      shopId: req.query.shopId as string,
+      shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
     });
@@ -46,7 +46,7 @@ export const getVideoReport = async (req: AuthRequest, res: Response, next: Next
 export const getRevenueReport = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const report = await reportService.getRevenueReport({
-      shopId: req.query.shopId as string,
+      shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
       groupBy: (req.query.groupBy as string) || 'day',
@@ -60,11 +60,34 @@ export const getRevenueReport = async (req: AuthRequest, res: Response, next: Ne
 export const getStaffPerformance = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const report = await reportService.getStaffPerformance({
-      shopId: req.query.shopId as string,
+      shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
     });
     success(res, report);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getOperationalReport = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const report = await reportService.getOperationalReport({
+      shopId: (req.query.shopId as string) || (req.user?.shopId as string),
+      startDate: req.query.startDate as string,
+      endDate: req.query.endDate as string,
+      groupBy: (req.query.groupBy as string) || 'day',
+    });
+    success(res, report);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const syncNow = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await reportService.syncNow(req.user!.userId, req.body?.channels, req.user?.shopId ?? null);
+    success(res, result, 'Đã đồng bộ dữ liệu từ kênh bán hàng');
   } catch (error) {
     next(error);
   }

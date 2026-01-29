@@ -2,7 +2,7 @@ import { Router } from 'express';
 import * as authController from './auth.controller';
 import { validate } from '../../middlewares/validation.middleware';
 import { authenticate } from '../../middlewares/auth.middleware';
-import { loginSchema, registerSchema, refreshTokenSchema } from './auth.dto';
+import { assumeShopSchema, loginSchema, registerSchema, refreshTokenSchema } from './auth.dto';
 
 const router = Router();
 
@@ -17,5 +17,6 @@ router.post('/logout', authController.logout);
 router.get('/me', authController.getMe);
 router.put('/me', authController.updateMe);
 router.put('/change-password', authController.changePassword);
+router.post('/assume-shop', validate(assumeShopSchema), authController.assumeShop);
 
 export default router;

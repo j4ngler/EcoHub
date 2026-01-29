@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { 
   Plus, 
@@ -10,25 +10,166 @@ import {
   MoreVertical,
   Download
 } from 'lucide-react';
-import { ordersApi, OrderQueryParams } from '@/api/orders.api';
+import { ordersApi, OrderQueryParams, OrderItem } from '@/api/orders.api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge, { ORDER_STATUS_BADGES } from '@/components/ui/Badge';
 import Select from '@/components/ui/Select';
 import { formatCurrency, formatDateTime } from '@/utils/format';
+import Modal from '@/components/ui/Modal';
+import { useAuthStore } from '@/store/authStore';
+import toast from 'react-hot-toast';
+import { getErrorMessage } from '@/api/axios';
 
 export default function OrdersPage() {
+  const { user } = useAuthStore();
+  const activeShopId = user?.activeShop?.id;
+
   const [filters, setFilters] = useState<OrderQueryParams>({
     page: 1,
     limit: 10,
     status: '',
     search: '',
+    shopId: activeShopId,
   });
+
+  useEffect(() => {
+    // Khi đổi shop đang quản lý thì reset filter theo shop đó
+    setFilters((prev) => ({
+      ...prev,
+      page: 1,
+      shopId: activeShopId,
+    }));
+  }, [activeShopId]);
+
+  const [openCreate, setOpenCreate] = useState(false);
+  const [form, setForm] = useState<{
+    customerName: string;
+    customerPhone: string;
+    shippingAddress: string;
+    notes: string;
+    items: Array<{
+      productName: string;
+      productSku: string;
+      quantity: string;
+      unitPrice: string;
+    }>;
+  }>({
+    customerName: '',
+    customerPhone: '',
+    shippingAddress: '',
+    notes: '',
+    items: [
+      {
+        productName: '',
+        productSku: '',
+        quantity: '1',
+        unitPrice: '0',
+      },
+    ],
+  });
+
+  const queryClient = useQueryClient();
 
   const { data, isLoading } = useQuery({
     queryKey: ['orders', filters],
     queryFn: () => ordersApi.getOrders(filters),
   });
+
+  const createOrderMutation = useMutation({
+    mutationFn: async () => {
+      if (!activeShopId) {
+        throw new Error('Vui lòng chọn shop để quản lý trước khi tạo đơn hàng');
+      }
+
+      if (!form.customerName || !form.customerPhone || !form.shippingAddress) {
+        throw new Error('Vui lòng nhập đầy đủ thông tin khách hàng và địa chỉ');
+      }
+
+      const items: OrderItem[] = form.items
+        .map((it) => ({
+          productName: it.productName.trim(),
+          productSku: it.productSku.trim() || undefined,
+          quantity: Number(it.quantity || '0'),
+          unitPrice: Number(it.unitPrice || '0'),
+        }))
+        .filter((it) => it.productName && it.quantity > 0 && it.unitPrice > 0);
+
+      if (items.length === 0) {
+        throw new Error('Đơn hàng phải có ít nhất 1 sản phẩm hợp lệ');
+      }
+
+      return ordersApi.createOrder({
+        shopId: activeShopId,
+        customerName: form.customerName,
+        customerPhone: form.customerPhone,
+        customerEmail: undefined,
+        shippingAddress: form.shippingAddress,
+        shippingProvince: undefined,
+        shippingDistrict: undefined,
+        shippingWard: undefined,
+        carrierId: undefined,
+        trackingCode: undefined,
+        shippingFee: 0,
+        codAmount: 0,
+        discountAmount: 0,
+        paymentMethod: undefined,
+        notes: form.notes || undefined,
+        items,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Tạo đơn hàng thành công');
+      setOpenCreate(false);
+      setForm({
+        customerName: '',
+        customerPhone: '',
+        shippingAddress: '',
+        notes: '',
+        items: [
+          {
+            productName: '',
+            productSku: '',
+            quantity: '1',
+            unitPrice: '0',
+          },
+        ],
+      });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (error: any) => {
+      const message = getErrorMessage(error) || error?.message || 'Tạo đơn hàng thất bại';
+      toast.error(message);
+    },
+  });
+
+  const handleAddItem = () => {
+    setForm((prev) => ({
+      ...prev,
+      items: [
+        ...prev.items,
+        { productName: '', productSku: '', quantity: '1', unitPrice: '0' },
+      ],
+    }));
+  };
+
+  const handleChangeItem = (
+    index: number,
+    field: 'productName' | 'productSku' | 'quantity' | 'unitPrice',
+    value: string
+  ) => {
+    setForm((prev) => ({
+      ...prev,
+      items: prev.items.map((it, i) =>
+        i === index
+          ? {
+              ...it,
+              [field]: value,
+            }
+          : it
+      ),
+    }));
+  };
 
   const statusOptions = [
     { value: '', label: 'Tất cả trạng thái' },
@@ -50,7 +191,7 @@ export default function OrdersPage() {
           <h1 className="text-2xl font-bold text-gray-900">Đơn hàng</h1>
           <p className="text-gray-500">Quản lý tất cả đơn hàng</p>
         </div>
-        <Button>
+        <Button onClick={() => setOpenCreate(true)}>
           <Plus className="w-4 h-4 mr-2" />
           Tạo đơn hàng
         </Button>
@@ -231,6 +372,157 @@ export default function OrdersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Create order modal */}
+      <Modal open={openCreate} onClose={() => setOpenCreate(false)} title="Tạo đơn hàng mới" size="xl">
+        {!activeShopId && (
+          <p className="mb-4 text-sm text-red-600">
+            Vui lòng chọn shop để quản lý trước (vào trang Shop và bấm &quot;Quản lý shop này&quot;).
+          </p>
+        )}
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tên khách hàng <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                className="input"
+                value={form.customerName}
+                onChange={(e) => setForm({ ...form, customerName: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Số điện thoại <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                className="input"
+                value={form.customerPhone}
+                onChange={(e) => setForm({ ...form, customerPhone: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Địa chỉ giao hàng <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              className="input"
+              value={form.shippingAddress}
+              onChange={(e) => setForm({ ...form, shippingAddress: e.target.value })}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+            <textarea
+              className="input min-h-[80px]"
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+            />
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-gray-900">Sản phẩm trong đơn</h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={handleAddItem}
+              >
+                <Plus className="w-4 h-4 mr-1" />
+                Thêm dòng sản phẩm
+              </Button>
+            </div>
+
+            <div className="space-y-2">
+              {form.items.map((item, index) => (
+                <div key={index} className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Tên sản phẩm
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={item.productName}
+                      onChange={(e) =>
+                        handleChangeItem(index, 'productName', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      SKU
+                    </label>
+                    <input
+                      type="text"
+                      className="input"
+                      value={item.productSku}
+                      onChange={(e) =>
+                        handleChangeItem(index, 'productSku', e.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Số lượng
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        className="input"
+                        value={item.quantity}
+                        onChange={(e) =>
+                          handleChangeItem(index, 'quantity', e.target.value)
+                        }
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Đơn giá (VNĐ)
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        className="input"
+                        value={item.unitPrice}
+                        onChange={(e) =>
+                          handleChangeItem(index, 'unitPrice', e.target.value)
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2 border-t">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpenCreate(false)}
+            >
+              Hủy
+            </Button>
+            <Button
+              type="button"
+              disabled={createOrderMutation.isPending || !activeShopId}
+              onClick={() => createOrderMutation.mutate()}
+            >
+              {createOrderMutation.isPending ? 'Đang tạo...' : 'Tạo đơn hàng'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

@@ -18,6 +18,11 @@ export default defineConfig({
         target: 'http://backend:3000',
         changeOrigin: true,
       },
+      // Allow playing uploaded videos via `/uploads/<file>` while using Vite dev server
+      '/uploads': {
+        target: 'http://backend:3000',
+        changeOrigin: true,
+      },
     },
   },
 });

@@ -43,7 +43,7 @@ export const getOrderByTrackingCode = async (req: AuthRequest, res: Response, ne
 
 export const createOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const order = await orderService.createOrder(req.body, req.user!.userId);
+    const order = await orderService.createOrder(req.body, req.user!.userId, req.user);
     created(res, order, 'Tạo đơn hàng thành công');
   } catch (error) {
     next(error);

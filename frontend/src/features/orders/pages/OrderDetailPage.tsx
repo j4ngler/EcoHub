@@ -1,31 +1,46 @@
+import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { 
-  ArrowLeft, 
-  Package, 
-  Truck, 
-  User, 
-  MapPin, 
-  Phone, 
+import {
+  ArrowLeft,
+  Package,
+  Truck,
+  User,
+  MapPin,
+  Phone,
   Mail,
   Video,
   Clock,
-  CheckCircle
+  CheckCircle,
+  Play,
+  Download,
 } from 'lucide-react';
 import { ordersApi } from '@/api/orders.api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge, { ORDER_STATUS_BADGES } from '@/components/ui/Badge';
+import Modal from '@/components/ui/Modal';
 import { formatCurrency, formatDateTime } from '@/utils/format';
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const [openVideo, setOpenVideo] = useState(false);
+  const [activeVideo, setActiveVideo] = useState<any | null>(null);
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', id],
     queryFn: () => ordersApi.getOrderById(id!),
     enabled: !!id,
   });
+
+  // Tính URL phát video, bỏ qua các video demo không có file thật (/uploads/demo/...)
+  const rawPlayableUrl =
+    (activeVideo?.processedVideoUrl as string | undefined) ||
+    (activeVideo?.originalVideoUrl as string | undefined) ||
+    (activeVideo?.videoUrl as string | undefined) ||
+    '';
+  const isDemoVideo = rawPlayableUrl.includes('/uploads/demo/');
+  const playableUrl = isDemoVideo ? '' : rawPlayableUrl;
 
   if (isLoading) {
     return (
@@ -142,23 +157,51 @@ export default function OrderDetailPage() {
             </CardHeader>
             <CardContent>
               {order.packageVideos && order.packageVideos.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {order.packageVideos.map((video: any) => (
-                    <div key={video.id} className="border rounded-lg overflow-hidden">
-                      <div className="aspect-video bg-gray-100 flex items-center justify-center">
-                        {video.thumbnailUrl ? (
-                          <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <Video className="w-12 h-12 text-gray-400" />
-                        )}
-                      </div>
-                      <div className="p-3">
-                        <p className="text-sm text-gray-500">
-                          {formatDateTime(video.createdAt)}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <div className="space-y-3">
+                  {order.packageVideos.map((video: any) => {
+                    const rawUrl =
+                      (video.processedVideoUrl as string | undefined) ||
+                      (video.originalVideoUrl as string | undefined) ||
+                      (video.videoUrl as string | undefined) ||
+                      '';
+                    const fileName = rawUrl ? rawUrl.split('/').pop() : '';
+
+                    return (
+                      <button
+                        key={video.id}
+                        type="button"
+                        onClick={() => {
+                          setActiveVideo(video);
+                          setOpenVideo(true);
+                        }}
+                        className="w-full border rounded-lg px-4 py-3 text-left hover:shadow-md hover:bg-gray-50 transition"
+                        title="Tải video"
+                      >
+                        <div className="flex items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <p className="font-medium text-gray-900">
+                              {video.trackingCode ||
+                                order.trackingCode ||
+                                order.orderCode ||
+                                'Video đóng gói'}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {formatDateTime(video.createdAt)}
+                            </p>
+                            {fileName && (
+                              <p className="text-xs text-gray-400 break-all mt-1">
+                                {fileName}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 text-primary-600">
+                            <Download className="w-4 h-4" />
+                            <span className="text-sm font-medium">Tải về</span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="text-center py-8 text-gray-500">
@@ -274,6 +317,42 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      <Modal
+        open={openVideo}
+        onClose={() => {
+          setOpenVideo(false);
+          setActiveVideo(null);
+        }}
+        title={activeVideo?.trackingCode ? `Video - ${activeVideo.trackingCode}` : 'Tải video'}
+        size="xl"
+      >
+        {playableUrl ? (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600 break-all">
+              Đường dẫn file: <span className="font-mono">{playableUrl}</span>
+            </p>
+            <a
+              href={playableUrl}
+              download
+              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Tải video (.mp4)
+            </a>
+            <p className="text-xs text-gray-400">
+              Nếu trình duyệt không tự tải, hãy chuột phải vào đường dẫn và chọn &quot;Save
+              link as...&quot;.
+            </p>
+          </div>
+        ) : (
+          <div className="text-sm text-gray-600">
+            {isDemoVideo
+              ? 'Đây là dữ liệu demo, hệ thống không có file video thật để phát. Vui lòng upload video mới cho đơn hàng này nếu bạn muốn xem lại.'
+              : 'Video này chưa có đường dẫn phát (thiếu `originalVideoUrl/processedVideoUrl`).'}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 }

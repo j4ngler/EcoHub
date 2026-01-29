@@ -11,7 +11,8 @@ import {
   PlusCircle,
   Warehouse,
   UserCircle,
-  Settings
+  Settings,
+  Store
 } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 
@@ -27,7 +28,9 @@ const navigation = [
   { name: 'Kho hàng', href: '/inventory', icon: Warehouse },
   { name: 'Video đóng gói', href: '/videos', icon: Video },
   { name: 'Tạo video', href: '/videos/create', icon: PlusCircle },
+  { name: 'Video hoàn hàng', href: '/videos/receiving', icon: Video, roles: ['super_admin', 'admin', 'staff'] },
   { name: 'Người dùng', href: '/users', icon: Users, roles: ['super_admin', 'admin'] },
+  { name: 'Shop', href: '/shops', icon: Store, roles: ['super_admin'] },
   { name: 'Cài đặt', href: '/settings', icon: Settings, roles: ['super_admin', 'admin'] },
   { name: 'Báo cáo', href: '/reports', icon: BarChart3, roles: ['super_admin', 'admin'] },
 ];

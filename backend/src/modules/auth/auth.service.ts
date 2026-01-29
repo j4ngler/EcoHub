@@ -14,6 +14,8 @@ interface TokenPayload {
   userId: string;
   email: string;
   roles: RoleName[];
+  shopId?: string | null;
+  impersonating?: boolean;
 }
 
 const generateTokens = (payload: TokenPayload) => {
@@ -31,6 +33,16 @@ const generateTokens = (payload: TokenPayload) => {
 
   return { accessToken, refreshToken };
 };
+
+const sanitizeUserForAuth = (user: { id: string; username: string; email: string; fullName: string; phone?: string | null; avatarUrl?: string | null }, roles: RoleName[]) => ({
+  id: user.id,
+  username: user.username,
+  email: user.email,
+  fullName: user.fullName,
+  phone: user.phone || undefined,
+  avatarUrl: user.avatarUrl || undefined,
+  roles,
+});
 
 export const register = async (data: RegisterDto) => {
   // Check if email exists
@@ -102,7 +114,7 @@ export const login = async (email: string, password: string) => {
     where: { email },
     include: {
       userRoles: {
-        include: { role: true },
+        include: { role: true, shop: true },
       },
     },
   });
@@ -129,22 +141,93 @@ export const login = async (email: string, password: string) => {
 
   // Generate tokens
   const roles = user.userRoles.map(ur => ur.role.name);
+
+  // Nếu KHÔNG phải super_admin và user có gắn với 1 shop cụ thể
+  // => mặc định coi như đang làm việc trong shop đó
+  const isSuperAdmin = roles.includes(RoleName.super_admin);
+  const defaultShop = isSuperAdmin
+    ? null
+    : user.userRoles.find(ur => ur.shop)?.shop || null;
+
   const tokens = generateTokens({
     userId: user.id,
     email: user.email,
     roles,
+    shopId: defaultShop?.id ?? null,
+    impersonating: false,
   });
 
   return {
     user: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      avatarUrl: user.avatarUrl,
-      roles,
+      ...sanitizeUserForAuth(user, roles),
+      activeShop: defaultShop
+        ? { id: defaultShop.id, name: defaultShop.name, code: defaultShop.code }
+        : null,
     },
+    ...tokens,
+  };
+};
+
+export const assumeShop = async (userId: string, shopId: string | null) => {
+  // Load user + roles (có shop scope)
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    include: {
+      userRoles: {
+        include: { role: true, shop: true },
+      },
+    },
+  });
+
+  if (!user || user.status !== 'active') {
+    throw unauthorized('Tài khoản không tồn tại hoặc đã bị vô hiệu hóa');
+  }
+
+  // Thoát chế độ quản lý shop => token "bình thường" (giữ super_admin nếu có)
+  if (!shopId) {
+    const roles = user.userRoles.map(ur => ur.role.name);
+    const tokens = generateTokens({ userId: user.id, email: user.email, roles, shopId: null, impersonating: false });
+    return {
+      user: { ...sanitizeUserForAuth(user, roles), activeShop: null },
+      activeShop: null,
+      ...tokens,
+    };
+  }
+
+  const targetShop = await prisma.shop.findUnique({
+    where: { id: shopId },
+    select: { id: true, name: true, code: true },
+  });
+  if (!targetShop) throw notFound('Không tìm thấy shop');
+
+  const isSuperAdmin = user.userRoles.some(ur => ur.role.name === RoleName.super_admin);
+
+  // Role trong shop mà user có (hoặc super_admin thì cho phép vào như admin)
+  const shopScopedRoles = user.userRoles.filter(ur => ur.shopId === shopId).map(ur => ur.role.name);
+  const allowed = isSuperAdmin || shopScopedRoles.length > 0;
+  if (!allowed) throw unauthorized('Bạn không có quyền quản lý shop này');
+
+  // Nếu là super_admin và không có role shop => impersonate như admin để dùng đúng permission scope
+  let effectiveRoles: RoleName[] =
+    shopScopedRoles.length > 0 ? shopScopedRoles : [RoleName.admin];
+
+  // Giữ lại super_admin trong token để UI vẫn biết đây là super admin,
+  // nhưng authorizePermission sẽ KHÔNG auto-bypass khi impersonating = true.
+  if (isSuperAdmin && !effectiveRoles.includes(RoleName.super_admin)) {
+    effectiveRoles = [RoleName.super_admin, ...effectiveRoles];
+  }
+
+  const tokens = generateTokens({
+    userId: user.id,
+    email: user.email,
+    roles: effectiveRoles,
+    shopId,
+    impersonating: true,
+  });
+
+  return {
+    user: { ...sanitizeUserForAuth(user, effectiveRoles), activeShop: targetShop },
+    activeShop: targetShop,
     ...tokens,
   };
 };
@@ -167,12 +250,14 @@ export const refreshToken = async (refreshToken: string) => {
       throw unauthorized('Tài khoản không tồn tại hoặc đã bị vô hiệu hóa');
     }
 
-    // Generate new tokens
+    // Generate new tokens - giữ nguyên shopId/impersonating từ token cũ
     const roles = user.userRoles.map(ur => ur.role.name);
     const tokens = generateTokens({
       userId: user.id,
       email: user.email,
       roles,
+      shopId: decoded.shopId ?? null,
+      impersonating: decoded.impersonating ?? false,
     });
 
     return tokens;

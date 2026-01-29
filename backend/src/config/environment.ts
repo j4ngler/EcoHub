@@ -20,6 +20,18 @@ const envSchema = z.object({
   AWS_SECRET_ACCESS_KEY: z.string().optional(),
   AWS_REGION: z.string().default('ap-southeast-1'),
   AWS_S3_BUCKET: z.string().optional(),
+  
+  // Email Configuration
+  MAIL_MAILER: z.string().default('smtp'),
+  MAIL_HOST: z.string().optional(),
+  MAIL_PORT: z.string().default('465'),
+  MAIL_USERNAME: z.string().optional(),
+  MAIL_PASSWORD: z.string().optional(),
+  MAIL_ENCRYPTION: z.string().optional(),
+  MAIL_FROM_ADDRESS: z.string().optional(),
+  MAIL_FROM_NAME: z.string().default('EcoHub'),
+  MAIL_REPLY_ADDRESS: z.string().optional(),
+  MAIL_REPLY_NAME: z.string().default('EcoHub'),
 });
 
 export type Env = z.infer<typeof envSchema>;

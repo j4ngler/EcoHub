@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   ShoppingCart,
@@ -8,47 +7,45 @@ import {
   TrendingUp,
   Clock,
   ChevronRight,
+  AlertTriangle,
+  HardDrive,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { reportsApi } from '@/api/reports.api';
-import { videosApi } from '@/api/videos.api';
 import { useAuthStore } from '@/store/authStore';
 import StatCard from '@/components/dashboard/StatCard';
-import VideoCard from '@/components/dashboard/VideoCard';
-import ActivityCard from '@/components/dashboard/ActivityCard';
 import Badge, { ORDER_STATUS_BADGES } from '@/components/ui/Badge';
-import { formatCurrency, formatRelativeTime } from '@/utils/format';
+import { formatCurrency } from '@/utils/format';
 
 const PIE_COLORS = ['#10b981', '#3b82f6', '#8b5cf6', '#f59e0b', '#ef4444'];
 
 export default function DashboardPage() {
-  const { user } = useAuthStore();
+  const { user, hasRole } = useAuthStore();
+  const isAdminLike = hasRole('admin') || hasRole('super_admin');
+  const activeShop = user?.activeShop;
+  const greetingName = activeShop?.name || user?.fullName || 'bạn';
 
   const { data: dashboard, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => reportsApi.getDashboard(),
   });
 
-  const { data: videosData } = useQuery({
-    queryKey: ['videos-recent'],
-    queryFn: () => videosApi.getVideos({ page: 1, limit: 5 }),
-  });
-
-  const recentVideos = videosData?.data ?? [];
   const summary = dashboard?.summary;
   const recentOrders = dashboard?.recentOrders ?? [];
   const ordersByStatus = dashboard?.ordersByStatus ?? [];
+  const storageSummary = dashboard?.summary?.storage;
+  const ordersWithoutVideo = (summary?.orders?.total ?? 0) - (summary?.videos?.total ?? 0);
+  const formatVideoStorage = (usedBytes: number, totalBytes: number) => {
+    const GB = 1024 ** 3;
+    const MB = 1024 ** 2;
 
-  const activities = [
-    ...recentOrders.slice(0, 3).map((o) => ({
-      type: 'order' as const,
-      message: `Đơn hàng ${o.orderCode} — ${o.customerName}`,
-      time: formatRelativeTime(o.createdAt),
-      user: 'Hệ thống',
-    })),
-    { type: 'approve' as const, message: 'Video đã được duyệt', time: '1 giờ trước', user: 'Admin' },
-    { type: 'upload' as const, message: 'Video mới đã tải lên', time: '2 giờ trước', user: 'Staff' },
-  ].slice(0, 5);
+    // Nếu dung lượng nhỏ, hiển thị MB để tránh nhìn thành 0.0 GB
+    if (usedBytes < GB) {
+      return `${(usedBytes / MB).toFixed(1)} MB / ${(totalBytes / GB).toFixed(1)} GB`;
+    }
+
+    return `${(usedBytes / GB).toFixed(2)} / ${(totalBytes / GB).toFixed(1)} GB`;
+  };
 
   const pieData = ordersByStatus.map((item: { status: string; count: number }, i: number) => ({
     name: ORDER_STATUS_BADGES[item.status]?.label || item.status,
@@ -70,19 +67,59 @@ export default function DashboardPage() {
       <div className="bg-gradient-to-r from-emerald-500 to-teal-600 rounded-xl p-6 text-white">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-bold mb-2">Chào {user?.fullName || 'bạn'}!</h2>
+            <h2 className="text-2xl font-bold mb-2">
+              Chào {greetingName}!
+            </h2>
             <p className="text-emerald-100 max-w-2xl">
-              Tổng quan hoạt động đóng gói và video. Theo dõi đơn hàng, video đã xử lý và doanh thu.
+              {activeShop
+                ? `Tổng quan hoạt động đóng gói và video của shop ${activeShop.name}.`
+                : 'Tổng quan hoạt động đóng gói và video trong hệ thống.'}
             </p>
           </div>
-          <div className="mt-4 md:mt-0 flex-shrink-0">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
-              <div className="text-2xl font-bold">{formatCurrency(summary?.revenue?.total || 0)}</div>
-              <div className="text-emerald-100 text-sm">Doanh thu</div>
+          {isAdminLike && (
+            <div className="mt-4 md:mt-0 flex-shrink-0">
+              <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 text-center">
+                <div className="text-2xl font-bold">{formatCurrency(summary?.revenue?.total || 0)}</div>
+                <div className="text-emerald-100 text-sm">Doanh thu</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Alerts */}
+      {(storageSummary?.status === 'warning' || storageSummary?.status === 'critical' || ordersWithoutVideo > 0) && (
+        <div className="bg-white rounded-xl shadow-sm p-4 border-l-4 border-amber-500">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5" />
+            <div className="flex-1">
+              <h3 className="font-medium text-gray-900 mb-2">Cảnh báo hệ thống</h3>
+              <div className="space-y-1 text-sm text-gray-600">
+                {storageSummary?.status === 'critical' && (
+                  <p>
+                    ⚠️ <strong>Dung lượng video sắp đầy:</strong> Đã dùng {storageSummary.usedPercent.toFixed(1)}% (
+                    {(storageSummary.usedBytes / (1024 ** 3)).toFixed(1)} /{' '}
+                    {(storageSummary.totalBytes / (1024 ** 3)).toFixed(1)} GB). Vui lòng xóa video cũ hoặc mở rộng
+                    dung lượng.
+                  </p>
+                )}
+                {storageSummary?.status === 'warning' && (
+                  <p>
+                    ⚠️ <strong>Dung lượng video:</strong> Đã dùng {storageSummary.usedPercent.toFixed(1)}% - Cần theo
+                    dõi.
+                  </p>
+                )}
+                {ordersWithoutVideo > 0 && (
+                  <p>
+                    ⚠️ <strong>Đơn hàng chưa có video:</strong> Có {ordersWithoutVideo} đơn hàng chưa được quay video
+                    đóng gói.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Stats grid - StatCard */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
@@ -107,19 +144,25 @@ export default function DashboardPage() {
           color="blue"
           trend=""
         />
+        {isAdminLike && (
+          <StatCard
+            title="Doanh thu"
+            value={formatCurrency(summary?.revenue?.total ?? 0)}
+            icon={DollarSign}
+            color="purple"
+            trend=""
+          />
+        )}
         <StatCard
-          title="Doanh thu"
-          value={formatCurrency(summary?.revenue?.total ?? 0)}
-          icon={DollarSign}
-          color="purple"
-          trend=""
-        />
-        <StatCard
-          title="Sản phẩm"
-          value={summary?.products?.total ?? 0}
-          icon={Package}
-          color="indigo"
-          trend=""
+          title="Dung lượng video"
+          value={
+            storageSummary
+              ? formatVideoStorage(storageSummary.usedBytes, storageSummary.totalBytes)
+              : '0 / 0 GB'
+          }
+          icon={HardDrive}
+          color={storageSummary?.status === 'critical' ? 'rose' : storageSummary?.status === 'warning' ? 'amber' : 'indigo'}
+          trend={`${storageSummary?.usedPercent.toFixed(1) || 0}%`}
         />
         <StatCard
           title="Sắp hết hàng"
@@ -194,49 +237,6 @@ export default function DashboardPage() {
                 );
               })
             )}
-          </div>
-        </div>
-      </div>
-
-      {/* Recent videos & Activities - EcoVision style */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-gray-800">Video gần đây</h3>
-            <Link
-              to="/videos"
-              className="text-emerald-600 hover:text-emerald-700 font-medium text-sm flex items-center gap-1"
-            >
-              Xem tất cả
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="space-y-4">
-            {recentVideos.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">Chưa có video nào</p>
-            ) : (
-              recentVideos.map((video) => (
-                <VideoCard key={video.id} video={video} showActions={false} />
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="bg-white rounded-xl shadow-sm p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h3 className="text-lg font-bold text-gray-800">Hoạt động gần đây</h3>
-            <Link
-              to="/orders"
-              className="text-emerald-600 hover:text-emerald-700 font-medium text-sm flex items-center gap-1"
-            >
-              Xem tất cả
-              <ChevronRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <div className="space-y-1">
-            {activities.map((activity, i) => (
-              <ActivityCard key={i} activity={activity} />
-            ))}
           </div>
         </div>
       </div>

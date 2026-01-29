@@ -13,6 +13,7 @@ export const getVideos = async (req: AuthRequest, res: Response, next: NextFunct
       status: req.query.status as string,
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
+      showDeleted: req.query.showDeleted === 'true' || req.query.showDeleted === true,
     }, req.user);
     
     paginated(res, result.videos, result.total, result.page, result.limit);

@@ -1,8 +1,9 @@
 import bcrypt from 'bcryptjs';
 import prisma from '../../config/database';
-import { notFound, conflict, badRequest } from '../../middlewares/error.middleware';
+import { notFound, conflict, badRequest, forbidden } from '../../middlewares/error.middleware';
 import { getPagination } from '../../utils/helpers';
 import { CreateUserDto, UpdateUserDto } from './users.dto';
+import { RoleName } from '@prisma/client';
 
 interface GetUsersParams {
   page: number;
@@ -12,7 +13,15 @@ interface GetUsersParams {
   status?: string;
 }
 
-export const getUsers = async (params: GetUsersParams) => {
+type CurrentUser = {
+  userId: string;
+  roles: RoleName[];
+  shopId?: string | null;
+};
+
+const SHOP_VISIBLE_ROLES: RoleName[] = [RoleName.admin, RoleName.staff, RoleName.customer];
+
+export const getUsers = async (params: GetUsersParams, currentUser?: CurrentUser) => {
   const { page, limit, skip } = getPagination(params.page, params.limit);
 
   const where: any = {};
@@ -29,12 +38,29 @@ export const getUsers = async (params: GetUsersParams) => {
     where.status = params.status;
   }
 
-  if (params.role) {
+  const activeShopId = currentUser?.shopId ?? null;
+  if (activeShopId) {
+    // Khi đang quản lý shop: chỉ thấy người thuộc shop đó và các role liên quan shop
     where.userRoles = {
       some: {
-        role: { name: params.role },
+        shopId: activeShopId,
+        role: { name: { in: SHOP_VISIBLE_ROLES } },
       },
     };
+  }
+
+  if (params.role) {
+    // Nếu đang ở shop, không cho lọc ra super_admin hoặc role ngoài shop
+    if (activeShopId && !SHOP_VISIBLE_ROLES.includes(params.role as RoleName)) {
+      where.id = '__no_match__';
+    } else {
+      where.userRoles = {
+        some: {
+          ...(activeShopId ? { shopId: activeShopId } : {}),
+          role: { name: params.role },
+        },
+      };
+    }
   }
 
   const [users, total] = await Promise.all([
@@ -79,7 +105,7 @@ export const getUsers = async (params: GetUsersParams) => {
   };
 };
 
-export const getUserById = async (id: string) => {
+export const getUserById = async (id: string, currentUser?: CurrentUser) => {
   const user = await prisma.user.findUnique({
     where: { id },
     include: {
@@ -100,6 +126,16 @@ export const getUserById = async (id: string) => {
 
   if (!user) {
     throw notFound('Không tìm thấy người dùng');
+  }
+
+  const activeShopId = currentUser?.shopId ?? null;
+  if (activeShopId) {
+    const belongsToShop = user.userRoles.some(
+      (ur) => ur.shopId === activeShopId && SHOP_VISIBLE_ROLES.includes(ur.role.name)
+    );
+    if (!belongsToShop) {
+      throw forbidden('Bạn chỉ được xem người dùng thuộc shop đang quản lý');
+    }
   }
 
   const permissions = new Set<string>();
@@ -131,7 +167,19 @@ export const getUserById = async (id: string) => {
   };
 };
 
-export const createUser = async (data: CreateUserDto, createdBy: string) => {
+export const createUser = async (data: CreateUserDto, createdBy: string, currentUser?: CurrentUser) => {
+  // Validate shop sớm (tránh tạo user rồi mới fail)
+  const activeShopId = currentUser?.shopId ?? null;
+  if (activeShopId) {
+    if (data.shopId && data.shopId !== activeShopId) {
+      throw badRequest('Không được tạo người dùng cho shop khác khi đang quản lý shop hiện tại');
+    }
+    data.shopId = activeShopId;
+  }
+  if (!data.shopId) {
+    throw badRequest('Vui lòng chọn shop');
+  }
+
   // Check email
   const existingEmail = await prisma.user.findUnique({
     where: { email: data.email },
@@ -164,6 +212,20 @@ export const createUser = async (data: CreateUserDto, createdBy: string) => {
   });
 
   // Assign role if provided
+  if (activeShopId) {
+    // Trong chế độ quản lý shop: bắt buộc gán vai trò và chỉ được tạo user thuộc đúng shop đang quản lý,
+    // và CHỈ tạo được nhân viên (staff)
+    if (!data.roleId) {
+      throw badRequest('Khi đang quản lý shop, vui lòng chọn vai trò cho người dùng');
+    }
+
+    const role = await prisma.role.findUnique({ where: { id: data.roleId } });
+    if (!role) throw notFound('Không tìm thấy vai trò');
+    if (role.name !== RoleName.staff) {
+      throw badRequest('Trong shop chỉ được tạo tài khoản Nhân viên');
+    }
+  }
+
   if (data.roleId) {
     await prisma.userRole.create({
       data: {
@@ -175,13 +237,23 @@ export const createUser = async (data: CreateUserDto, createdBy: string) => {
     });
   }
 
-  return getUserById(user.id);
+  return getUserById(user.id, currentUser);
 };
 
-export const updateUser = async (id: string, data: UpdateUserDto) => {
+export const updateUser = async (id: string, data: UpdateUserDto, currentUser?: CurrentUser) => {
   const user = await prisma.user.findUnique({ where: { id } });
   if (!user) {
     throw notFound('Không tìm thấy người dùng');
+  }
+
+  const activeShopId = currentUser?.shopId ?? null;
+  if (activeShopId) {
+    const userRoles = await prisma.userRole.findMany({
+      where: { userId: id, shopId: activeShopId },
+      include: { role: true },
+    });
+    const ok = userRoles.some((ur) => SHOP_VISIBLE_ROLES.includes(ur.role.name));
+    if (!ok) throw forbidden('Bạn chỉ được cập nhật người dùng thuộc shop đang quản lý');
   }
 
   // Check email if changed
@@ -210,7 +282,7 @@ export const updateUser = async (id: string, data: UpdateUserDto) => {
     data: updateData,
   });
 
-  return getUserById(id);
+  return getUserById(id, currentUser);
 };
 
 export const deleteUser = async (id: string) => {
@@ -227,6 +299,7 @@ export const assignRole = async (
   roleId: string,
   shopId: string | null,
   assignedBy: string
+, currentUser?: CurrentUser
 ) => {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) {
@@ -236,6 +309,15 @@ export const assignRole = async (
   const role = await prisma.role.findUnique({ where: { id: roleId } });
   if (!role) {
     throw notFound('Không tìm thấy vai trò');
+  }
+
+  const activeShopId = currentUser?.shopId ?? null;
+  if (activeShopId) {
+    // chỉ gán role trong đúng shop đang quản lý
+    shopId = activeShopId;
+    if (!SHOP_VISIBLE_ROLES.includes(role.name)) {
+      throw badRequest('Không được gán vai trò này trong phạm vi shop');
+    }
   }
 
   // Check if already has this role
@@ -255,7 +337,7 @@ export const assignRole = async (
     },
   });
 
-  return getUserById(userId);
+  return getUserById(userId, currentUser);
 };
 
 export const removeRole = async (userId: string, roleId: string) => {

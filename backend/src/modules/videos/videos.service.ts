@@ -11,17 +11,24 @@ interface GetVideosParams {
   status?: string;
   startDate?: string;
   endDate?: string;
+  showDeleted?: boolean;
 }
 
 type CurrentUser = {
   userId: string;
   roles: RoleName[];
+  shopId?: string | null;
 };
 
 export const getVideos = async (params: GetVideosParams, currentUser?: CurrentUser) => {
   const { page, limit, skip } = getPagination(params.page, params.limit);
 
   const where: any = {};
+  
+  // Nếu không yêu cầu hiển thị video đã xóa, chỉ lấy video chưa bị xóa
+  if (!params.showDeleted) {
+    where.deletedAt = null;
+  }
 
   if (params.search) {
     where.OR = [
@@ -44,6 +51,24 @@ export const getVideos = async (params: GetVideosParams, currentUser?: CurrentUs
       ...(where.order || {}),
       customerId: currentUser.userId,
     };
+  }
+
+  // Nếu đang quản lý một shop cụ thể (impersonate / admin shop) thì chỉ xem video của shop đó
+  if (currentUser?.shopId) {
+    where.order = {
+      ...(where.order || {}),
+      shopId: currentUser.shopId,
+    };
+  }
+
+  // Nếu là nhân viên (staff) nhưng KHÔNG phải admin/super_admin
+  // => chỉ xem được những video do chính mình quay (recordedBy)
+  const isAdminLike =
+    currentUser?.roles.includes(RoleName.admin) ||
+    currentUser?.roles.includes(RoleName.super_admin);
+
+  if (!isAdminLike && currentUser?.roles.includes(RoleName.staff)) {
+    where.recordedBy = currentUser.userId;
   }
 
   const dateFilter = parseDateRange(params.startDate, params.endDate);
@@ -101,6 +126,14 @@ export const getVideoById = async (id: string, currentUser?: CurrentUser) => {
     throw notFound('Không tìm thấy video');
   }
 
+  // Nếu đang ở ngữ cảnh shop thì chỉ xem video của đơn thuộc shop đó
+  if (currentUser?.shopId) {
+    const order = await prisma.order.findUnique({ where: { id: video.orderId } });
+    if (order && order.shopId !== currentUser.shopId) {
+      throw forbidden('Bạn không được phép xem video của shop khác');
+    }
+  }
+
   if (
     currentUser?.roles.includes(RoleName.customer) &&
     video.order &&
@@ -110,6 +143,17 @@ export const getVideoById = async (id: string, currentUser?: CurrentUser) => {
     (video.order as any).customerId !== currentUser.userId
   ) {
     throw forbidden('Bạn không được phép xem video của đơn hàng này');
+  }
+
+  // Nhân viên đóng gói chỉ được xem video do chính mình quay
+  const isAdminLike =
+    currentUser?.roles.includes(RoleName.admin) ||
+    currentUser?.roles.includes(RoleName.super_admin);
+
+  if (!isAdminLike && currentUser?.roles.includes(RoleName.staff)) {
+    if (video.recordedBy !== currentUser.userId) {
+      throw forbidden('Bạn chỉ được phép xem video do mình quay');
+    }
   }
 
   return video;
@@ -137,8 +181,19 @@ export const getVideoByTrackingCode = async (trackingCode: string) => {
 };
 
 export const getVideosByOrder = async (orderId: string, currentUser?: CurrentUser) => {
+  const isAdminLike =
+    currentUser?.roles.includes(RoleName.admin) ||
+    currentUser?.roles.includes(RoleName.super_admin);
+
+  const where: any = { orderId };
+
+  // Nhân viên chỉ xem được video do mình quay trong đơn đó
+  if (!isAdminLike && currentUser?.roles.includes(RoleName.staff)) {
+    where.recordedBy = currentUser.userId;
+  }
+
   const videos = await prisma.packageVideo.findMany({
-    where: { orderId },
+    where,
     include: {
       recorder: { select: { id: true, fullName: true } },
       approver: { select: { id: true, fullName: true } },
@@ -146,10 +201,17 @@ export const getVideosByOrder = async (orderId: string, currentUser?: CurrentUse
     orderBy: { createdAt: 'desc' },
   });
 
-  if (currentUser?.roles.includes(RoleName.customer) && videos.length > 0) {
+  if (videos.length > 0) {
     const order = await prisma.order.findUnique({ where: { id: orderId } });
-    if (order?.customerId && order.customerId !== currentUser.userId) {
+
+    // Nếu là customer: chỉ xem video của đơn hàng của chính mình
+    if (currentUser?.roles.includes(RoleName.customer) && order?.customerId && order.customerId !== currentUser.userId) {
       throw forbidden('Bạn không được phép xem video của đơn hàng này');
+    }
+
+    // Nếu đang ở ngữ cảnh shop: chỉ xem video của đơn thuộc shop đó
+    if (currentUser?.shopId && order && order.shopId !== currentUser.shopId) {
+      throw forbidden('Bạn không được phép xem video của shop khác');
     }
   }
 
@@ -176,34 +238,31 @@ export const uploadPackageVideo = async (params: UploadPackageVideoParams) => {
     throw badRequest('Đơn hàng chưa có mã vận đơn');
   }
 
-  // Create video record
+  // Create video record - auto mark as completed & approved
   const video = await prisma.packageVideo.create({
     data: {
       orderId: params.orderId,
       trackingCode,
       originalVideoUrl: `/uploads/${params.file.filename}`,
       originalVideoSize: params.file.size,
-      processingStatus: 'uploaded',
+      // Video được xử lý xong ngay (demo) và coi như đã phê duyệt
+      processingStatus: 'completed',
+      processedVideoUrl: `/uploads/${params.file.filename}`,
       trackingCodePosition: (params.trackingCodePosition as any) || 'bottom_right',
       recordedBy: params.recordedBy,
+      approvedBy: params.recordedBy,
+      approvedAt: new Date(),
     },
   });
 
-  // TODO: Queue video processing job to add tracking code overlay
-  // For now, we'll just set processed URL same as original
-  await prisma.packageVideo.update({
-    where: { id: video.id },
-    data: {
-      processedVideoUrl: video.originalVideoUrl,
-      processingStatus: 'completed',
-    },
-  });
-
-  // Update order status if it's confirmed
-  if (order.status === 'confirmed') {
+  // Update order status to packed + packedAt khi đã có video
+  if (order.status === 'confirmed' || order.status === 'packing') {
     await prisma.order.update({
       where: { id: params.orderId },
-      data: { status: 'packing' },
+      data: {
+        status: 'packed',
+        packedAt: new Date(),
+      },
     });
   }
 
@@ -249,9 +308,13 @@ export const deleteVideo = async (id: string) => {
     throw notFound('Không tìm thấy video');
   }
 
-  // TODO: Delete file from storage
-
-  await prisma.packageVideo.delete({ where: { id } });
+  // Soft delete - chỉ đánh dấu đã xóa, không xóa thật
+  await prisma.packageVideo.update({
+    where: { id },
+    data: {
+      deletedAt: new Date(),
+    },
+  });
 };
 
 interface UploadReceivingVideoParams {

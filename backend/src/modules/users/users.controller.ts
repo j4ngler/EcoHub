@@ -12,7 +12,7 @@ export const getUsers = async (req: AuthRequest, res: Response, next: NextFuncti
       search: search as string,
       role: role as string,
       status: status as string,
-    });
+    }, req.user);
     
     paginated(res, result.users, result.total, result.page, result.limit);
   } catch (error) {
@@ -22,7 +22,7 @@ export const getUsers = async (req: AuthRequest, res: Response, next: NextFuncti
 
 export const getUserById = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const user = await userService.getUserById(req.params.id);
+    const user = await userService.getUserById(req.params.id, req.user);
     success(res, user);
   } catch (error) {
     next(error);
@@ -31,7 +31,7 @@ export const getUserById = async (req: AuthRequest, res: Response, next: NextFun
 
 export const createUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const user = await userService.createUser(req.body, req.user!.userId);
+    const user = await userService.createUser(req.body, req.user!.userId, req.user);
     created(res, user, 'Tạo người dùng thành công');
   } catch (error) {
     next(error);
@@ -40,7 +40,7 @@ export const createUser = async (req: AuthRequest, res: Response, next: NextFunc
 
 export const updateUser = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const user = await userService.updateUser(req.params.id, req.body);
+    const user = await userService.updateUser(req.params.id, req.body, req.user);
     success(res, user, 'Cập nhật người dùng thành công');
   } catch (error) {
     next(error);
@@ -59,7 +59,7 @@ export const deleteUser = async (req: AuthRequest, res: Response, next: NextFunc
 export const assignRole = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { roleId, shopId } = req.body;
-    const result = await userService.assignRole(req.params.id, roleId, shopId, req.user!.userId);
+    const result = await userService.assignRole(req.params.id, roleId, shopId, req.user!.userId, req.user);
     success(res, result, 'Gán vai trò thành công');
   } catch (error) {
     next(error);

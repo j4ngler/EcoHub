@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Video, Search, Upload, Filter, Clock } from 'lucide-react';
+import { Video, Search, Upload, Filter, Eye, Trash2, HardDrive, Clock } from 'lucide-react';
 import { videosApi, VideoQueryParams } from '@/api/videos.api';
-import VideoCard from '@/components/dashboard/VideoCard';
 import { getErrorMessage } from '@/api/axios';
+import { formatDateTime } from '@/utils/format';
 import toast from 'react-hot-toast';
 
 export default function VideosPage() {
@@ -15,20 +15,12 @@ export default function VideosPage() {
     limit: 12,
     search: '',
     status: '',
+    showDeleted: false,
   });
 
   const { data, isLoading } = useQuery({
     queryKey: ['videos', filters],
     queryFn: () => videosApi.getVideos(filters),
-  });
-
-  const approveMutation = useMutation({
-    mutationFn: (id: string) => videosApi.approveVideo(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['videos'] });
-      toast.success('Đã phê duyệt video');
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
   });
 
   const deleteMutation = useMutation({
@@ -39,11 +31,6 @@ export default function VideosPage() {
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
-
-  const handleApprove = (id: string) => {
-    if (window.confirm('Phê duyệt video này?')) approveMutation.mutate(id);
-  };
-
   const handleDelete = (id: string) => {
     if (window.confirm('Bạn có chắc muốn xóa video này?')) deleteMutation.mutate(id);
   };
@@ -55,6 +42,7 @@ export default function VideosPage() {
     { value: 'completed', label: 'Hoàn thành' },
     { value: 'failed', label: 'Thất bại' },
   ];
+
 
   const videos = data?.data ?? [];
   const meta = data?.meta;
@@ -104,16 +92,25 @@ export default function VideosPage() {
                 ))}
               </select>
             </div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filters.showDeleted || false}
+                onChange={(e) => {
+                  setFilters({ ...filters, showDeleted: e.target.checked, page: 1 });
+                }}
+                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+              />
+              <span className="text-sm text-gray-700">Hiển thị video đã xóa</span>
+            </label>
           </div>
         </div>
       </div>
 
-      {/* Video grid - VideoCard */}
+      {/* Danh sách video dạng bảng giống kho hàng */}
       {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="h-72 bg-gray-200 rounded-xl animate-pulse" />
-          ))}
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-emerald-600" />
         </div>
       ) : videos.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm p-12 text-center">
@@ -137,16 +134,138 @@ export default function VideosPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {videos.map((video) => (
-            <VideoCard
-              key={video.id}
-              video={video}
-              onApprove={handleApprove}
-              onDelete={handleDelete}
-              showActions
-            />
-          ))}
+        <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Video / Đơn hàng
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Mã vận đơn
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Trạng thái xử lý
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Dung lượng
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Thời gian tạo
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Thời gian xóa
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Thao tác
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {videos.map((video) => {
+                const order = video.order;
+                const statusLabelMap: Record<string, string> = {
+                  uploaded: 'Đã upload',
+                  processing: 'Đang xử lý',
+                  completed: 'Hoàn thành',
+                  failed: 'Thất bại',
+                };
+                const statusColorMap: Record<string, string> = {
+                  uploaded: 'bg-yellow-100 text-yellow-800',
+                  processing: 'bg-blue-100 text-blue-800',
+                  completed: 'bg-green-100 text-green-800',
+                  failed: 'bg-red-100 text-red-800',
+                };
+                const statusText = statusLabelMap[video.processingStatus] || video.processingStatus;
+                const statusColor =
+                  statusColorMap[video.processingStatus] || 'bg-gray-100 text-gray-800';
+
+                return (
+                  <tr key={video.id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                          <Video className="h-5 w-5 text-white" />
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {order?.orderCode || video.trackingCode}
+                          </div>
+                          {order?.customerName && (
+                            <div className="text-sm text-gray-500 line-clamp-1">
+                              {order.customerName}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
+                      {video.trackingCode}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span
+                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}
+                      >
+                        {statusText}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {(() => {
+                        const originalSize = Number(video.originalVideoSize || 0);
+                        const processedSize = Number(video.processedVideoSize || 0);
+                        const totalSize = originalSize + processedSize;
+                        if (totalSize === 0) return '-';
+                        const sizeMB = totalSize / (1024 * 1024);
+                        return (
+                          <div className="flex items-center gap-1">
+                            <HardDrive className="h-4 w-4 text-gray-400" />
+                            <span>{sizeMB.toFixed(2)} MB</span>
+                          </div>
+                        );
+                      })()}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDateTime(video.createdAt)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {video.deletedAt ? (
+                        <div className="flex items-center gap-1 text-red-600">
+                          <Clock className="h-4 w-4" />
+                          <span>{formatDateTime(video.deletedAt)}</span>
+                        </div>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex space-x-2">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigate(`/orders/${order?.id || (video as any).orderId || video.id}`)
+                          }
+                          className="text-emerald-600 hover:text-emerald-900"
+                          title="Xem đơn hàng"
+                        >
+                          <Eye className="h-5 w-5" />
+                        </button>
+                        {!video.deletedAt && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(video.id)}
+                            className="text-red-600 hover:text-red-900"
+                            title="Xóa video"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

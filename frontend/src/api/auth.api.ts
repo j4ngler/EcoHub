@@ -22,6 +22,7 @@ export interface AuthResponse {
     phone?: string;
     avatarUrl?: string;
     roles: string[];
+    activeShop?: { id: string; name: string; code: string } | null;
   };
   accessToken: string;
   refreshToken: string;
@@ -59,6 +60,11 @@ export const authApi = {
   
   changePassword: async (data: { currentPassword: string; newPassword: string }) => {
     const response = await api.put('/auth/change-password', data);
+    return response.data.data;
+  },
+
+  assumeShop: async (shopId: string | null): Promise<AuthResponse> => {
+    const response = await api.post('/auth/assume-shop', { shopId });
     return response.data.data;
   },
 };

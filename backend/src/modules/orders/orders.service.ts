@@ -19,6 +19,7 @@ interface GetOrdersParams {
 type CurrentUser = {
   userId: string;
   roles: RoleName[];
+  shopId?: string | null;
 };
 
 export const getOrders = async (params: GetOrdersParams, currentUser?: CurrentUser) => {
@@ -39,7 +40,12 @@ export const getOrders = async (params: GetOrdersParams, currentUser?: CurrentUs
     where.status = params.status;
   }
 
-  if (params.shopId) {
+  // Scope theo shop
+  // Nếu user đang quản lý 1 shop (impersonate) => luôn lọc theo shop đó
+  // Nếu không, cho phép filter theo shopId query (super admin xem nhiều shop)
+  if (currentUser?.shopId) {
+    where.shopId = currentUser.shopId;
+  } else if (params.shopId) {
     where.shopId = params.shopId;
   }
 
@@ -126,6 +132,11 @@ export const getOrderById = async (id: string, currentUser?: CurrentUser) => {
     throw notFound('Không tìm thấy đơn hàng');
   }
 
+  // Nếu user đang ở trong ngữ cảnh 1 shop thì chỉ xem được đơn của shop đó
+  if (currentUser?.shopId && order.shopId !== currentUser.shopId) {
+    throw forbidden('Bạn không được phép xem đơn hàng của shop khác');
+  }
+
   if (currentUser?.roles.includes(RoleName.customer) && order.customerId && order.customerId !== currentUser.userId) {
     throw forbidden('Bạn không được phép xem đơn hàng này');
   }
@@ -179,7 +190,7 @@ export const getOrderByTrackingCode = async (trackingCode: string) => {
   };
 };
 
-export const createOrder = async (data: CreateOrderDto, createdBy: string) => {
+export const createOrder = async (data: CreateOrderDto, createdBy: string, currentUser?: CurrentUser) => {
   // Calculate totals
   let subtotal = 0;
   const items = data.items.map(item => {
@@ -193,10 +204,23 @@ export const createOrder = async (data: CreateOrderDto, createdBy: string) => {
 
   const totalAmount = subtotal - (data.discountAmount || 0) + (data.shippingFee || 0);
 
+  // Xác định shopId hiệu lực
+  const activeShopId = currentUser?.shopId ?? null;
+  const effectiveShopId = activeShopId || data.shopId;
+
+  if (!effectiveShopId) {
+    throw badRequest('Đơn hàng phải thuộc một shop hợp lệ');
+  }
+
+  // Nếu đang quản lý shop A thì không được tạo đơn cho shop B
+  if (activeShopId && data.shopId && data.shopId !== activeShopId) {
+    throw forbidden('Bạn không được phép tạo đơn hàng cho shop khác');
+  }
+
   // Create order
   const order = await prisma.order.create({
     data: {
-      shopId: data.shopId,
+      shopId: effectiveShopId,
       orderCode: generateOrderCode(),
       channelId: data.channelId,
       channelOrderId: data.channelOrderId,

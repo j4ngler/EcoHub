@@ -21,6 +21,12 @@ router.get('/revenue', authorizePermission('reports.view'), reportController.get
 // Staff performance
 router.get('/staff-performance', authorizePermission('reports.view'), reportController.getStaffPerformance);
 
+// Operational report (daily)
+router.get('/operational', authorizePermission('reports.view'), reportController.getOperationalReport);
+
+// Sync now (Shopee/TikTok demo)
+router.post('/sync-now', authorizePermission('orders.create'), reportController.syncNow);
+
 // Export report
 router.get('/export', authorizePermission('reports.export'), reportController.exportReport);
 

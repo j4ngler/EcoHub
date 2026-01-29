@@ -68,3 +68,12 @@ export const changePassword = async (req: AuthRequest, res: Response, next: Next
     next(error);
   }
 };
+
+export const assumeShop = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await authService.assumeShop(req.user!.userId, req.body?.shopId ?? null);
+    success(res, result, 'Đã chuyển quyền quản lý shop');
+  } catch (error) {
+    next(error);
+  }
+};

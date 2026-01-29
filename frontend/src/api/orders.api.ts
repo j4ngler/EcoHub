@@ -63,7 +63,15 @@ export interface OrderQueryParams {
 
 export const ordersApi = {
   getOrders: async (params: OrderQueryParams): Promise<OrdersResponse> => {
-    const response = await api.get('/orders', { params });
+    // Bỏ các field rỗng/undefined để tránh gửi `status=` gây lỗi Zod ở backend
+    const cleanedParams: Record<string, any> = {};
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        cleanedParams[key] = value;
+      }
+    });
+
+    const response = await api.get('/orders', { params: cleanedParams });
     return response.data;
   },
   

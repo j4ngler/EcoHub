@@ -9,7 +9,8 @@ export const getProducts = async (req: AuthRequest, res: Response, next: NextFun
       page: Number(req.query.page) || 1,
       limit: Number(req.query.limit) || 10,
       search: req.query.search as string,
-      shopId: req.query.shopId as string,
+      // Luôn ưu tiên shopId đang quản lý (impersonate)
+      shopId: (req.user?.shopId as string) || (req.query.shopId as string),
       categoryId: req.query.categoryId as string,
       status: req.query.status as string,
     });
@@ -31,7 +32,13 @@ export const getProductById = async (req: AuthRequest, res: Response, next: Next
 
 export const createProduct = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const product = await productService.createProduct(req.body, req.user!.userId);
+    // Khi đang quản lý shop, luôn gán sản phẩm vào shop đó để tránh tạo nhầm shop khác
+    const payload = {
+      ...req.body,
+      shopId: req.user?.shopId || req.body.shopId,
+    };
+
+    const product = await productService.createProduct(payload, req.user!.userId);
     created(res, product, 'Tạo sản phẩm thành công');
   } catch (error) {
     next(error);

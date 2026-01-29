@@ -25,7 +25,7 @@ export const createUserSchema = z.object({
     phone: z.string().optional(),
     status: z.enum(['active', 'inactive', 'suspended']).optional(),
     roleId: z.string().uuid().optional(),
-    shopId: z.string().uuid().optional(),
+    shopId: z.string().uuid('Vui lòng chọn shop'),
   }),
 });
 

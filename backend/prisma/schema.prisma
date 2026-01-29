@@ -497,6 +497,9 @@ model PackageVideo {
   approvedBy            String?                @map("approved_by")
   approvedAt            DateTime?              @map("approved_at")
   
+  // Soft delete
+  deletedAt             DateTime?              @map("deleted_at")
+  
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
 
@@ -528,6 +531,10 @@ model ReceivingVideo {
   comparisonNotes  String?          @map("comparison_notes")
   
   recordedAt       DateTime?        @map("recorded_at")
+  
+  // Soft delete
+  deletedAt        DateTime?        @map("deleted_at")
+  
   createdAt        DateTime         @default(now()) @map("created_at")
 
   // Relations
@@ -636,4 +643,20 @@ model Notification {
   @@index([userId])
   @@index([isRead])
   @@map("notifications")
+}
+
+// ============================================
+// REPORT SUBSCRIPTIONS
+// ============================================
+
+model ReportSubscription {
+  id          String   @id @default(uuid())
+  email       String
+  reportType  String   @map("report_type") // 'financial', 'operational', 'both'
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([email, reportType])
+  @@map("report_subscriptions")
 }

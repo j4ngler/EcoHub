@@ -5,13 +5,17 @@ export const queryOrdersSchema = z.object({
     page: z.string().optional(),
     limit: z.string().optional(),
     search: z.string().optional(),
-    status: z.enum([
-      'pending', 'confirmed', 'packing', 'packed',
-      'shipping', 'delivered', 'completed', 'cancelled', 'returned'
-    ]).optional(),
-    shopId: z.string().uuid().optional(),
-    channelId: z.string().uuid().optional(),
-    carrierId: z.string().uuid().optional(),
+    // Cho phép FE gửi chuỗi rỗng (vd: `status=`) nhưng sẽ được hiểu là "không lọc"
+    status: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.enum([
+        'pending', 'confirmed', 'packing', 'packed',
+        'shipping', 'delivered', 'completed', 'cancelled', 'returned'
+      ]).optional()
+    ),
+    shopId: z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
+    channelId: z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
+    carrierId: z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
   }),

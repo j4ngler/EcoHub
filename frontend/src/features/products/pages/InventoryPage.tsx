@@ -3,8 +3,12 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Plus, Download, Eye, Edit, Trash2, ArrowDown, ArrowUp, Package } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { productsApi, Product } from '@/api/products.api';
+import { useAuthStore } from '@/store/authStore';
 
 export default function InventoryPage() {
+  const { user, hasRole } = useAuthStore();
+  const isAdminLike = hasRole('admin') || hasRole('super_admin');
+  const activeShopId = user?.activeShop?.id;
   const [activeTab, setActiveTab] = useState<'stock' | 'import' | 'export'>('stock');
   const [searchTerm, setSearchTerm] = useState('');
   const [importForm, setImportForm] = useState({
@@ -97,8 +101,14 @@ export default function InventoryPage() {
       toast.error('Vui lòng điền đầy đủ thông tin bắt buộc');
       return;
     }
+
+    if (!activeShopId) {
+      toast.error('Vui lòng chọn shop đang quản lý trước khi nhập hàng');
+      return;
+    }
     
     createProductMutation.mutate({
+      shopId: activeShopId,
       name: importForm.name,
       sku: importForm.sku || `SKU-${Date.now()}`,
       categoryId: importForm.categoryId || undefined,
@@ -154,14 +164,16 @@ export default function InventoryPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Quản lý hàng hóa</h1>
-        <p className="mt-1 text-gray-500">Quản lý nhập, xuất và tồn kho hàng hóa</p>
+        <p className="mt-1 text-gray-500">
+          {isAdminLike ? 'Quản lý nhập, xuất và tồn kho hàng hóa' : 'Xem tồn kho hàng hóa trong shop'}
+        </p>
       </div>
 
       {/* Tabs */}
       <div className="bg-white rounded-xl shadow-sm">
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8 px-6" aria-label="Tabs">
-            {(['stock', 'import', 'export'] as const).map((tab) => (
+            {(isAdminLike ? (['stock', 'import', 'export'] as const) : (['stock'] as const)).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -195,26 +207,30 @@ export default function InventoryPage() {
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                   />
                 </div>
-                
+
                 <div className="flex space-x-3">
                   <button className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 flex items-center">
                     <Download className="h-4 w-4 mr-2" />
                     Xuất Excel
                   </button>
-                  <button
-                    onClick={() => setActiveTab('import')}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center"
-                  >
-                    <ArrowDown className="h-4 w-4 mr-2" />
-                    Nhập hàng
-                  </button>
-                  <button
-                    onClick={() => setActiveTab('export')}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
-                  >
-                    <ArrowUp className="h-4 w-4 mr-2" />
-                    Xuất hàng
-                  </button>
+                  {isAdminLike && (
+                    <>
+                      <button
+                        onClick={() => setActiveTab('import')}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 flex items-center"
+                      >
+                        <ArrowDown className="h-4 w-4 mr-2" />
+                        Nhập hàng
+                      </button>
+                      <button
+                        onClick={() => setActiveTab('export')}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center"
+                      >
+                        <ArrowUp className="h-4 w-4 mr-2" />
+                        Xuất hàng
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -271,16 +287,20 @@ export default function InventoryPage() {
                               <button className="text-emerald-600 hover:text-emerald-900" title="Xem chi tiết">
                                 <Eye className="h-5 w-5" />
                               </button>
-                              <button className="text-blue-600 hover:text-blue-900" title="Chỉnh sửa">
-                                <Edit className="h-5 w-5" />
-                              </button>
-                              <button 
-                                onClick={() => handleDelete(item.id)}
-                                className="text-red-600 hover:text-red-900" 
-                                title="Xóa"
-                              >
-                                <Trash2 className="h-5 w-5" />
-                              </button>
+                              {isAdminLike && (
+                                <>
+                                  <button className="text-blue-600 hover:text-blue-900" title="Chỉnh sửa">
+                                    <Edit className="h-5 w-5" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDelete(item.id)}
+                                    className="text-red-600 hover:text-red-900"
+                                    title="Xóa"
+                                  >
+                                    <Trash2 className="h-5 w-5" />
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -303,7 +323,7 @@ export default function InventoryPage() {
                       : 'Kho hàng của bạn đang trống. Hãy nhập hàng để bắt đầu!'
                     }
                   </p>
-                  {!searchTerm && (
+                  {!searchTerm && isAdminLike && (
                     <button
                       onClick={() => setActiveTab('import')}
                       className="mt-6 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
@@ -316,7 +336,7 @@ export default function InventoryPage() {
             </>
           )}
 
-          {activeTab === 'import' && (
+          {activeTab === 'import' && isAdminLike && (
             <form onSubmit={handleImport} className="max-w-3xl mx-auto">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Nhập hàng mới</h2>
               
@@ -436,7 +456,7 @@ export default function InventoryPage() {
             </form>
           )}
 
-          {activeTab === 'export' && (
+          {activeTab === 'export' && isAdminLike && (
             <form onSubmit={handleExport} className="max-w-3xl mx-auto">
               <h2 className="text-xl font-bold text-gray-900 mb-6">Xuất hàng</h2>
               

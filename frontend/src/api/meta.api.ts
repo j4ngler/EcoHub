@@ -11,6 +11,9 @@ export interface MetaShop {
   name: string;
   code: string;
   status: string;
+  phone?: string | null;
+  email?: string | null;
+  address?: string | null;
 }
 
 export const metaApi = {

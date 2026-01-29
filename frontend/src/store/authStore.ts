@@ -10,6 +10,7 @@ interface User {
   avatarUrl?: string;
   roles: string[];
   permissions?: string[];
+  activeShop?: { id: string; name: string; code: string } | null;
 }
 
 interface AuthState {
@@ -20,7 +21,7 @@ interface AuthState {
   
   setAuth: (user: User, accessToken: string, refreshToken: string) => void;
   updateUser: (user: Partial<User>) => void;
-  logout: () => void;
+  clearAuth: () => void;
   hasRole: (role: string) => boolean;
   hasPermission: (permission: string) => boolean;
 }
@@ -49,7 +50,7 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       
-      logout: () => {
+      clearAuth: () => {
         set({
           user: null,
           accessToken: null,

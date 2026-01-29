@@ -1,7 +1,15 @@
 import 'dotenv/config';
 import app from './app';
+import { initEmailService } from './services/email.service';
+import { startReportScheduler } from './services/report-scheduler.service';
 
 const PORT = process.env.PORT || 3000;
+
+// Initialize email service
+initEmailService();
+
+// Start report scheduler (sends daily reports at 18:00)
+startReportScheduler();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);

@@ -44,10 +44,28 @@ api.interceptors.response.use(
           });
           
           const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.data;
-          const { user } = useAuthStore.getState();
-          
+
+          // Ensure tokens are persisted even if user is temporarily missing (race/hydration)
+          let { user } = useAuthStore.getState();
+          if (!user) {
+            try {
+              const meRes = await axios.get(`${API_URL}/auth/me`, {
+                headers: { Authorization: `Bearer ${newAccessToken}` },
+              });
+              user = meRes.data.data;
+            } catch {
+              // ignore - we'll still store tokens so subsequent requests can recover
+            }
+          }
+
           if (user) {
             setAuth(user, newAccessToken, newRefreshToken);
+          } else {
+            useAuthStore.setState({
+              accessToken: newAccessToken,
+              refreshToken: newRefreshToken,
+              isAuthenticated: true,
+            });
           }
           
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;

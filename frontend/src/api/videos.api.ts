@@ -5,7 +5,9 @@ export interface PackageVideo {
   orderId: string;
   trackingCode: string;
   originalVideoUrl: string;
+  originalVideoSize?: number | string | bigint;
   processedVideoUrl?: string;
+  processedVideoSize?: number | string | bigint;
   thumbnailUrl?: string;
   processingStatus: string;
   processingError?: string;
@@ -13,6 +15,7 @@ export interface PackageVideo {
   recordedBy: string;
   approvedBy?: string;
   approvedAt?: string;
+  deletedAt?: string;
   createdAt: string;
   order?: {
     id: string;
@@ -42,11 +45,20 @@ export interface VideoQueryParams {
   status?: string;
   startDate?: string;
   endDate?: string;
+  showDeleted?: boolean;
 }
 
 export const videosApi = {
   getVideos: async (params: VideoQueryParams): Promise<VideosResponse> => {
-    const response = await api.get('/videos', { params });
+    // Bỏ các field rỗng/undefined để tránh gửi `status=` gây lỗi Zod ở backend
+    const cleanedParams: Record<string, any> = {};
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        cleanedParams[key] = value;
+      }
+    });
+
+    const response = await api.get('/videos', { params: cleanedParams });
     return response.data;
   },
   

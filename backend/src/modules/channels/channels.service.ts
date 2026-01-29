@@ -119,12 +119,21 @@ export const syncOrders = async (channelId: string, shopId: string, userId: stri
     throw badRequest('Kênh chưa được kết nối');
   }
 
+  // Demo sync cho Shopee và TikTok
+  if (connection.channel.code === 'shopee') {
+    const { syncDemoShopeeOrders } = await import('../../services/demo-channel-sync.service');
+    return syncDemoShopeeOrders(shopId, channelId, userId);
+  } else if (connection.channel.code === 'tiktok') {
+    const { syncDemoTikTokOrders } = await import('../../services/demo-channel-sync.service');
+    return syncDemoTikTokOrders(shopId, channelId, userId);
+  }
+
   // In production, you would:
   // 1. Call the channel's API to fetch orders
   // 2. Map the response to our order format
   // 3. Create/update orders in our database
 
-  // For now, return mock result
+  // For other channels, return mock result
   await prisma.shopChannelConnection.update({
     where: { id: connection.id },
     data: { lastSyncAt: new Date() },
