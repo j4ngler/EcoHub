@@ -90,7 +90,7 @@ export default function ProductsPage() {
     onSuccess: () => {
       toast.success('Cập nhật sản phẩm thành công');
       setShowModal(false);
-      queryClient.invalidateQueries({ key: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['products'] });
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Không thể cập nhật sản phẩm');
@@ -394,13 +394,13 @@ export default function ProductsPage() {
               </Button>
               <Button
                 type="submit"
-                disabled={createMutation.isLoading || updateMutation.isLoading || !activeShopId}
+                disabled={createMutation.isPending || updateMutation.isPending || !activeShopId}
               >
                 {editingProduct
-                  ? updateMutation.isLoading
+                  ? updateMutation.isPending
                     ? 'Đang lưu...'
                     : 'Cập nhật'
-                  : createMutation.isLoading
+                  : createMutation.isPending
                   ? 'Đang tạo...'
                   : 'Tạo sản phẩm'}
               </Button>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Mail, Phone, MoreVertical, Trash2, Pencil } from 'lucide-react';
+import { Plus, Search, Mail, Phone, Trash2, Pencil, UserCog } from 'lucide-react';
 import { toast } from 'react-toastify';
 import { usersApi, UsersUser, UserStatus } from '@/api/users.api';
 import { metaApi } from '@/api/meta.api';
@@ -14,7 +14,8 @@ import { formatDateTime } from '@/utils/format';
 import { useAuthStore } from '@/store/authStore';
 
 export default function UsersPage() {
-  const { user: currentUser } = useAuthStore();
+  const { user: currentUser, hasRole } = useAuthStore();
+  const isSuperAdmin = hasRole('super_admin');
   const activeShop = currentUser?.activeShop || null;
   const isShopContext = (() => {
     try {
@@ -38,6 +39,10 @@ export default function UsersPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [activeUser, setActiveUser] = useState<UsersUser | null>(null);
+  const [transferModal, setTransferModal] = useState<{ userId: string; message: string } | null>(null);
+  const [transferToUserId, setTransferToUserId] = useState('');
+  const [rolesModalUser, setRolesModalUser] = useState<UsersUser | null>(null);
+  const [assignRoleForm, setAssignRoleForm] = useState({ roleId: '', shopId: '' });
 
   const [createForm, setCreateForm] = useState({
     username: '',
@@ -68,8 +73,9 @@ export default function UsersPage() {
     return params;
   }, [filters]);
 
+  // Refetch khi đổi shop (assume shop) để danh sách user theo shop đúng
   const { data, isLoading } = useQuery({
-    queryKey: ['users', usersParams],
+    queryKey: ['users', usersParams, activeShop?.id],
     queryFn: async () => {
       return usersApi.list(usersParams);
     },
@@ -88,8 +94,15 @@ export default function UsersPage() {
   const allowedRoleOptions = useMemo(() => {
     const list = roles || [];
     if (!isShopContext && !activeShop) return list;
-    // Trong chế độ quản lý shop: chỉ cho chọn các role thuộc shop
-    return list.filter((r) => ['admin', 'staff', 'customer'].includes(r.name));
+    // Trong shop: cho phép tạo Nhân viên, Nhân viên CSKH và Khách hàng (không admin/super_admin)
+    const filtered = list.filter((r) => ['staff', 'customer_service', 'customer'].includes(r.name));
+    // Debug: log để kiểm tra
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[UsersPage] All roles:', list.map(r => r.name));
+      console.log('[UsersPage] Filtered roles:', filtered.map(r => r.name));
+      console.log('[UsersPage] Has customer_service:', list.some(r => r.name === 'customer_service'));
+    }
+    return filtered;
   }, [roles, activeShop, isShopContext]);
 
   const createMutation = useMutation({
@@ -146,15 +159,62 @@ export default function UsersPage() {
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => usersApi.remove(id),
+  const deleteMutation = useMutation<void, Error, { id: string; transferShopToUserId?: string }>({
+    mutationFn: (payload) =>
+      usersApi.remove(payload.id, { transferShopToUserId: payload.transferShopToUserId }),
     onSuccess: () => {
       toast.success('Xóa người dùng thành công');
       queryClient.invalidateQueries({ queryKey: ['users'] });
+      setTransferModal(null);
+      setTransferToUserId('');
     },
-    onError: (e: any) => {
-      toast.error(e?.response?.data?.message || 'Xóa người dùng thất bại');
+    onError: (e: any, variables: { id: string }) => {
+      const msg = e?.response?.data?.message || 'Xóa người dùng thất bại';
+      toast.error(msg);
+      if (msg.includes('shop') || msg.includes('Chuyển')) {
+        setTransferModal({ userId: variables.id, message: msg });
+      }
     },
+  });
+
+  const assignRoleMutation = useMutation({
+    mutationFn: () => {
+      if (!rolesModalUser) throw new Error('No user');
+      return usersApi.assignRole(rolesModalUser.id, {
+        roleId: assignRoleForm.roleId,
+        shopId: assignRoleForm.shopId || (activeShop ? activeShop.id : undefined) || undefined,
+      });
+    },
+    onSuccess: () => {
+      toast.success('Gán vai trò thành công');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setAssignRoleForm({ roleId: '', shopId: '' });
+      if (rolesModalUser) {
+        setRolesModalUser((prev) => {
+          if (!prev) return null;
+          const newRoles = [...prev.roles];
+          const role = roles?.find((r) => r.id === assignRoleForm.roleId);
+          const shop = shops?.find((s) => s.id === (assignRoleForm.shopId || activeShop?.id));
+          if (role) newRoles.push({ id: role.id, name: role.name, shop: shop ? { id: shop.id, name: shop.name } : null });
+          return { ...prev, roles: newRoles };
+        });
+      }
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Gán vai trò thất bại'),
+  });
+
+  const removeRoleMutation = useMutation({
+    mutationFn: ({ userId, roleId }: { userId: string; roleId: string }) =>
+      usersApi.removeRole(userId, roleId),
+    onSuccess: (_, variables) => {
+      toast.success('Đã gỡ vai trò');
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      setRolesModalUser((prev) => {
+        if (!prev || prev.id !== variables.userId) return prev;
+        return { ...prev, roles: prev.roles.filter((r) => r.id !== variables.roleId) };
+      });
+    },
+    onError: (e: any) => toast.error(e?.response?.data?.message || 'Gỡ vai trò thất bại'),
   });
 
   const getRoleBadge = (roleName: string) => {
@@ -162,9 +222,36 @@ export default function UsersPage() {
       super_admin: { label: 'Super Admin', variant: 'success' },
       admin: { label: 'Admin', variant: 'info' },
       staff: { label: 'Nhân viên', variant: 'warning' },
+      customer_service: { label: 'Chăm sóc khách hàng', variant: 'info' },
       customer: { label: 'Khách hàng', variant: 'default' },
     };
     return config[roleName] || { label: roleName, variant: 'default' as any };
+  };
+
+  const getRoleInfo = (roleName: string) => {
+    const config: Record<string, { label: string; description: string }> = {
+      super_admin: {
+        label: 'Super Admin',
+        description: 'Quản trị viên cao nhất, có toàn quyền quản lý hệ thống và tất cả shop',
+      },
+      admin: {
+        label: 'Admin',
+        description: 'Quản trị viên shop, quản lý nhân viên và đơn hàng trong shop',
+      },
+      staff: {
+        label: 'Nhân viên đóng hàng',
+        description: 'Đóng gói, quay video đóng gói, cập nhật trạng thái đơn hàng, quản lý sản phẩm',
+      },
+      customer_service: {
+        label: 'Nhân viên chăm sóc khách hàng',
+        description: 'Xử lý hoàn trả, theo dõi vận chuyển, cập nhật trạng thái đơn hàng',
+      },
+      customer: {
+        label: 'Khách hàng',
+        description: 'Xem đơn hàng của mình, xem video đóng gói, tạo yêu cầu hoàn trả',
+      },
+    };
+    return config[roleName] || { label: roleName, description: '' };
   };
 
   const getStatusBadge = (status: string) => {
@@ -218,6 +305,7 @@ export default function UsersPage() {
                 <option value="super_admin">Super Admin</option>
                 <option value="admin">Admin</option>
                 <option value="staff">Nhân viên</option>
+                <option value="customer_service">Chăm sóc khách hàng</option>
                 <option value="customer">Khách hàng</option>
               </select>
             </div>
@@ -253,6 +341,11 @@ export default function UsersPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Vai trò
                   </th>
+                  {isSuperAdmin && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Shop
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                     Trạng thái
                   </th>
@@ -266,14 +359,14 @@ export default function UsersPage() {
                 {isLoading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i}>
-                      <td colSpan={6} className="px-6 py-4">
+                      <td colSpan={isSuperAdmin ? 7 : 6} className="px-6 py-4">
                         <div className="h-4 bg-gray-200 rounded animate-pulse" />
                       </td>
                     </tr>
                   ))
                 ) : data?.data?.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan={isSuperAdmin ? 7 : 6} className="px-6 py-12 text-center text-gray-500">
                       Không có người dùng nào
                     </td>
                   </tr>
@@ -314,17 +407,53 @@ export default function UsersPage() {
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-wrap gap-1">
-                            {user.roles.map((role) => {
-                              const roleBadge = getRoleBadge(role.name);
-                              return (
-                                <Badge key={role.id} variant={roleBadge.variant}>
-                                  {roleBadge.label}
-                                </Badge>
-                              );
-                            })}
+                          <div className="flex flex-wrap gap-1.5">
+                            {user.roles.length === 0 ? (
+                              <span className="text-xs text-gray-400 italic">Chưa có vai trò</span>
+                            ) : (
+                              user.roles.map((role) => {
+                                const roleBadge = getRoleBadge(role.name);
+                                const roleInfo = getRoleInfo(role.name);
+                                return (
+                                  <div
+                                    key={role.id}
+                                    className="group relative"
+                                    title={`${roleBadge.label}${role.shop ? ` - Shop: ${role.shop.name}` : ' (Toàn cục)'}\n${roleInfo.description}`}
+                                  >
+                                    <Badge variant={roleBadge.variant} className="cursor-help">
+                                      {roleBadge.label}
+                                      {role.shop && (
+                                        <span className="ml-1 text-xs opacity-75">@{role.shop.name}</span>
+                                      )}
+                                    </Badge>
+                                  </div>
+                                );
+                              })
+                            )}
                           </div>
                         </td>
+                        {isSuperAdmin && (
+                          <td className="px-6 py-4">
+                            <div className="flex flex-wrap gap-1">
+                              {(() => {
+                                const shops = Array.from(
+                                  new Map(
+                                    user.roles
+                                      .filter((r) => r.shop)
+                                      .map((r) => [r.shop!.id, r.shop!.name])
+                                  ).entries()
+                                );
+                                if (shops.length === 0)
+                                  return <span className="text-sm text-gray-400">—</span>;
+                                return shops.map(([id, name]) => (
+                                  <Badge key={id} variant="default">
+                                    {name}
+                                  </Badge>
+                                ));
+                              })()}
+                            </div>
+                          </td>
+                        )}
                         <td className="px-6 py-4">
                           <Badge variant={statusBadge.variant}>
                             {statusBadge.label}
@@ -354,17 +483,24 @@ export default function UsersPage() {
                             </button>
                             <button
                               className="p-2 hover:bg-gray-100 rounded-lg"
+                              title="Quản lý vai trò"
+                              onClick={() => {
+                                setRolesModalUser(user);
+                                setAssignRoleForm({ roleId: '', shopId: '' });
+                              }}
+                            >
+                              <UserCog className="w-4 h-4 text-gray-600" />
+                            </button>
+                            <button
+                              className="p-2 hover:bg-gray-100 rounded-lg"
                               title="Xóa"
                               onClick={() => {
                                 if (window.confirm('Bạn có chắc chắn muốn xóa người dùng này?')) {
-                                  deleteMutation.mutate(user.id);
+                                  deleteMutation.mutate({ id: user.id });
                                 }
                               }}
                             >
                               <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                            <button className="p-2 hover:bg-gray-100 rounded-lg" title="Khác">
-                              <MoreVertical className="w-4 h-4 text-gray-500" />
                             </button>
                           </div>
                         </td>
@@ -458,20 +594,35 @@ export default function UsersPage() {
                 { value: 'suspended', label: 'Bị khóa' },
               ]}
             />
-            <Select
-              label={
-                activeShop || isShopContext
-                  ? `Vai trò (bắt buộc${activeShop ? ` trong shop: ${activeShop.name}` : ''})`
-                  : 'Vai trò (tùy chọn)'
-              }
-              value={createForm.roleId}
-              onChange={(e) => setCreateForm({ ...createForm, roleId: e.target.value })}
-              required={!!activeShop || isShopContext}
-              options={[
-                ...(activeShop || isShopContext ? [] : [{ value: '', label: 'Không gán vai trò' }]),
-                ...allowedRoleOptions.map((r) => ({ value: r.id, label: r.name })),
-              ]}
-            />
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                {activeShop || isShopContext
+                  ? `Vai trò (bắt buộc${activeShop ? ` trong shop: ${activeShop.name}` : ''})` 
+                  : 'Vai trò (tùy chọn)'}
+                {(activeShop || isShopContext) && <span className="text-red-500 ml-1">*</span>}
+              </label>
+              <select
+                className="input w-full"
+                value={createForm.roleId}
+                onChange={(e) => setCreateForm({ ...createForm, roleId: e.target.value })}
+                required={!!activeShop || isShopContext}
+              >
+                {!(activeShop || isShopContext) && <option value="">-- Không gán vai trò --</option>}
+                {allowedRoleOptions.map((r) => {
+                  const roleInfo = getRoleInfo(r.name);
+                  return (
+                    <option key={r.id} value={r.id} title={roleInfo.description}>
+                      {roleInfo.label}
+                    </option>
+                  );
+                })}
+              </select>
+              {createForm.roleId && (
+                <p className="text-xs text-gray-500 mt-1.5 italic">
+                  {getRoleInfo(allowedRoleOptions.find(r => r.id === createForm.roleId)?.name || '').description}
+                </p>
+              )}
+            </div>
             {activeShop || isShopContext ? (
               <Input
                 label="Shop"
@@ -564,6 +715,184 @@ export default function UsersPage() {
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* Modal quản lý vai trò */}
+      <Modal
+        open={!!rolesModalUser}
+        onClose={() => { setRolesModalUser(null); setAssignRoleForm({ roleId: '', shopId: '' }); }}
+        title={`Quản lý vai trò: ${rolesModalUser?.fullName || ''}`}
+        size="lg"
+      >
+        {rolesModalUser && (
+          <div className="space-y-5">
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <p className="text-sm text-gray-600">
+                <span className="font-medium">Email:</span> {rolesModalUser.email}
+              </p>
+              {rolesModalUser.phone && (
+                <p className="text-sm text-gray-600 mt-1">
+                  <span className="font-medium">SĐT:</span> {rolesModalUser.phone}
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-3">Vai trò hiện tại</p>
+              {rolesModalUser.roles.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">Chưa có vai trò nào được gán</p>
+              ) : (
+                <div className="space-y-2">
+                  {rolesModalUser.roles.map((role) => {
+                    const roleBadge = getRoleBadge(role.name);
+                    const roleInfo = getRoleInfo(role.name);
+                    return (
+                      <div
+                        key={`${role.id}-${role.shop?.id || 'global'}`}
+                        className="flex items-start justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant={roleBadge.variant}>{roleBadge.label}</Badge>
+                            {role.shop && (
+                              <span className="text-xs text-gray-500">
+                                Shop: <span className="font-medium">{role.shop.name}</span>
+                              </span>
+                            )}
+                            {!role.shop && (
+                              <span className="text-xs text-gray-400 italic">(Toàn cục)</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-gray-600">{roleInfo.description}</p>
+                        </div>
+                        <button
+                          type="button"
+                          className="ml-2 text-red-600 hover:text-red-800 hover:bg-red-50 p-1 rounded"
+                          title="Gỡ vai trò"
+                          onClick={() => {
+                            if (window.confirm(`Gỡ vai trò "${roleBadge.label}"${role.shop ? ` trong shop ${role.shop.name}` : ''}?`)) {
+                              removeRoleMutation.mutate({ userId: rolesModalUser!.id, roleId: role.id });
+                            }
+                          }}
+                          disabled={removeRoleMutation.isPending}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="border-t pt-4">
+              <p className="text-sm font-medium text-gray-700 mb-3">Gán thêm vai trò</p>
+              <form
+                className="space-y-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (assignRoleForm.roleId) assignRoleMutation.mutate();
+                }}
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Vai trò</label>
+                  <select
+                    className="input w-full"
+                    value={assignRoleForm.roleId}
+                    onChange={(e) => setAssignRoleForm({ ...assignRoleForm, roleId: e.target.value })}
+                  >
+                    <option value="">-- Chọn vai trò --</option>
+                    {allowedRoleOptions
+                      .filter((r) => !rolesModalUser.roles.some((ur) => ur.id === r.id && ur.shop?.id === (assignRoleForm.shopId || activeShop?.id)))
+                      .map((r) => {
+                        const roleInfo = getRoleInfo(r.name);
+                        return (
+                          <option key={r.id} value={r.id} title={roleInfo.description}>
+                            {roleInfo.label}
+                          </option>
+                        );
+                      })}
+                  </select>
+                  {assignRoleForm.roleId && (
+                    <p className="text-xs text-gray-500 mt-1.5 italic">
+                      {getRoleInfo(allowedRoleOptions.find(r => r.id === assignRoleForm.roleId)?.name || '').description}
+                    </p>
+                  )}
+                </div>
+                {isSuperAdmin && !activeShop && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Shop (tùy chọn)</label>
+                    <select
+                      className="input w-full"
+                      value={assignRoleForm.shopId}
+                      onChange={(e) => setAssignRoleForm({ ...assignRoleForm, shopId: e.target.value })}
+                    >
+                      <option value="">-- Không gắn shop (role toàn cục) --</option>
+                      {(shops || []).map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name} ({s.code})
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Chọn shop để gán role cho user trong shop đó. Để trống để gán role toàn cục.
+                    </p>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    disabled={!assignRoleForm.roleId || assignRoleMutation.isPending}
+                    loading={assignRoleMutation.isPending}
+                  >
+                    Gán vai trò
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal chuyển shop khi xóa thất bại do user là chủ shop */}
+      <Modal
+        open={!!transferModal}
+        onClose={() => { setTransferModal(null); setTransferToUserId(''); }}
+        title="Chuyển shop sang user khác"
+        size="md"
+      >
+        {transferModal && (
+          <div className="space-y-4">
+            <p className="text-gray-600 text-sm">{transferModal.message}</p>
+            <p className="text-sm font-medium">Chọn user nhận shop (bắt buộc nếu user là chủ shop):</p>
+            <select
+              className="input w-full"
+              value={transferToUserId}
+              onChange={(e) => setTransferToUserId(e.target.value)}
+            >
+              <option value="">-- Chọn user --</option>
+              {(data?.data || [])
+                .filter((u) => u.id !== transferModal.userId)
+                .map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.fullName} ({u.email})
+                  </option>
+                ))}
+            </select>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => { setTransferModal(null); setTransferToUserId(''); }}>
+                Đóng
+              </Button>
+              <Button
+                disabled={!transferToUserId || deleteMutation.isPending}
+                onClick={() => {
+                  deleteMutation.mutate({ id: transferModal.userId, transferShopToUserId: transferToUserId });
+                }}
+              >
+                {deleteMutation.isPending ? 'Đang xử lý...' : 'Xóa và chuyển shop'}
+              </Button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

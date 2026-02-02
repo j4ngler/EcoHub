@@ -31,9 +31,17 @@ const app: Application = express();
 // Security headers
 app.use(helmet());
 
-// CORS
+// CORS: cho phép cả localhost và 127.0.0.1 (khi FE gọi trực tiếp backend trong dev)
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:5173',
+  'http://127.0.0.1:5173',
+].filter(Boolean) as string[];
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) cb(null, true);
+    else cb(null, false);
+  },
   credentials: true,
 }));
 

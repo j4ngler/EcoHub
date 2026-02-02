@@ -2,6 +2,7 @@ import api from './axios';
 
 export interface ReportSubscription {
   id: string;
+  shopId?: string;
   email: string;
   reportType: 'financial' | 'operational' | 'both';
   enabled: boolean;
@@ -10,8 +11,10 @@ export interface ReportSubscription {
 }
 
 export const settingsApi = {
-  getReportSubscriptions: async (): Promise<ReportSubscription[]> => {
-    const response = await api.get('/settings/report-subscriptions');
+  /** shopId: ngữ cảnh shop (từ header/assume) hoặc Super Admin truyền để xem cài đặt theo shop) */
+  getReportSubscriptions: async (shopId?: string | null): Promise<ReportSubscription[]> => {
+    const params = shopId ? { shopId } : {};
+    const response = await api.get('/settings/report-subscriptions', { params });
     return response.data.data;
   },
 
@@ -19,6 +22,7 @@ export const settingsApi = {
     email: string;
     reportType: 'financial' | 'operational' | 'both';
     enabled?: boolean;
+    shopId?: string | null;
   }): Promise<ReportSubscription> => {
     const response = await api.post('/settings/report-subscriptions', data);
     return response.data.data;

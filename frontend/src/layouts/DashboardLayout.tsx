@@ -38,16 +38,16 @@ export default function DashboardLayout() {
   };
 
   const navigation = [
-    { name: 'Trang chủ', href: '/dashboard', icon: Home, roles: ['customer', 'staff', 'admin', 'super_admin'] },
-    { name: 'Video đóng gói', href: '/videos', icon: Video, roles: ['customer', 'staff', 'admin', 'super_admin'] },
+    { name: 'Trang chủ', href: '/dashboard', icon: Home, roles: ['customer', 'staff', 'customer_service', 'admin', 'super_admin'] },
+    { name: 'Video đóng gói', href: '/videos', icon: Video, roles: ['customer', 'staff', 'customer_service', 'admin', 'super_admin'] },
     { name: 'Tạo video', href: '/videos/create', icon: PlusCircle, roles: ['customer', 'staff', 'admin', 'super_admin'] },
-    { name: 'Đơn hàng', href: '/orders', icon: Package, roles: ['staff', 'admin', 'super_admin'] },
-    { name: 'Sản phẩm', href: '/products', icon: Package, roles: ['staff', 'admin', 'super_admin'] },
+    { name: 'Đơn hàng', href: '/orders', icon: Package, roles: ['staff', 'customer_service', 'admin', 'super_admin'] },
+    { name: 'Sản phẩm', href: '/products', icon: Package, roles: ['staff', 'customer_service', 'admin', 'super_admin'] },
     { name: 'Quản lý hàng hóa', href: '/inventory', icon: Package, roles: ['admin', 'super_admin'] },
     { name: 'Người dùng', href: '/users', icon: Users, roles: ['super_admin'] },
     { name: 'Báo cáo', href: '/reports', icon: BarChart3, roles: ['admin', 'super_admin'] },
     { name: 'Shop', href: '/shops', icon: Store, roles: ['super_admin'] },
-    { name: 'Hồ sơ', href: '/profile', icon: Settings, roles: ['customer', 'staff', 'admin', 'super_admin'] },
+    { name: 'Hồ sơ', href: '/profile', icon: Settings, roles: ['customer', 'staff', 'customer_service', 'admin', 'super_admin'] },
   ].filter((item) => {
     if (!item.roles) return true;
     return item.roles.some((role) => user?.roles?.includes(role));

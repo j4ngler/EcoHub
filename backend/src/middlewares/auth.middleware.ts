@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import prisma from '../config/database';
-import { unauthorized, forbidden } from './error.middleware';
+import { unauthorized, forbidden, serviceUnavailable } from './error.middleware';
 import { RoleName } from '@prisma/client';
 
 export interface JwtPayload {
@@ -36,24 +36,37 @@ export const authenticate = async (
         process.env.JWT_SECRET || 'secret'
       ) as JwtPayload;
 
-      // Verify user still exists
-      const user = await prisma.user.findUnique({
-        where: { id: decoded.userId },
-        include: {
-          userRoles: {
-            include: { role: true }
+      let user;
+      try {
+        user = await prisma.user.findUnique({
+          where: { id: decoded.userId },
+          include: {
+            userRoles: {
+              include: { role: true }
+            }
           }
-        }
-      });
+        });
+      } catch (dbError) {
+        console.error('[authenticate] Database error:', dbError);
+        return next(serviceUnavailable('Không kết nối được database. Kiểm tra backend và PostgreSQL.'));
+      }
 
       if (!user || user.status !== 'active') {
         throw unauthorized('Tài khoản không tồn tại hoặc đã bị vô hiệu hóa');
       }
 
+      let roles: JwtPayload['roles'];
+      try {
+        roles = decoded.roles || user.userRoles.map(ur => ur.role.name);
+      } catch (e) {
+        console.error('[authenticate] Error mapping roles:', e);
+        return next(serviceUnavailable('Lỗi xử lý quyền. Kiểm tra dữ liệu UserRole/Role.'));
+      }
+
       req.user = {
         userId: user.id,
         email: user.email,
-        roles: decoded.roles || user.userRoles.map(ur => ur.role.name),
+        roles,
         shopId: decoded.shopId ?? null,
         impersonating: decoded.impersonating ?? false,
       };
@@ -66,7 +79,11 @@ export const authenticate = async (
       if (error instanceof jwt.JsonWebTokenError) {
         throw unauthorized('Token không hợp lệ');
       }
-      throw error;
+      if ((error as any)?.statusCode === 401) {
+        return next(error);
+      }
+      console.error('[authenticate] Unexpected error:', error);
+      return next(serviceUnavailable('Lỗi xác thực. Thử đăng nhập lại.'));
     }
   } catch (error) {
     next(error);

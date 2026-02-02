@@ -25,6 +25,7 @@ enum RoleName {
   super_admin
   admin
   staff
+  customer_service
   customer
 }
 
@@ -215,14 +216,15 @@ model Shop {
   updatedAt DateTime    @updatedAt @map("updated_at")
 
   // Relations
-  owner              User                    @relation(fields: [ownerId], references: [id])
-  userRoles          UserRole[]
-  channelConnections ShopChannelConnection[]
-  carrierSettings    ShopCarrierSetting[]
-  categories         ProductCategory[]
-  products           Product[]
-  orders             Order[]
-  warehouses         Warehouse[]
+  owner                User                    @relation(fields: [ownerId], references: [id])
+  userRoles            UserRole[]
+  channelConnections   ShopChannelConnection[]
+  carrierSettings      ShopCarrierSetting[]
+  categories           ProductCategory[]
+  products             Product[]
+  orders               Order[]
+  warehouses           Warehouse[]
+  reportSubscriptions  ReportSubscription[]
 
   @@map("shops")
 }
@@ -651,12 +653,15 @@ model Notification {
 
 model ReportSubscription {
   id          String   @id @default(uuid())
+  shopId      String   @map("shop_id")
   email       String
   reportType  String   @map("report_type") // 'financial', 'operational', 'both'
   enabled     Boolean  @default(true)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  @@unique([email, reportType])
+  shop        Shop     @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, email, reportType])
   @@map("report_subscriptions")
 }

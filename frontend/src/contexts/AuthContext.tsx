@@ -5,11 +5,13 @@ import { useAuthStore } from '@/store/authStore';
 
 interface User {
   id: string;
+  username?: string;
   email: string;
   fullName: string;
   phone?: string;
-  role: string;
+  role?: string;
   roles?: string[];
+  activeShop?: { id: string; name: string; code: string } | null;
 }
 
 interface AuthContextType {

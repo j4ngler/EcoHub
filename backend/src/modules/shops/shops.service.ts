@@ -2,6 +2,8 @@ import prisma from '../../config/database';
 import { conflict, notFound, unauthorized, forbidden, badRequest } from '../../middlewares/error.middleware';
 import { CreateShopDto } from './shops.dto';
 import bcrypt from 'bcryptjs';
+import fs from 'fs/promises';
+import path from 'path';
 
 export const listShopsForUser = async (userId: string, roles: string[]) => {
   // Super admin: xem tất cả shop đang hoạt động
@@ -147,12 +149,149 @@ export const deleteShop = async (
     throw notFound('Không tìm thấy shop');
   }
 
-  // Soft delete: chuyển shop sang trạng thái inactive để tránh lỗi ràng buộc dữ liệu
-  await prisma.shop.update({
-    where: { id: shopId },
-    data: {
-      status: 'inactive',
+  // Lấy tất cả video liên quan đến shop để xóa file trên đĩa
+  const orders = await prisma.order.findMany({
+    where: { shopId },
+    select: {
+      id: true,
+      packageVideos: {
+        select: {
+          originalVideoUrl: true,
+          processedVideoUrl: true,
+          thumbnailUrl: true,
+        },
+      },
+      receivingVideos: {
+        select: {
+          videoUrl: true,
+          thumbnailUrl: true,
+        },
+      },
     },
+  });
+
+  // Xóa file video trên đĩa
+  const uploadsDir = path.resolve(process.cwd(), 'uploads');
+  const filesToDelete = new Set<string>();
+
+  for (const order of orders) {
+    // Package videos
+    for (const video of order.packageVideos) {
+      if (video.originalVideoUrl) {
+        const filename = video.originalVideoUrl.replace('/uploads/', '');
+        if (filename) filesToDelete.add(filename);
+      }
+      if (video.processedVideoUrl) {
+        const filename = video.processedVideoUrl.replace('/uploads/', '');
+        if (filename) filesToDelete.add(filename);
+      }
+      if (video.thumbnailUrl) {
+        const filename = video.thumbnailUrl.replace('/uploads/', '');
+        if (filename) filesToDelete.add(filename);
+      }
+    }
+    // Receiving videos
+    for (const video of order.receivingVideos) {
+      if (video.videoUrl) {
+        const filename = video.videoUrl.replace('/uploads/', '');
+        if (filename) filesToDelete.add(filename);
+      }
+      if (video.thumbnailUrl) {
+        const filename = video.thumbnailUrl.replace('/uploads/', '');
+        if (filename) filesToDelete.add(filename);
+      }
+    }
+  }
+
+  // Xóa file trên đĩa (không throw error nếu file không tồn tại)
+  for (const filename of filesToDelete) {
+    try {
+      const filePath = path.join(uploadsDir, filename);
+      await fs.unlink(filePath);
+    } catch (err: any) {
+      // Bỏ qua lỗi nếu file không tồn tại
+      if (err?.code !== 'ENOENT') {
+        console.error(`Lỗi khi xóa file ${filename}:`, err);
+      }
+    }
+  }
+
+  // Xóa tất cả dữ liệu liên quan trong database bằng transaction
+  await prisma.$transaction(async (tx: any) => {
+    // 1. Xóa ReceivingVideo (liên quan đến Order)
+    await tx.receivingVideo.deleteMany({
+      where: { order: { shopId } },
+    });
+
+    // 2. Xóa PackageVideo (liên quan đến Order)
+    await tx.packageVideo.deleteMany({
+      where: { order: { shopId } },
+    });
+
+    // 3. Xóa ReturnRequest (liên quan đến Order)
+    await tx.returnRequest.deleteMany({
+      where: { order: { shopId } },
+    });
+
+    // 4. Xóa OrderStatusHistory (liên quan đến Order)
+    await tx.orderStatusHistory.deleteMany({
+      where: { order: { shopId } },
+    });
+
+    // 5. Xóa OrderItem (liên quan đến Order)
+    await tx.orderItem.deleteMany({
+      where: { order: { shopId } },
+    });
+
+    // 6. Xóa Order
+    await tx.order.deleteMany({
+      where: { shopId },
+    });
+
+    // 7. Xóa InventoryTransaction (liên quan đến Warehouse và Product)
+    await tx.inventoryTransaction.deleteMany({
+      where: {
+        OR: [
+          { warehouse: { shopId } },
+          { product: { shopId } },
+        ],
+      },
+    });
+
+    // 8. Xóa Product (cascade sẽ xóa OrderItem liên quan, nhưng đã xóa ở trên)
+    await tx.product.deleteMany({
+      where: { shopId },
+    });
+
+    // 9. Xóa ProductCategory
+    await tx.productCategory.deleteMany({
+      where: { shopId },
+    });
+
+    // 10. Xóa Warehouse (cascade sẽ xóa InventoryTransaction, nhưng đã xóa ở trên)
+    await tx.warehouse.deleteMany({
+      where: { shopId },
+    });
+
+    // 11. Xóa ShopCarrierSetting
+    await tx.shopCarrierSetting.deleteMany({
+      where: { shopId },
+    });
+
+    // 12. Xóa ShopChannelConnection
+    await tx.shopChannelConnection.deleteMany({
+      where: { shopId },
+    });
+
+    // 13. Xóa UserRole liên quan đến shop
+    await tx.userRole.deleteMany({
+      where: { shopId },
+    });
+
+    // 14. Cuối cùng xóa Shop
+    await tx.shop.delete({
+      where: { id: shopId },
+    });
   });
 
   return { id: shopId };

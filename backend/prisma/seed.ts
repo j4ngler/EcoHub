@@ -46,6 +46,14 @@ async function main() {
       },
     }),
     prisma.role.upsert({
+      where: { name: RoleName.customer_service },
+      update: {},
+      create: {
+        name: RoleName.customer_service,
+        description: 'Nhân viên chăm sóc khách hàng, xử lý đơn hàng và hoàn trả',
+      },
+    }),
+    prisma.role.upsert({
       where: { name: RoleName.customer },
       update: {},
       create: {
@@ -125,6 +133,7 @@ async function main() {
   const superAdminRole = roles.find(r => r.name === RoleName.super_admin)!;
   const adminRole = roles.find(r => r.name === RoleName.admin)!;
   const staffRole = roles.find(r => r.name === RoleName.staff)!;
+  const customerServiceRole = roles.find(r => r.name === RoleName.customer_service)!;
   const customerRole = roles.find(r => r.name === RoleName.customer)!;
 
   // Super Admin gets all permissions
@@ -180,6 +189,27 @@ async function main() {
       update: {},
       create: {
         roleId: staffRole.id,
+        permissionId: permission.id,
+      },
+    });
+  }
+
+  // Customer Service (Nhân viên chăm sóc khách hàng): xem đơn, cập nhật trạng thái đơn, xem/xử lý hoàn trả, xem sản phẩm, xem video
+  const customerServicePermissions = permissions.filter(p => 
+    ['orders.view', 'orders.status', 'products.view', 'videos.view',
+     'returns.view', 'returns.process', 'shipping.view'].includes(p.name)
+  );
+  for (const permission of customerServicePermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        roleId_permissionId: {
+          roleId: customerServiceRole.id,
+          permissionId: permission.id,
+        },
+      },
+      update: {},
+      create: {
+        roleId: customerServiceRole.id,
         permissionId: permission.id,
       },
     });

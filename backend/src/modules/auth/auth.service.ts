@@ -19,15 +19,13 @@ interface TokenPayload {
 }
 
 const generateTokens = (payload: TokenPayload) => {
-  // @ts-ignore - expiresIn accepts string like "15m" or "7d"
   const accessTokenOptions: SignOptions = {
-    expiresIn: JWT_EXPIRES_IN,
+    expiresIn: JWT_EXPIRES_IN as jwt.SignOptions['expiresIn'],
   };
   const accessToken = jwt.sign(payload, JWT_SECRET, accessTokenOptions);
 
-  // @ts-ignore - expiresIn accepts string like "15m" or "7d"
   const refreshTokenOptions: SignOptions = {
-    expiresIn: JWT_REFRESH_EXPIRES_IN,
+    expiresIn: JWT_REFRESH_EXPIRES_IN as jwt.SignOptions['expiresIn'],
   };
   const refreshToken = jwt.sign(payload, JWT_REFRESH_SECRET, refreshTokenOptions);
 

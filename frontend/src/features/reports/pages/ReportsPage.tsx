@@ -81,6 +81,21 @@ export default function ReportsPage() {
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
+  const exportMutation = useMutation({
+    mutationFn: () => reportsApi.exportReport({ ...dateRange, type: 'dashboard', format: 'json' }),
+    onSuccess: (data) => {
+      toast.success('Đã xuất báo cáo');
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `baocao-${dateRange.startDate || 'all'}-${dateRange.endDate || 'all'}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
   // Prepare chart data
   const orderStatusData = dashboard?.ordersByStatus?.map((item, index) => ({
     name: item.status,
@@ -142,8 +157,12 @@ export default function ReportsPage() {
               Cập nhật dữ liệu
             </Button>
           )}
-          <Button variant="outline">
-            <Download className="w-4 h-4 mr-2" />
+          <Button
+            variant="outline"
+            onClick={() => exportMutation.mutate()}
+            disabled={exportMutation.isPending}
+          >
+            <Download className={`w-4 h-4 mr-2 ${exportMutation.isPending ? 'animate-spin' : ''}`} />
             Xuất báo cáo
           </Button>
         </div>

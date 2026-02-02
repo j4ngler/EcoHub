@@ -25,27 +25,35 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Response interceptor
+// Response interceptor: 401 → thử refresh token; nếu không được thì tự logout và chuyển về /login
 api.interceptors.response.use(
   (response) => response,
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
-    
-    // If 401 and not already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
+    const is401 = error.response?.status === 401;
+
+    const doLogout = () => {
+      useAuthStore.getState().clearAuth();
+      window.location.href = '/login';
+    };
+
+    // 401 lần 2 (sau khi đã retry) hoặc không có config → logout ngay
+    if (is401 && originalRequest?._retry) {
+      doLogout();
+      return Promise.reject(error);
+    }
+
+    if (is401 && originalRequest) {
       originalRequest._retry = true;
-      
-      const { refreshToken, logout, setAuth } = useAuthStore.getState();
-      
+      const { refreshToken, clearAuth, setAuth } = useAuthStore.getState();
+
       if (refreshToken) {
         try {
           const response = await axios.post(`${API_URL}/auth/refresh-token`, {
             refreshToken,
           });
-          
           const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data.data;
 
-          // Ensure tokens are persisted even if user is temporarily missing (race/hydration)
           let { user } = useAuthStore.getState();
           if (!user) {
             try {
@@ -54,7 +62,7 @@ api.interceptors.response.use(
               });
               user = meRes.data.data;
             } catch {
-              // ignore - we'll still store tokens so subsequent requests can recover
+              /* ignore */
             }
           }
 
@@ -67,20 +75,18 @@ api.interceptors.response.use(
               isAuthenticated: true,
             });
           }
-          
+
           originalRequest.headers.Authorization = `Bearer ${newAccessToken}`;
           return api(originalRequest);
-        } catch (refreshError) {
-          logout();
-          window.location.href = '/login';
-          return Promise.reject(refreshError);
+        } catch {
+          doLogout();
+          return Promise.reject(error);
         }
-      } else {
-        logout();
-        window.location.href = '/login';
       }
+      // Không có refreshToken → không có auth, logout và về login
+      doLogout();
     }
-    
+
     return Promise.reject(error);
   }
 );

@@ -140,4 +140,9 @@ export const reportsApi = {
     const response = await api.post('/reports/sync-now', { channels });
     return response.data.data;
   },
+
+  exportReport: async (params?: ReportParams & { type?: string; format?: string }) => {
+    const response = await api.get('/reports/export', { params });
+    return response.data.data;
+  },
 };

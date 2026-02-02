@@ -8,8 +8,10 @@ import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import Modal from '@/components/ui/Modal';
 import { settingsApi, ReportSubscription } from '@/api/settings.api';
+import { metaApi } from '@/api/meta.api';
 import { getErrorMessage } from '@/api/axios';
 import toast from 'react-hot-toast';
+import { useAuthStore } from '@/store/authStore';
 
 type AppSettings = {
   notifications: boolean;
@@ -36,11 +38,37 @@ export default function SettingsPage() {
   });
 
   const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const activeShopId = user?.activeShop?.id ?? (user as any)?.shopId ?? null;
+  const isSuperAdmin = user?.roles?.includes('super_admin') ?? false;
+  const isManagingShop = !!activeShopId; // Đang ở chế độ quản lý shop
+
+  // Super Admin có thể chọn shop để xem/sửa cài đặt email mà không cần "Vào shop"
+  // Nhưng khi đang assume shop, chỉ được xem shop đó
+  const [selectedShopIdForSettings, setSelectedShopIdForSettings] = useState<string>(activeShopId ?? '');
+  const effectiveShopId = isManagingShop ? activeShopId : (selectedShopIdForSettings || activeShopId || null);
+
+  const { data: shops } = useQuery({
+    queryKey: ['meta', 'shops'],
+    queryFn: metaApi.getShops,
+    enabled: isSuperAdmin && !isManagingShop, // Chỉ cho phép chọn shop khi Super Admin không assume shop
+  });
 
   const { data: subscriptions, isLoading: loadingSubscriptions } = useQuery({
-    queryKey: ['report-subscriptions'],
-    queryFn: settingsApi.getReportSubscriptions,
+    queryKey: ['report-subscriptions', effectiveShopId],
+    queryFn: () => settingsApi.getReportSubscriptions(effectiveShopId),
+    enabled: !!effectiveShopId,
   });
+
+  // Khi user "Vào shop" (assume), đồng bộ dropdown sang shop đó và không cho phép đổi
+  useEffect(() => {
+    if (activeShopId) {
+      setSelectedShopIdForSettings(activeShopId);
+    } else {
+      // Khi thoát assume shop, reset về empty để Super Admin có thể chọn lại
+      setSelectedShopIdForSettings('');
+    }
+  }, [activeShopId]);
 
   const createMutation = useMutation({
     mutationFn: settingsApi.createReportSubscription,
@@ -116,7 +144,14 @@ export default function SettingsPage() {
         },
       });
     } else {
-      createMutation.mutate(emailForm);
+      if (!effectiveShopId) {
+        toast.error('Vui lòng chọn shop trước khi thêm email nhận báo cáo');
+        return;
+      }
+      createMutation.mutate({
+        ...emailForm,
+        shopId: effectiveShopId,
+      });
     }
   };
 
@@ -184,22 +219,48 @@ export default function SettingsPage() {
       {/* Email Report Subscriptions */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-4">
             <CardTitle className="flex items-center gap-2">
               <Mail className="w-5 h-5" />
               Báo cáo định kỳ qua email
             </CardTitle>
-            <Button onClick={() => handleOpenEmailModal()} size="sm">
-              <Plus className="w-4 h-4 mr-2" />
-              Thêm email
-            </Button>
+            <div className="flex items-center gap-3">
+              {isSuperAdmin && !isManagingShop && shops && shops.length > 0 && (
+                <Select
+                  value={selectedShopIdForSettings}
+                  onChange={(e) => setSelectedShopIdForSettings(e.target.value)}
+                  className="min-w-[200px]"
+                  options={[
+                    { value: '', label: '-- Chọn shop để xem/sửa --' },
+                    ...shops.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` })),
+                  ]}
+                />
+              )}
+              {isManagingShop && activeShopId && user?.activeShop && (
+                <Badge variant="success" className="shrink-0">
+                  Shop: {user.activeShop.name}
+                </Badge>
+              )}
+              <Button onClick={() => handleOpenEmailModal()} size="sm" disabled={!effectiveShopId}>
+                <Plus className="w-4 h-4 mr-2" />
+                Thêm email
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-6">
           <p className="text-sm text-gray-500 mb-4">
-            Cấu hình danh sách email nhận báo cáo tự động hàng ngày lúc 18:00
+            Cấu hình danh sách email nhận báo cáo tự động hàng ngày lúc 18:00. Mỗi shop có danh sách riêng — chọn shop để xem/sửa đúng cài đặt của shop đó.
           </p>
-          {loadingSubscriptions ? (
+          {!effectiveShopId ? (
+            <p className="text-sm text-amber-600 bg-amber-50 p-3 rounded-lg">
+              {isSuperAdmin && !isManagingShop
+                ? 'Chọn một shop ở dropdown trên để xem và thêm email nhận báo cáo theo shop.'
+                : isManagingShop
+                ? 'Đang ở chế độ quản lý shop. Chỉ có thể xem và sửa email của shop đang quản lý.'
+                : 'Vui lòng chọn shop (ngữ cảnh) ở header để xem và thêm email nhận báo cáo theo shop.'}
+            </p>
+          ) : loadingSubscriptions ? (
             <div className="text-center py-8 text-gray-500">Đang tải...</div>
           ) : subscriptions && subscriptions.length > 0 ? (
             <div className="space-y-3">

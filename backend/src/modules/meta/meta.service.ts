@@ -10,6 +10,7 @@ export const getRoles = async () => {
 
 export const getShops = async () => {
   const shops = await prisma.shop.findMany({
+    where: { status: 'active' }, // Chỉ lấy shop đang hoạt động
     orderBy: { createdAt: 'desc' },
     select: { id: true, name: true, code: true, status: true, phone: true, email: true, address: true },
   });

@@ -1,9 +1,9 @@
-import cron from 'node-cron';
+import cron, { type ScheduledTask } from 'node-cron';
 import prisma from '../config/database';
 import * as reportService from '../modules/reports/reports.service';
 import { sendDailyReport } from './email.service';
 
-let scheduledJob: cron.ScheduledTask | null = null;
+let scheduledJob: ScheduledTask | null = null;
 
 export const startReportScheduler = () => {
   // Chạy mỗi ngày lúc 18:00
@@ -95,7 +95,6 @@ export const startReportScheduler = () => {
       console.error('❌ [Cron] Failed to send daily reports:', error);
     }
   }, {
-    scheduled: true,
     timezone: 'Asia/Ho_Chi_Minh',
   });
 

@@ -64,10 +64,12 @@ export const paginated = <T>(
   limit: number,
   message?: string
 ) => {
+  const safeLimit = limit > 0 ? limit : 1;
+  const totalPages = Math.max(0, Math.ceil(total / safeLimit));
   return success(res, data, message, 200, {
     page,
-    limit,
+    limit: safeLimit,
     total,
-    totalPages: Math.ceil(total / limit),
+    totalPages,
   });
 };

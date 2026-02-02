@@ -24,12 +24,17 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ) => {
-  const statusCode = err.statusCode || 500;
-  const message = err.message || 'Lỗi hệ thống';
+  if (res.headersSent) return next(err);
 
-  // Log error in development
+  const statusCode = err.statusCode || 500;
+  // 500: không trả message nội bộ (Prisma, DB) ra client ở production
+  const message =
+    statusCode === 500 && process.env.NODE_ENV !== 'development'
+      ? 'Lỗi hệ thống'
+      : (err.message || 'Lỗi hệ thống');
+
   if (process.env.NODE_ENV === 'development') {
-    console.error('Error:', err);
+    console.error('[Error]', statusCode, err.message, err.stack);
   }
 
   res.status(statusCode).json({
@@ -46,3 +51,4 @@ export const unauthorized = (message = 'Chưa xác thực') => new ApiError(401,
 export const forbidden = (message = 'Không có quyền truy cập') => new ApiError(403, message);
 export const conflict = (message = 'Dữ liệu đã tồn tại') => new ApiError(409, message);
 export const internalError = (message = 'Lỗi hệ thống') => new ApiError(500, message);
+export const serviceUnavailable = (message = 'Dịch vụ tạm thời không khả dụng') => new ApiError(503, message);

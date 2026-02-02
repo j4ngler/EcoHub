@@ -10,10 +10,10 @@ const router = Router();
 // All routes require authentication
 router.use(authenticate);
 
-// List users - Admin and Super Admin only
+// List users - Admin và Super Admin (kiểm tra role từ JWT, không gọi Prisma trong middleware → tránh 500)
 router.get(
   '/',
-  authorizePermission('users.view'),
+  authorize(RoleName.super_admin, RoleName.admin),
   validate(queryUsersSchema),
   userController.getUsers
 );
@@ -25,18 +25,18 @@ router.get(
   userController.getUserById
 );
 
-// Create user - Super Admin and Admin only
+// Create user - Super Admin và Admin (dùng role từ JWT, tránh 403 do permission users.create)
 router.post(
   '/',
-  authorizePermission('users.create'),
+  authorize(RoleName.super_admin, RoleName.admin),
   validate(createUserSchema),
   userController.createUser
 );
 
-// Update user
+// Update user - Super Admin và Admin
 router.put(
   '/:id',
-  authorizePermission('users.update'),
+  authorize(RoleName.super_admin, RoleName.admin),
   validate(updateUserSchema),
   userController.updateUser
 );

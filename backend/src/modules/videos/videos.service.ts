@@ -61,11 +61,11 @@ export const getVideos = async (params: GetVideosParams, currentUser?: CurrentUs
     };
   }
 
-  // Nếu là nhân viên (staff) nhưng KHÔNG phải admin/super_admin
-  // => chỉ xem được những video do chính mình quay (recordedBy)
+  // Admin / Super Admin / CSKH: xem tất cả video trong shop. Staff: chỉ xem video do mình quay
   const isAdminLike =
     currentUser?.roles.includes(RoleName.admin) ||
-    currentUser?.roles.includes(RoleName.super_admin);
+    currentUser?.roles.includes(RoleName.super_admin) ||
+    currentUser?.roles.includes(RoleName.customer_service);
 
   if (!isAdminLike && currentUser?.roles.includes(RoleName.staff)) {
     where.recordedBy = currentUser.userId;
@@ -145,10 +145,11 @@ export const getVideoById = async (id: string, currentUser?: CurrentUser) => {
     throw forbidden('Bạn không được phép xem video của đơn hàng này');
   }
 
-  // Nhân viên đóng gói chỉ được xem video do chính mình quay
+  // Admin / Super Admin / CSKH: xem mọi video. Nhân viên đóng gói chỉ xem video do mình quay
   const isAdminLike =
     currentUser?.roles.includes(RoleName.admin) ||
-    currentUser?.roles.includes(RoleName.super_admin);
+    currentUser?.roles.includes(RoleName.super_admin) ||
+    currentUser?.roles.includes(RoleName.customer_service);
 
   if (!isAdminLike && currentUser?.roles.includes(RoleName.staff)) {
     if (video.recordedBy !== currentUser.userId) {
@@ -183,11 +184,12 @@ export const getVideoByTrackingCode = async (trackingCode: string) => {
 export const getVideosByOrder = async (orderId: string, currentUser?: CurrentUser) => {
   const isAdminLike =
     currentUser?.roles.includes(RoleName.admin) ||
-    currentUser?.roles.includes(RoleName.super_admin);
+    currentUser?.roles.includes(RoleName.super_admin) ||
+    currentUser?.roles.includes(RoleName.customer_service);
 
   const where: any = { orderId };
 
-  // Nhân viên chỉ xem được video do mình quay trong đơn đó
+  // Nhân viên đóng gói chỉ xem video do mình quay; Admin/CSKH xem tất cả
   if (!isAdminLike && currentUser?.roles.includes(RoleName.staff)) {
     where.recordedBy = currentUser.userId;
   }

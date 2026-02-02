@@ -14,13 +14,12 @@ export default defineConfig({
     host: '0.0.0.0',
     proxy: {
       '/api': {
-        // When running Vite inside Docker, proxy to the backend service name
-        target: 'http://backend:3000',
+        // Windows: 127.0.0.1 ổn định hơn localhost; Docker: set VITE_PROXY_TARGET=http://backend:3000
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:3000',
         changeOrigin: true,
       },
-      // Allow playing uploaded videos via `/uploads/<file>` while using Vite dev server
       '/uploads': {
-        target: 'http://backend:3000',
+        target: process.env.VITE_PROXY_TARGET || 'http://127.0.0.1:3000',
         changeOrigin: true,
       },
     },

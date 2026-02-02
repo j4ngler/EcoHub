@@ -294,7 +294,7 @@ export default function OrderDetailPage() {
                     <div key={history.id} className="flex gap-3">
                       <div className="relative">
                         <div className={`w-3 h-3 rounded-full ${index === 0 ? 'bg-primary-600' : 'bg-gray-300'}`} />
-                        {index < order.statusHistory.length - 1 && (
+                        {order.statusHistory && index < order.statusHistory.length - 1 && (
                           <div className="absolute top-3 left-1.5 w-0.5 h-full -translate-x-1/2 bg-gray-200" />
                         )}
                       </div>

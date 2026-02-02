@@ -19,90 +19,118 @@ type CurrentUser = {
   shopId?: string | null;
 };
 
-const SHOP_VISIBLE_ROLES: RoleName[] = [RoleName.admin, RoleName.staff, RoleName.customer];
+const SHOP_VISIBLE_ROLES: RoleName[] = [RoleName.admin, RoleName.staff, RoleName.customer_service, RoleName.customer];
 
 export const getUsers = async (params: GetUsersParams, currentUser?: CurrentUser) => {
   const { page, limit, skip } = getPagination(params.page, params.limit);
 
-  const where: any = {};
+  try {
+    const where: any = {};
 
-  if (params.search) {
-    where.OR = [
-      { username: { contains: params.search, mode: 'insensitive' } },
-      { email: { contains: params.search, mode: 'insensitive' } },
-      { fullName: { contains: params.search, mode: 'insensitive' } },
-    ];
-  }
-
-  if (params.status) {
-    where.status = params.status;
-  }
-
-  const activeShopId = currentUser?.shopId ?? null;
-  if (activeShopId) {
-    // Khi đang quản lý shop: chỉ thấy người thuộc shop đó và các role liên quan shop
-    where.userRoles = {
-      some: {
-        shopId: activeShopId,
-        role: { name: { in: SHOP_VISIBLE_ROLES } },
-      },
-    };
-  }
-
-  if (params.role) {
-    // Nếu đang ở shop, không cho lọc ra super_admin hoặc role ngoài shop
-    if (activeShopId && !SHOP_VISIBLE_ROLES.includes(params.role as RoleName)) {
-      where.id = '__no_match__';
-    } else {
-      where.userRoles = {
-        some: {
-          ...(activeShopId ? { shopId: activeShopId } : {}),
-          role: { name: params.role },
-        },
-      };
+    if (params.search && params.search.trim()) {
+      const term = params.search.trim();
+      where.OR = [
+        { username: { contains: term, mode: 'insensitive' } },
+        { email: { contains: term, mode: 'insensitive' } },
+        { fullName: { contains: term, mode: 'insensitive' } },
+      ];
     }
-  }
 
-  const [users, total] = await Promise.all([
-    prisma.user.findMany({
-      where,
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        userRoles: {
-          include: {
-            role: true,
-            shop: true,
+    if (params.status) {
+      where.status = params.status;
+    }
+
+    const activeShopId = currentUser?.shopId ?? null;
+    const isSuperAdmin = currentUser?.roles?.includes(RoleName.super_admin) ?? false;
+    if (activeShopId) {
+      // Super Admin khi assume shop: thấy tất cả users trong shop đó
+      // Admin/Staff thông thường: chỉ thấy users có role trong SHOP_VISIBLE_ROLES
+      if (isSuperAdmin) {
+        where.userRoles = {
+          some: {
+            shopId: activeShopId,
+          },
+        };
+      } else {
+        where.userRoles = {
+          some: {
+            shopId: activeShopId,
+            role: { name: { in: SHOP_VISIBLE_ROLES } },
+          },
+        };
+      }
+    }
+
+    // Chỉ dùng filter role nếu giá trị hợp lệ (tránh Prisma throw do enum không tồn tại)
+    const validRoleNames = Object.values(RoleName) as string[];
+    if (params.role && validRoleNames.includes(params.role)) {
+      // Super Admin có thể filter theo bất kỳ role nào, Admin/Staff chỉ filter theo SHOP_VISIBLE_ROLES
+      if (activeShopId && !isSuperAdmin && !SHOP_VISIBLE_ROLES.includes(params.role as RoleName)) {
+        return { users: [], total: 0, page, limit };
+      }
+      // Nếu đã có filter shop ở trên, cần merge với filter role
+      if (activeShopId && where.userRoles) {
+        // Merge: user phải có role này VÀ trong shop này
+        where.userRoles = {
+          some: {
+            shopId: activeShopId,
+            role: { name: params.role as RoleName },
+          },
+        };
+      } else {
+        where.userRoles = {
+          some: {
+            ...(activeShopId ? { shopId: activeShopId } : {}),
+            role: { name: params.role as RoleName },
+          },
+        };
+      }
+    }
+
+    const [users, total] = await Promise.all([
+      prisma.user.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          userRoles: {
+            include: {
+              role: true,
+              shop: true,
+            },
           },
         },
-      },
-    }),
-    prisma.user.count({ where }),
-  ]);
+      }),
+      prisma.user.count({ where }),
+    ]);
 
-  return {
-    users: users.map(user => ({
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
-      avatarUrl: user.avatarUrl,
-      status: user.status,
-      emailVerified: user.emailVerified,
-      lastLoginAt: user.lastLoginAt,
-      createdAt: user.createdAt,
-      roles: user.userRoles.map(ur => ({
-        id: ur.role.id,
-        name: ur.role.name,
-        shop: ur.shop ? { id: ur.shop.id, name: ur.shop.name } : null,
+    return {
+      users: users.map(user => ({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        fullName: user.fullName,
+        phone: user.phone,
+        avatarUrl: user.avatarUrl,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        lastLoginAt: user.lastLoginAt,
+        createdAt: user.createdAt,
+        roles: user.userRoles.map(ur => ({
+          id: ur.role.id,
+          name: ur.role.name,
+          shop: ur.shop && ur.shop.status === 'active' ? { id: ur.shop.id, name: ur.shop.name } : null,
+        })),
       })),
-    })),
-    total,
-    page,
-    limit,
-  };
+      total,
+      page,
+      limit,
+    };
+  } catch (err) {
+    console.error('[getUsers]', err);
+    return { users: [], total: 0, page, limit };
+  }
 };
 
 export const getUserById = async (id: string, currentUser?: CurrentUser) => {
@@ -129,7 +157,9 @@ export const getUserById = async (id: string, currentUser?: CurrentUser) => {
   }
 
   const activeShopId = currentUser?.shopId ?? null;
-  if (activeShopId) {
+  const isSuperAdmin = currentUser?.roles?.includes(RoleName.super_admin) ?? false;
+  // Super Admin luôn được xem mọi user (kể cả khi assume shop)
+  if (activeShopId && !isSuperAdmin) {
     const belongsToShop = user.userRoles.some(
       (ur) => ur.shopId === activeShopId && SHOP_VISIBLE_ROLES.includes(ur.role.name)
     );
@@ -161,7 +191,7 @@ export const getUserById = async (id: string, currentUser?: CurrentUser) => {
       id: ur.role.id,
       name: ur.role.name,
       description: ur.role.description,
-      shop: ur.shop ? { id: ur.shop.id, name: ur.shop.name, code: ur.shop.code } : null,
+      shop: ur.shop && ur.shop.status === 'active' ? { id: ur.shop.id, name: ur.shop.name, code: ur.shop.code } : null,
     })),
     permissions: Array.from(permissions),
   };
@@ -214,15 +244,18 @@ export const createUser = async (data: CreateUserDto, createdBy: string, current
   // Assign role if provided
   if (activeShopId) {
     // Trong chế độ quản lý shop: bắt buộc gán vai trò và chỉ được tạo user thuộc đúng shop đang quản lý,
-    // và CHỈ tạo được nhân viên (staff)
+    // Cho phép tạo: staff, customer_service, customer (không cho phép admin hoặc super_admin)
     if (!data.roleId) {
       throw badRequest('Khi đang quản lý shop, vui lòng chọn vai trò cho người dùng');
     }
 
     const role = await prisma.role.findUnique({ where: { id: data.roleId } });
     if (!role) throw notFound('Không tìm thấy vai trò');
-    if (role.name !== RoleName.staff) {
-      throw badRequest('Trong shop chỉ được tạo tài khoản Nhân viên');
+    
+    // Chỉ cho phép tạo các role thuộc shop (không cho phép admin/super_admin)
+    const allowedRoles = [RoleName.staff, RoleName.customer_service, RoleName.customer];
+    if (!allowedRoles.includes(role.name)) {
+      throw badRequest('Trong shop chỉ được tạo tài khoản Nhân viên, Nhân viên chăm sóc khách hàng hoặc Khách hàng');
     }
   }
 
@@ -237,7 +270,36 @@ export const createUser = async (data: CreateUserDto, createdBy: string, current
     });
   }
 
-  return getUserById(user.id, currentUser);
+  // Sau khi tạo user và role, query lại để trả về đầy đủ thông tin
+  // Super Admin luôn được phép xem user mới tạo (đã sửa trong getUserById)
+  try {
+    return await getUserById(user.id, currentUser);
+  } catch (error: any) {
+    // Nếu getUserById fail (có thể do permission check), vẫn trả về user cơ bản
+    // nhưng log lỗi để debug
+    console.error('[createUser] getUserById failed after creating user:', error?.message || error);
+    // Trả về user cơ bản với thông tin role đã tạo
+    return {
+      id: user.id,
+      username: user.username,
+      email: user.email,
+      fullName: user.fullName,
+      phone: user.phone,
+      avatarUrl: user.avatarUrl,
+      status: user.status,
+      emailVerified: user.emailVerified,
+      lastLoginAt: user.lastLoginAt,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      roles: data.roleId ? [{
+        id: data.roleId,
+        name: 'unknown', // Sẽ được load lại ở lần query tiếp theo
+        description: null,
+        shop: data.shopId ? { id: data.shopId, name: '', code: '' } : null,
+      }] : [],
+      permissions: [],
+    };
+  }
 };
 
 export const updateUser = async (id: string, data: UpdateUserDto, currentUser?: CurrentUser) => {
@@ -285,13 +347,99 @@ export const updateUser = async (id: string, data: UpdateUserDto, currentUser?: 
   return getUserById(id, currentUser);
 };
 
-export const deleteUser = async (id: string) => {
-  const user = await prisma.user.findUnique({ where: { id } });
+export const deleteUser = async (id: string, options?: { transferShopToUserId?: string }) => {
+  const user = await prisma.user.findUnique({
+    where: { id },
+    include: {
+      ownedShops: { select: { id: true, name: true, status: true } },
+    },
+  });
   if (!user) {
     throw notFound('Không tìm thấy người dùng');
   }
 
-  await prisma.user.delete({ where: { id } });
+  let transferTo = options?.transferShopToUserId?.trim();
+
+  // Nếu user là chủ shop nhưng chưa chỉ định user nhận: thử chuyển sang một super_admin khác
+  if (user.ownedShops.length > 0 && !transferTo) {
+    const superAdminRole = await prisma.role.findUnique({ where: { name: RoleName.super_admin } });
+    if (superAdminRole) {
+      const otherSuperAdmin = await prisma.userRole.findFirst({
+        where: { roleId: superAdminRole.id, userId: { not: id } },
+        select: { userId: true },
+      });
+      if (otherSuperAdmin) {
+        transferTo = otherSuperAdmin.userId;
+      }
+    }
+    if (!transferTo) {
+      const names = user.ownedShops.map((s) => s.name).join(', ');
+      throw badRequest(
+        `Không thể xóa người dùng đang là chủ shop (${names}). Cần ít nhất một Super Admin khác để chuyển shop; hoặc chọn "Chuyển shop sang user khác" trong modal và chọn user nhận.`
+      );
+    }
+  }
+
+  if (transferTo) {
+    if (transferTo === id) {
+      throw badRequest('Không thể chuyển shop sang chính user đang xóa.');
+    }
+    const targetUser = await prisma.user.findUnique({ where: { id: transferTo } });
+    if (!targetUser) {
+      throw notFound('Không tìm thấy user nhận shop.');
+    }
+  }
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      // Chuyển toàn bộ shop của user sang user khác (nếu có) để tránh FK shops.owner_id RESTRICT
+      if (transferTo) {
+        await tx.shop.updateMany({ where: { ownerId: id }, data: { ownerId: transferTo } });
+      }
+
+      // Set các FK tùy chọn về null để bỏ tham chiếu tới user
+      await tx.order.updateMany({ where: { createdBy: id }, data: { createdBy: null } });
+      await tx.orderStatusHistory.updateMany({ where: { changedBy: id }, data: { changedBy: null } });
+      await tx.packageVideo.updateMany({ where: { approvedBy: id }, data: { approvedBy: null } });
+      await tx.product.updateMany({ where: { createdBy: id }, data: { createdBy: null } });
+      await tx.inventoryTransaction.updateMany({ where: { createdBy: id }, data: { createdBy: null } });
+      await tx.userRole.updateMany({ where: { assignedBy: id }, data: { assignedBy: null } });
+      await tx.returnRequest.updateMany({ where: { reviewedBy: id }, data: { reviewedBy: null } });
+
+      // Gỡ liên kết ReceivingVideo -> PackageVideo trước khi xóa PackageVideo (tránh FK khi xóa)
+      const packageVideoIds = await tx.packageVideo.findMany({ where: { recordedBy: id }, select: { id: true } });
+      if (packageVideoIds.length > 0) {
+        await tx.receivingVideo.updateMany({
+          where: { packageVideoId: { in: packageVideoIds.map((p) => p.id) } },
+          data: { packageVideoId: null },
+        });
+      }
+
+      // Xóa bản ghi phụ thuộc bắt buộc (FK required) trước khi xóa User
+      await tx.receivingVideo.deleteMany({ where: { customerId: id } });
+      await tx.packageVideo.deleteMany({ where: { recordedBy: id } });
+      await tx.returnRequest.deleteMany({ where: { customerId: id } });
+
+      // UserRole và Notification có onDelete: Cascade khi xóa User
+      await tx.user.delete({ where: { id } });
+    });
+  } catch (err: unknown) {
+    const detail = err instanceof Error ? err.message : String(err);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[deleteUser] Transaction failed:', err);
+    }
+    const prismaErr = err as { code?: string; message?: string };
+    const isFk =
+      prismaErr?.code === 'P2003' ||
+      (err instanceof Error && err.message?.toLowerCase().includes('foreign key'));
+    if (isFk) {
+      // Luôn trả chi tiết lỗi để UI hiển thị (giúp xác định bảng/FK gây lỗi)
+      throw badRequest(
+        `Không thể xóa người dùng do còn dữ liệu liên quan. Chi tiết: ${detail}`
+      );
+    }
+    throw err;
+  }
 };
 
 export const assignRole = async (

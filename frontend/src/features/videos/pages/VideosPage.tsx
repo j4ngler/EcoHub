@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Video, Search, Upload, Filter, Eye, Trash2, HardDrive, Clock } from 'lucide-react';
+import { Video, Search, Upload, Filter, Eye, Trash2, HardDrive, Clock, CheckCircle, GitCompare } from 'lucide-react';
 import { videosApi, VideoQueryParams } from '@/api/videos.api';
 import { getErrorMessage } from '@/api/axios';
 import { formatDateTime } from '@/utils/format';
 import toast from 'react-hot-toast';
+import Modal from '@/components/ui/Modal';
 
 export default function VideosPage() {
   const navigate = useNavigate();
@@ -30,6 +31,20 @@ export default function VideosPage() {
       toast.success('Đã xóa video');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
+  });
+  const approveMutation = useMutation({
+    mutationFn: (id: string) => videosApi.approveVideo(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['videos'] });
+      toast.success('Đã phê duyệt video');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+  const [compareVideoId, setCompareVideoId] = useState<string | null>(null);
+  const { data: compareData, isLoading: compareLoading } = useQuery({
+    queryKey: ['videos', 'compare', compareVideoId],
+    queryFn: () => (compareVideoId ? videosApi.compareVideos(compareVideoId) : Promise.resolve(null)),
+    enabled: !!compareVideoId,
   });
   const handleDelete = (id: string) => {
     if (window.confirm('Bạn có chắc muốn xóa video này?')) deleteMutation.mutate(id);
@@ -250,14 +265,35 @@ export default function VideosPage() {
                           <Eye className="h-5 w-5" />
                         </button>
                         {!video.deletedAt && (
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(video.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Xóa video"
-                          >
-                            <Trash2 className="h-5 w-5" />
-                          </button>
+                          <>
+                            {!video.approvedAt && (video.processingStatus === 'completed' || video.processingStatus === 'uploaded') && (
+                              <button
+                                type="button"
+                                onClick={() => approveMutation.mutate(video.id)}
+                                disabled={approveMutation.isPending}
+                                className="text-green-600 hover:text-green-900"
+                                title="Phê duyệt video"
+                              >
+                                <CheckCircle className="h-5 w-5" />
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setCompareVideoId(video.id)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="So sánh video đóng gói / nhận hàng"
+                            >
+                              <GitCompare className="h-5 w-5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(video.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Xóa video"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </>
                         )}
                       </div>
                     </td>
@@ -293,6 +329,70 @@ export default function VideosPage() {
           </button>
         </div>
       )}
+
+      {/* Modal so sánh video đóng gói vs nhận hàng */}
+      <Modal
+        open={!!compareVideoId}
+        onClose={() => setCompareVideoId(null)}
+        title="So sánh video đóng gói / nhận hàng"
+        size="lg"
+      >
+        {compareLoading ? (
+          <div className="flex justify-center py-8">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-emerald-600" />
+          </div>
+        ) : compareData ? (
+          <div className="space-y-4">
+            {compareData.order && (
+              <p className="text-sm text-gray-600">
+                Đơn: <strong>{compareData.order.orderCode}</strong> — {compareData.order.customerName}
+              </p>
+            )}
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Video đóng gói ({compareData.packageVideo.trackingCode})</p>
+              <div className="rounded-lg overflow-hidden bg-gray-100">
+                {compareData.packageVideo.videoUrl ? (
+                  <video
+                    src={compareData.packageVideo.videoUrl}
+                    controls
+                    className="w-full max-h-64"
+                  />
+                ) : (
+                  <p className="p-4 text-gray-500">Không có video</p>
+                )}
+              </div>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-gray-700 mb-2">Video nhận hàng ({compareData.receivingVideos?.length ?? 0})</p>
+              {compareData.receivingVideos?.length ? (
+                <div className="space-y-2">
+                  {compareData.receivingVideos.map((rv: { id: string; videoUrl: string; customer?: { fullName: string }; recordedAt?: string }) => (
+                    <div key={rv.id} className="rounded-lg overflow-hidden bg-gray-100 p-2">
+                      {rv.videoUrl ? (
+                        <video src={rv.videoUrl} controls className="w-full max-h-48" />
+                      ) : (
+                        <p className="p-2 text-gray-500">Không có video</p>
+                      )}
+                      {rv.customer && <p className="text-xs text-gray-500 mt-1">{rv.customer.fullName}</p>}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">Chưa có video nhận hàng nào.</p>
+              )}
+            </div>
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={() => setCompareVideoId(null)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   );
 }

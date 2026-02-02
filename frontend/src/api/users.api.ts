@@ -68,8 +68,15 @@ export const usersApi = {
     const res = await api.put(`/users/${id}`, payload);
     return res.data.data;
   },
-  remove: async (id: string): Promise<void> => {
-    await api.delete(`/users/${id}`);
+  remove: async (id: string, options?: { transferShopToUserId?: string }): Promise<void> => {
+    await api.delete(`/users/${id}`, { data: options });
+  },
+  assignRole: async (userId: string, payload: { roleId: string; shopId?: string | null }): Promise<UsersUser> => {
+    const res = await api.post(`/users/${userId}/roles`, payload);
+    return res.data.data;
+  },
+  removeRole: async (userId: string, roleId: string): Promise<void> => {
+    await api.delete(`/users/${userId}/roles/${roleId}`);
   },
 };
 

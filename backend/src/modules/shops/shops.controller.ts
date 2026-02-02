@@ -14,6 +14,11 @@ export const listShops = async (req: AuthRequest, res: Response, next: NextFunct
 
 export const createShop = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    // Khi đang assume shop (impersonating), không cho phép tạo shop mới
+    if (req.user?.impersonating || req.user?.shopId) {
+      const { forbidden } = await import('../../middlewares/error.middleware');
+      return next(forbidden('Không thể tạo shop khi đang ở chế độ quản lý shop. Vui lòng thoát quản lý shop trước.'));
+    }
     const shop = await shopsService.createShop(req.body);
     created(res, shop, 'Tạo shop thành công');
   } catch (err) {
@@ -23,6 +28,11 @@ export const createShop = async (req: AuthRequest, res: Response, next: NextFunc
 
 export const deleteShop = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    // Khi đang assume shop (impersonating), không cho phép xóa shop
+    if (req.user?.impersonating || req.user?.shopId) {
+      const { forbidden } = await import('../../middlewares/error.middleware');
+      return next(forbidden('Không thể xóa shop khi đang ở chế độ quản lý shop. Vui lòng thoát quản lý shop trước.'));
+    }
     await shopsService.deleteShop(
       req.params.id,
       req.user!.userId,

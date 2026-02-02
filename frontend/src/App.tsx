@@ -18,6 +18,8 @@ import InventoryPage from '@/features/products/pages/InventoryPage';
 import SettingsPage from '@/features/settings/pages/SettingsPage';
 import ReceivingVideosPage from '@/features/videos/pages/ReceivingVideosPage';
 import ShopsPage from '@/features/shops/pages/ShopsPage';
+import ReturnsPage from '@/features/returns/pages/ReturnsPage';
+import ShippingSettingsPage from '@/features/settings/pages/ShippingSettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -69,7 +71,9 @@ function App() {
           <Route path="users" element={<UsersPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="settings/shipping" element={<ShippingSettingsPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="returns" element={<ReturnsPage />} />
           <Route path="shops" element={<ShopsPage />} />
         </Route>
         

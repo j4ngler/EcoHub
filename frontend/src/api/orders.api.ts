@@ -39,6 +39,11 @@ export interface Order {
   channel?: { id: string; name: string; code: string };
   carrier?: { id: string; name: string; code: string };
   hasVideo?: boolean;
+  packageVideos?: Array<{ id: string; trackingCode: string; [key: string]: unknown }>;
+  statusHistory?: Array<{ id: string; status: string; createdAt: string; [key: string]: unknown }>;
+  packedAt?: string | null;
+  shippedAt?: string | null;
+  deliveredAt?: string | null;
 }
 
 export interface OrdersResponse {

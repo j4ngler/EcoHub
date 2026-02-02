@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Search, ArrowRightCircle, LogOut, Phone, Globe, MapPin, CheckCircle2, Plus, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-import { shopsApi } from '@/api/shops.api';
+import { shopsApi, type Shop } from '@/api/shops.api';
 import { authApi } from '@/api/auth.api';
 import { getErrorMessage } from '@/api/axios';
 import { useAuthStore } from '@/store/authStore';
@@ -41,8 +41,16 @@ export default function ShopsPage() {
     queryFn: shopsApi.list,
   });
 
+  const isManagingShop = !!activeShopId; // Đang ở chế độ quản lý shop
+
   const filtered = useMemo(() => {
-    const list = shops || [];
+    let list = shops || [];
+    
+    // Khi đang quản lý shop, chỉ hiển thị shop đang quản lý
+    if (isManagingShop && activeShopId) {
+      list = list.filter((s) => s.id === activeShopId);
+    }
+    
     const keyword = q.trim().toLowerCase();
     if (!keyword) return list;
     return list.filter((s) =>
@@ -50,7 +58,7 @@ export default function ShopsPage() {
         .toLowerCase()
         .includes(keyword)
     );
-  }, [shops, q]);
+  }, [shops, q, isManagingShop, activeShopId]);
 
   const assumeMutation = useMutation({
     mutationFn: (shopId: string | null) => authApi.assumeShop(shopId),
@@ -137,18 +145,22 @@ export default function ShopsPage() {
           <p className="text-gray-500">Bấm vào một shop để vào quyền quản lý như admin shop đó.</p>
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            Thêm shop
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => assumeMutation.mutate(null)}
-            disabled={assumeMutation.isPending}
-          >
-            <LogOut className="w-4 h-4 mr-2" />
-            Thoát quản lý shop
-          </Button>
+          {!isManagingShop && (
+            <Button onClick={() => setCreateOpen(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              Thêm shop
+            </Button>
+          )}
+          {isManagingShop && (
+            <Button
+              variant="outline"
+              onClick={() => assumeMutation.mutate(null)}
+              disabled={assumeMutation.isPending}
+            >
+              <LogOut className="w-4 h-4 mr-2" />
+              Thoát quản lý shop
+            </Button>
+          )}
         </div>
       </div>
 
@@ -218,27 +230,41 @@ export default function ShopsPage() {
                     </div>
 
                     <div className="shrink-0 flex flex-col items-end gap-2">
-                      <Button
-                        onClick={() => assumeMutation.mutate(s.id)}
-                        disabled={assumeMutation.isPending}
-                        className={activeShopId === s.id ? 'bg-emerald-600 hover:bg-emerald-700' : undefined}
-                      >
-                        <ArrowRightCircle className="w-4 h-4 mr-2" />
-                        {activeShopId === s.id ? 'Vào shop' : 'Quản lý'}
-                      </Button>
+                      {!isManagingShop && (
+                        <Button
+                          onClick={() => assumeMutation.mutate(s.id)}
+                          disabled={assumeMutation.isPending}
+                          className={activeShopId === s.id ? 'bg-emerald-600 hover:bg-emerald-700' : undefined}
+                        >
+                          <ArrowRightCircle className="w-4 h-4 mr-2" />
+                          {activeShopId === s.id ? 'Vào shop' : 'Quản lý'}
+                        </Button>
+                      )}
+                      {isManagingShop && activeShopId === s.id && (
+                        <Button
+                          onClick={() => assumeMutation.mutate(s.id)}
+                          disabled={assumeMutation.isPending}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          <ArrowRightCircle className="w-4 h-4 mr-2" />
+                          Vào shop
+                        </Button>
+                      )}
                       {s.role && <Badge variant="info">Role: {s.role}</Badge>}
-                      <button
-                        type="button"
-                        className="mt-1 inline-flex items-center text-xs text-red-500 hover:text-red-700"
-                        onClick={() => {
-                          setShopToDelete(s as any);
-                          setDeletePassword('');
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        <Trash2 className="w-3 h-3 mr-1" />
-                        Xóa shop
-                      </button>
+                      {!isManagingShop && (
+                        <button
+                          type="button"
+                          className="mt-1 inline-flex items-center text-xs text-red-500 hover:text-red-700"
+                          onClick={() => {
+                            setShopToDelete(s as any);
+                            setDeletePassword('');
+                            setDeleteOpen(true);
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3 mr-1" />
+                          Xóa shop
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -370,7 +396,7 @@ export default function ShopsPage() {
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              variant="danger"
               disabled={!shopToDelete || !deletePassword || deleteShopMutation.isPending}
               onClick={() => deleteShopMutation.mutate()}
             >

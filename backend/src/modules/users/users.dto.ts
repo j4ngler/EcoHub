@@ -6,7 +6,11 @@ export const queryUsersSchema = z.object({
     limit: z.string().optional(),
     search: z.string().optional(),
     role: z.string().optional(),
-    status: z.enum(['active', 'inactive', 'suspended']).optional(),
+    // Cho phép chuỗi rỗng từ dropdown "Tất cả" → coi như undefined
+    status: z.preprocess(
+      (val) => (val === '' || val === undefined ? undefined : val),
+      z.enum(['active', 'inactive', 'suspended']).optional()
+    ),
   }),
 });
 
@@ -25,7 +29,12 @@ export const createUserSchema = z.object({
     phone: z.string().optional(),
     status: z.enum(['active', 'inactive', 'suspended']).optional(),
     roleId: z.string().uuid().optional(),
-    shopId: z.string().uuid('Vui lòng chọn shop'),
+    // shopId là optional vì backend sẽ tự lấy từ req.user.shopId khi assume shop
+    // Nếu không có trong context thì sẽ validate trong service
+    shopId: z.preprocess(
+      (val) => (val === '' || val === null ? undefined : val),
+      z.string().uuid('Shop ID không hợp lệ').optional()
+    ),
   }),
 });
 
