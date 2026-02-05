@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}EcoHub Demo - Quay video{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card card-ecohub mb-4">
+      <div class="card-header">Camera quay (Camera 1)</div>
+      <div class="card-body p-0">
+        <div class="camera-wrap">
+          <img id="cameraStream" src="{{ url_for('video_feed', index=0) }}" class="img-fluid w-100" alt="Camera 1">
+        </div>
+      </div>
+    </div>
+    {% if num_cameras and num_cameras > 1 %}
+      <div class="card card-ecohub">
+        <div class="card-header">Camera phụ (dùng để quét mã)</div>
+        <div class="card-body">
+          <div class="row g-2">
+            {% for i in range(1, num_cameras) %}
+              <div class="col-md-6">
+                <p class="small text-muted mb-1">Camera {{ i + 1 }}</p>
+                <div class="camera-wrap rounded" style="min-height:180px">
+                  <img src="{{ url_for('video_feed', index=i) }}" class="img-fluid w-100" alt="Camera {{ i + 1 }}">
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+          <p class="text-muted small mb-0 mt-2">Ghi hình mặc định từ Camera 1. Camera phụ dùng để quét mã nhanh hơn.</p>
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  <div class="col-lg-4">
+    <div class="card card-ecohub mb-3">
+      <div class="card-header">Mã đơn (từ AI quét)</div>
+      <div class="card-body">
+        <p id="orderCode" class="fs-5 fw-bold text-primary mb-2">{% if current_order_code %}{{ current_order_code }}{% else %}Chưa quét được mã{% endif %}</p>
+        <button id="resetOrderBtn" class="btn btn-outline-secondary btn-sm">Reset mã</button>
+        <p class="text-muted small mt-2 mb-0">Quay video có thể bắt đầu ngay cả khi chưa quét mã (hệ thống sẽ dùng mã tạm).</p>
+      </div>
+    </div>
+    <div class="card card-ecohub">
+      <div class="card-header">Quay video</div>
+      <div class="card-body">
+        <p class="mb-2">Trạng thái: <span id="recordStatus" class="badge badge-status bg-secondary">Idle</span></p>
+        <p class="mb-3">Thời gian: <span id="recordTimer">00:00</span></p>
+        <div class="d-grid gap-2">
+          <button id="startBtn" class="btn btn-ecohub btn-lg">Bắt đầu quay</button>
+          <button id="stopBtn" class="btn btn-outline-danger btn-lg" disabled>Kết thúc</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}

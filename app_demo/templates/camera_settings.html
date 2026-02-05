@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}EcoHub Demo - Cài đặt camera{% endblock %}
+{% block content %}
+<h4 class="mb-4">Cài đặt camera</h4>
+
+<div class="card card-ecohub mb-4">
+  <div class="card-body">
+    <p class="text-muted small mb-3">Đang dùng <strong>{{ num_cameras }}</strong> camera. Bật/tắt từng camera rồi bấm <strong>Áp dụng</strong>.</p>
+    <form method="post" action="{{ url_for('camera_settings') }}">
+      {% for i in range(MAX_CAMERAS) %}
+        {% set cfg = camera_configs[i] if i < camera_configs|length else {} %}
+        <div class="d-flex flex-wrap align-items-center gap-2 gap-md-3 py-3 border-bottom cam-row">
+          <div class="form-check mb-0">
+            <input type="checkbox" name="enable_{{ i }}" value="1" id="enable_{{ i }}" class="form-check-input" {% if i < camera_configs|length %}checked{% endif %}>
+            <label class="form-check-label fw-medium" for="enable_{{ i }}">Camera {{ i + 1 }}</label>
+          </div>
+          <div class="d-flex gap-2 flex-wrap align-items-center cam-options">
+            <span class="text-muted small">Nguồn:</span>
+            <div class="d-flex gap-2">
+              <div class="form-check form-check-inline mb-0">
+                <input type="radio" name="source_type_{{ i }}" value="{{ SOURCE_USB }}" id="usb_{{ i }}" class="form-check-input" {% if cfg.get('source_type', SOURCE_USB) == SOURCE_USB %}checked{% endif %}>
+                <label class="form-check-label small" for="usb_{{ i }}">USB</label>
+              </div>
+              <div class="form-check form-check-inline mb-0">
+                <input type="radio" name="source_type_{{ i }}" value="{{ SOURCE_RTSP }}" id="rtsp_{{ i }}" class="form-check-input" {% if cfg.get('source_type') == SOURCE_RTSP %}checked{% endif %}>
+                <label class="form-check-label small" for="rtsp_{{ i }}">RTSP</label>
+              </div>
+            </div>
+            <span class="cam-usb-{{ i }}">
+              <select name="camera_index_{{ i }}" class="form-select form-select-sm" style="width:auto">
+                {% for idx in available_cameras %}
+                  <option value="{{ idx }}" {% if idx == cfg.get('camera_index', 0) %}selected{% endif %}>Camera {{ idx }}</option>
+                {% endfor %}
+                {% if not available_cameras %}<option value="0">Camera 0</option>{% endif %}
+              </select>
+            </span>
+            <span class="cam-rtsp-{{ i }}" style="display:none">
+              <input type="text" name="rtsp_url_{{ i }}" class="form-control form-control-sm" value="{{ cfg.get('rtsp_url', '') }}" placeholder="rtsp://..." style="min-width:220px">
+            </span>
+          </div>
+        </div>
+      {% endfor %}
+
+      <div class="mt-4 pt-3 border-top">
+        <div class="d-flex flex-wrap align-items-center gap-3 mb-3">
+          <div>
+            <label class="form-label small text-muted mb-0">Độ nhạy quét mã</label>
+            <select name="scan_sensitivity" class="form-select form-select-sm" style="width:auto">
+              <option value="{{ SENSITIVITY_LOW }}"   {% if scan_sensitivity == SENSITIVITY_LOW %}selected{% endif %}>Thấp</option>
+              <option value="{{ SENSITIVITY_NORMAL }}" {% if scan_sensitivity == SENSITIVITY_NORMAL %}selected{% endif %}>Trung bình</option>
+              <option value="{{ SENSITIVITY_HIGH }}"  {% if scan_sensitivity == SENSITIVITY_HIGH %}selected{% endif %}>Cao</option>
+            </select>
+          </div>
+          <div class="form-check mb-0">
+            <input type="checkbox" name="auto_record_on_qr" value="1" id="auto_record_on_qr" class="form-check-input" {% if auto_record_on_qr %}checked{% endif %}>
+            <label class="form-check-label small" for="auto_record_on_qr">
+              🎬 Tự động quay video khi quét được QR
+            </label>
+          </div>
+        </div>
+        <div>
+          <button type="submit" class="btn btn-ecohub">Áp dụng</button>
+          <a href="{{ url_for('dashboard') }}" class="btn btn-outline-secondary">Về Dashboard</a>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card card-ecohub">
+  <div class="card-header">Xem trước</div>
+  <div class="card-body">
+    {% if num_cameras and num_cameras > 1 %}
+      <div class="row g-2">
+        {% for i in range(num_cameras) %}
+          <div class="col-md-6">
+            <p class="small text-muted mb-1">Camera {{ i + 1 }}</p>
+            <div class="camera-wrap rounded">
+              <img src="{{ url_for('video_feed', index=i) }}" class="img-fluid w-100" alt="Cam {{ i + 1 }}">
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="camera-wrap rounded">
+        <img src="{{ url_for('video_feed') }}" class="img-fluid w-100" alt="Preview">
+      </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  (function(){
+    for (var i = 0; i < {{ MAX_CAMERAS }}; i++) {
+      (function(idx){
+        var usb = document.getElementById('usb_' + idx);
+        var rtsp = document.getElementById('rtsp_' + idx);
+        var usbSpan = document.querySelector('.cam-usb-' + idx);
+        var rtspSpan = document.querySelector('.cam-rtsp-' + idx);
+        function up() {
+          var on = rtsp && rtsp.checked;
+          if (usbSpan) usbSpan.style.display = on ? 'none' : 'inline';
+          if (rtspSpan) rtspSpan.style.display = on ? 'inline' : 'none';
+        }
+        if (usb) usb.addEventListener('change', up);
+        if (rtsp) rtsp.addEventListener('change', up);
+        up();
+      })(i);
+    }
+  })();
+</script>
+{% endblock %}

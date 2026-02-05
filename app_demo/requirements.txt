@@ -1,0 +1,5 @@
+flask>=2.3.0
+opencv-python
+pyzbar
+numpy
+

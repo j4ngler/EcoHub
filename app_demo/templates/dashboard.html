@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}EcoHub Demo - Dashboard{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card card-ecohub mb-4">
+      <div class="card-header">
+        Camera live + AI quét mã {% if num_cameras and num_cameras > 1 %}({{ num_cameras }} camera){% endif %}
+      </div>
+      <div class="card-body p-0">
+        {% if num_cameras and num_cameras > 1 %}
+          <div class="row g-2 p-2">
+            {% for i in range(num_cameras) %}
+              <div class="col-md-6">
+                <p class="small text-muted mb-1">Camera {{ i + 1 }}</p>
+                <div class="camera-wrap">
+                  <img src="{{ url_for('video_feed', index=i) }}" class="img-fluid w-100" alt="Camera {{ i + 1 }}">
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="camera-wrap">
+            <img id="cameraStream" src="{{ url_for('video_feed') }}" class="img-fluid w-100" alt="Camera">
+          </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4">
+    <div class="card card-ecohub mb-3">
+      <div class="card-header">Mã đơn hiện tại</div>
+      <div class="card-body">
+        <p id="orderCode" class="fs-5 fw-bold text-primary mb-2">
+          {% if current_order_code %}{{ current_order_code }}{% else %}Chưa quét được mã{% endif %}
+        </p>
+        <button id="resetOrderBtn" class="btn btn-outline-secondary btn-sm">Reset mã</button>
+      </div>
+    </div>
+    <div class="card card-ecohub mb-3">
+      <div class="card-header">Thông tin đơn hàng</div>
+      <div class="card-body" id="orderInfo">
+        {% if current_order_info %}
+          <p class="mb-1"><strong>Mã đơn:</strong> {{ current_order_info.order_id }}</p>
+          <p class="mb-1"><strong>Nền tảng:</strong> {{ current_order_info.platform }}</p>
+          <ul class="mb-0 ps-3">
+            {% for item in current_order_info.get('items', []) %}
+              <li>{{ item.qty }} x {{ item.name }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted small mb-0">Quét mã QR/Barcode bằng camera để hiển thị đơn hàng.</p>
+        {% endif %}
+      </div>
+    </div>
+    <div class="card card-ecohub">
+      <div class="card-header">Quay video</div>
+      <div class="card-body">
+        <p class="mb-2">Trạng thái: <span id="recordStatus" class="badge badge-status bg-secondary">Idle</span></p>
+        <p class="mb-3">Thời gian: <span id="recordTimer">00:00</span></p>
+        <div class="d-grid gap-2">
+          <button id="startBtn" class="btn btn-ecohub">Bắt đầu quay</button>
+          <button id="stopBtn" class="btn btn-outline-danger" disabled>Kết thúc</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+{% endblock %}
