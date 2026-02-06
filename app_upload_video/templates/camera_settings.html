@@ -1,0 +1,548 @@
+{% extends "base.html" %}
+{% block title %}EcoHub - Cài đặt camera{% endblock %}
+{% block content %}
+
+<style>
+/* ===== CAMERA SETTINGS STYLES ===== */
+.settings-header {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: white;
+  padding: 1.25rem 1.5rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
+}
+
+.settings-header h4 {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.settings-header p {
+  margin: 0.25rem 0 0 0;
+  opacity: 0.9;
+  font-size: 0.875rem;
+}
+
+.config-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.info-text {
+  background: #f0fdfa;
+  border-left: 3px solid #0d9488;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.25rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #0f766e;
+}
+
+.camera-item {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  border: 1px solid #e2e8f0;
+  transition: border-color 0.2s;
+}
+
+.camera-item:hover {
+  border-color: #0d9488;
+}
+
+.camera-item.disabled {
+  opacity: 0.6;
+  background: #fafafa;
+}
+
+.camera-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.camera-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.camera-toggle .form-check-input {
+  width: 2rem;
+  height: 1.1rem;
+  cursor: pointer;
+  border-radius: 1rem;
+}
+
+.camera-toggle .form-check-input:checked {
+  background-color: #0d9488;
+  border-color: #0d9488;
+}
+
+.camera-toggle label {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.9rem;
+  cursor: pointer;
+  margin: 0;
+}
+
+.camera-badge {
+  background: #0d9488;
+  color: white;
+  padding: 0.2rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.camera-badge.inactive {
+  background: #94a3b8;
+}
+
+.source-selector {
+  background: white;
+  border-radius: 6px;
+  padding: 0.875rem;
+  border: 1px solid #e2e8f0;
+}
+
+.source-label {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.8rem;
+  margin-bottom: 0.5rem;
+  display: block;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.source-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.source-tabs .form-check {
+  flex: 1;
+}
+
+.source-tabs .form-check-input {
+  display: none;
+}
+
+.source-tabs .form-check-label {
+  display: block;
+  text-align: center;
+  padding: 0.5rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+  color: #64748b;
+}
+
+.source-tabs .form-check-input:checked + .form-check-label {
+  background: #0d9488;
+  color: white;
+  border-color: #0d9488;
+}
+
+.source-tabs .form-check-label:hover {
+  border-color: #0d9488;
+}
+
+.source-input {
+  margin-top: 0.5rem;
+}
+
+.source-input select,
+.source-input input {
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.source-input select:focus,
+.source-input input:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+}
+
+.ai-settings {
+  display: flex;
+  gap: 1.5rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.setting-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.setting-item label {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.setting-item select {
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  min-width: 140px;
+}
+
+.auto-record-box {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: #f8fafc;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+}
+
+.auto-record-box .form-check-input {
+  width: 2rem;
+  height: 1.1rem;
+  cursor: pointer;
+  border-radius: 1rem;
+}
+
+.auto-record-box .form-check-input:checked {
+  background-color: #0d9488;
+  border-color: #0d9488;
+}
+
+.auto-record-box label {
+  cursor: pointer;
+  margin: 0;
+  font-weight: 500;
+  color: #334155;
+  font-size: 0.875rem;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-apply {
+  background: #0d9488;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.btn-apply:hover {
+  background: #0f766e;
+  color: white;
+}
+
+.btn-back {
+  background: white;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  border-color: #0d9488;
+  color: #0d9488;
+}
+
+.preview-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.camera-preview-item {
+  background: #0f172a;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  margin-bottom: 0.75rem;
+}
+
+.camera-preview-item::before {
+  content: '';
+  display: block;
+  padding-top: 56.25%;
+}
+
+.camera-preview-item img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.camera-label {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  z-index: 1;
+}
+
+@media (max-width: 768px) {
+  .settings-header {
+    padding: 1rem;
+  }
+  
+  .config-card {
+    padding: 1rem;
+  }
+  
+  .camera-item {
+    padding: 0.875rem;
+  }
+  
+  .ai-settings {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .btn-apply,
+  .btn-back {
+    width: 100%;
+  }
+}
+</style>
+
+<!-- Header -->
+<div class="settings-header">
+  <h4>⚙️ Cài đặt camera</h4>
+  <p>Quản lý camera và cấu hình AI quét mã</p>
+</div>
+
+<!-- Configuration Form -->
+<form method="post" action="{{ url_for('camera_settings') }}">
+  <div class="config-card">
+    <div class="section-title">📹 Cấu hình camera ({{ num_cameras }}/{{ MAX_CAMERAS }})</div>
+    
+    <div class="info-text">
+      Bật/tắt từng camera, chọn nguồn (USB hoặc RTSP), sau đó nhấn <strong>Áp dụng</strong>.
+    </div>
+
+    {% for i in range(MAX_CAMERAS) %}
+      {% set cfg = camera_configs[i] if i < camera_configs|length else {} %}
+      {% set is_enabled = i < camera_configs|length %}
+      
+      <div class="camera-item {% if not is_enabled %}disabled{% endif %}" id="camera-item-{{ i }}">
+        <div class="camera-header">
+          <div class="camera-toggle">
+            <input type="checkbox" 
+                   name="enable_{{ i }}" 
+                   value="1" 
+                   id="enable_{{ i }}" 
+                   class="form-check-input" 
+                   {% if is_enabled %}checked{% endif %}
+                   onchange="toggleCamera({{ i }})">
+            <label class="form-check-label" for="enable_{{ i }}">Camera {{ i + 1 }}</label>
+          </div>
+          <span class="camera-badge {% if not is_enabled %}inactive{% endif %}">
+            {% if is_enabled %}Bật{% else %}Tắt{% endif %}
+          </span>
+        </div>
+
+        <div class="source-selector" id="source-selector-{{ i }}">
+          <span class="source-label">Nguồn camera</span>
+          
+          <div class="source-tabs">
+            <div class="form-check">
+              <input type="radio" 
+                     name="source_type_{{ i }}" 
+                     value="{{ SOURCE_USB }}" 
+                     id="usb_{{ i }}" 
+                     class="form-check-input" 
+                     {% if cfg.get('source_type', SOURCE_USB) == SOURCE_USB %}checked{% endif %}>
+              <label class="form-check-label" for="usb_{{ i }}">USB</label>
+            </div>
+            <div class="form-check">
+              <input type="radio" 
+                     name="source_type_{{ i }}" 
+                     value="{{ SOURCE_RTSP }}" 
+                     id="rtsp_{{ i }}" 
+                     class="form-check-input" 
+                     {% if cfg.get('source_type') == SOURCE_RTSP %}checked{% endif %}>
+              <label class="form-check-label" for="rtsp_{{ i }}">RTSP</label>
+            </div>
+          </div>
+
+          <div class="source-input cam-usb-{{ i }}">
+            <select name="camera_index_{{ i }}" class="form-control">
+              {% for idx in available_cameras %}
+                <option value="{{ idx }}" {% if idx == cfg.get('camera_index', 0) %}selected{% endif %}>
+                  Camera {{ idx }}
+                </option>
+              {% endfor %}
+              {% if not available_cameras %}
+                <option value="0">Camera 0</option>
+              {% endif %}
+            </select>
+          </div>
+
+          <div class="source-input cam-rtsp-{{ i }}" style="display:none">
+            <input type="text" 
+                   name="rtsp_url_{{ i }}" 
+                   class="form-control" 
+                   value="{{ cfg.get('rtsp_url', '') }}" 
+                   placeholder="rtsp://...">
+          </div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+
+  <div class="config-card">
+    <div class="section-title">🤖 Cài đặt AI</div>
+
+    <div class="ai-settings">
+      <div class="setting-item">
+        <label for="scan_sensitivity">Độ nhạy quét mã</label>
+        <select name="scan_sensitivity" id="scan_sensitivity" class="form-select">
+          <option value="{{ SENSITIVITY_LOW }}" {% if scan_sensitivity == SENSITIVITY_LOW %}selected{% endif %}>
+            Thấp
+          </option>
+          <option value="{{ SENSITIVITY_NORMAL }}" {% if scan_sensitivity == SENSITIVITY_NORMAL %}selected{% endif %}>
+            Trung bình
+          </option>
+          <option value="{{ SENSITIVITY_HIGH }}" {% if scan_sensitivity == SENSITIVITY_HIGH %}selected{% endif %}>
+            Cao
+          </option>
+        </select>
+      </div>
+
+      <div class="auto-record-box">
+        <input type="checkbox" 
+               name="auto_record_on_qr" 
+               value="1" 
+               id="auto_record_on_qr" 
+               class="form-check-input" 
+               {% if auto_record_on_qr %}checked{% endif %}>
+        <label class="form-check-label" for="auto_record_on_qr">
+          Tự động quay video khi quét được QR
+        </label>
+      </div>
+    </div>
+
+    <div class="action-buttons">
+      <button type="submit" class="btn btn-apply">Áp dụng</button>
+      <a href="{{ url_for('dashboard') }}" class="btn btn-back">Hủy</a>
+    </div>
+  </div>
+</form>
+
+<!-- Preview Section -->
+<div class="preview-card">
+  <div class="section-title">👁️ Xem trước</div>
+
+  {% if num_cameras and num_cameras > 1 %}
+    <div class="row g-2">
+      {% for i in range(num_cameras) %}
+        <div class="col-md-6">
+          <div class="camera-preview-item">
+            <span class="camera-label">Camera {{ i + 1 }}</span>
+            <img src="{{ url_for('video_feed', index=i) }}" alt="Camera {{ i + 1 }}">
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="camera-preview-item">
+      <span class="camera-label">Camera 1</span>
+      <img src="{{ url_for('video_feed') }}" alt="Camera">
+    </div>
+  {% endif %}
+</div>
+
+<script>
+function toggleCamera(idx) {
+  const checkbox = document.getElementById('enable_' + idx);
+  const item = document.getElementById('camera-item-' + idx);
+  const selector = document.getElementById('source-selector-' + idx);
+  
+  if (checkbox.checked) {
+    item.classList.remove('disabled');
+    if (selector) selector.style.opacity = '1';
+  } else {
+    item.classList.add('disabled');
+    if (selector) selector.style.opacity = '0.5';
+  }
+}
+
+(function(){
+  for (var i = 0; i < {{ MAX_CAMERAS }}; i++) {
+    (function(idx){
+      var usb = document.getElementById('usb_' + idx);
+      var rtsp = document.getElementById('rtsp_' + idx);
+      var usbSpan = document.querySelector('.cam-usb-' + idx);
+      var rtspSpan = document.querySelector('.cam-rtsp-' + idx);
+      
+      function updateSourceDisplay() {
+        var isRtsp = rtsp && rtsp.checked;
+        if (usbSpan) usbSpan.style.display = isRtsp ? 'none' : 'block';
+        if (rtspSpan) rtspSpan.style.display = isRtsp ? 'block' : 'none';
+      }
+      
+      if (usb) usb.addEventListener('change', updateSourceDisplay);
+      if (rtsp) rtsp.addEventListener('change', updateSourceDisplay);
+      updateSourceDisplay();
+    })(i);
+  }
+})();
+</script>
+{% endblock %}

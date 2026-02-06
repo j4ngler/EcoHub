@@ -1,0 +1,23 @@
+{
+  "camera_configs": [
+    {
+      "source_type": "rtsp",
+      "camera_index": 0,
+      "rtsp_url": "rtsp://admin:UIZCHI@192.168.1.17:554/cam/realmonitor?channel=1&subtype=0",
+      "width": 1280,
+      "height": 720,
+      "fps": 20.0
+    }
+  ],
+  "scan_sensitivity": "normal",
+  "auto_record_on_qr": false,
+  "storage_mode": "s3",
+  "s3_config": {
+    "endpoint": "https://s3.hn-2.cloud.cmctelecom.vn",
+    "access_key": "Z0FBQUFBQnBoWXdXSzJaNUcyeGdKQ1hxWm95bTM0TmF1X1JyR0Joa3RSOExGamx6enVTdFNycGY4Vi1QRnVoYnptTGZDY1dzczlmSklyanBKQUV1YVVIQXd4ZnoxRkR1cG5fVmNvT1lSQ0hrOXpYUDMyclhPQWM9",
+    "secret_key": "Z0FBQUFBQnBoWXdXbUxkbEtfZEhsSzFLRzdxSkgtd1hNRHYwaTVfVHlELWZ4b053OURoWmQzcDNYalduMk9pcFhSSzFhbjVEeFZvZ3BxS0tVZG50RzFXMG80NmxDVFg2R3Y3QU44ZmZWQ1llUjJoZFU0Y3BOZ2NhSUlHTXhSbEdscWh4aWZQMVJUdWE=",
+    "bucket": "komex-demo-before-tet",
+    "region": "hn-2",
+    "prefix": "Tuyền"
+  }
+}

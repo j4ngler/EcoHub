@@ -1,250 +1,366 @@
-# EcoHub – Tổng hợp dự án
+# EcoHub – Tổng quan hệ thống & tài liệu dự án
 
-## 1. Bảng danh sách API đang xây và lỗi
-
-| Module | Method | Endpoint | Mô tả | Trạng thái | Lỗi / Ghi chú |
-|--------|--------|----------|--------|------------|----------------|
-| **Auth** | POST | `/api/auth/register` | Đăng ký | ✅ | - |
-| | POST | `/api/auth/login` | Đăng nhập | ✅ | - |
-| | POST | `/api/auth/refresh-token` | Làm mới token | ✅ | - |
-| | POST | `/api/auth/logout` | Đăng xuất | ✅ | - |
-| | GET | `/api/auth/me` | Thông tin user hiện tại | ✅ | - |
-| | PUT | `/api/auth/me` | Cập nhật profile | ✅ | - |
-| | PUT | `/api/auth/change-password` | Đổi mật khẩu | ✅ | - |
-| | POST | `/api/auth/assume-shop` | Chuyển ngữ cảnh shop | ✅ | - |
-| **Users** | GET | `/api/users` | Danh sách users | ✅ | - |
-| | GET | `/api/users/:id` | Chi tiết user | ✅ | - |
-| | POST | `/api/users` | Tạo user | ✅ | - |
-| | PUT | `/api/users/:id` | Cập nhật user | ✅ | - |
-| | DELETE | `/api/users/:id` | Xóa user | ⚠️ | Khi user là chủ shop: gửi body `{ transferShopToUserId }` hoặc để backend tự chuyển sang Super Admin khác |
-| | POST | `/api/users/:id/roles` | Gán vai trò | ✅ | - |
-| | DELETE | `/api/users/:id/roles/:roleId` | Gỡ vai trò | ✅ | - |
-| **Orders** | GET | `/api/orders` | Danh sách đơn hàng | ✅ | - |
-| | GET | `/api/orders/:id` | Chi tiết đơn | ✅ | - |
-| | GET | `/api/orders/tracking/:trackingCode` | Tra cứu theo mã vận đơn | ✅ | - |
-| | GET | `/api/orders/stats` | Thống kê đơn hàng | ✅ | - |
-| | POST | `/api/orders` | Tạo đơn hàng | ✅ | - |
-| | PUT | `/api/orders/:id` | Cập nhật đơn | ✅ | - |
-| | PUT | `/api/orders/:id/status` | Cập nhật trạng thái | ✅ | - |
-| | DELETE | `/api/orders/:id` | Hủy đơn | ✅ | - |
-| **Products** | GET | `/api/products` | Danh sách sản phẩm | ✅ | - |
-| | GET | `/api/products/categories` | Danh sách danh mục | ✅ | - |
-| | POST | `/api/products/categories` | Tạo danh mục | ✅ | - |
-| | GET | `/api/products/:id` | Chi tiết sản phẩm | ✅ | - |
-| | POST | `/api/products` | Tạo sản phẩm | ✅ | - |
-| | PUT | `/api/products/:id` | Cập nhật sản phẩm | ✅ | - |
-| | DELETE | `/api/products/:id` | Xóa sản phẩm | ✅ | - |
-| | PUT | `/api/products/:id/stock` | Cập nhật tồn kho | ✅ | - |
-| **Videos** | GET | `/api/videos` | Danh sách video | ✅ | - |
-| | GET | `/api/videos/:id` | Chi tiết video | ✅ | - |
-| | GET | `/api/videos/tracking/:trackingCode` | Video theo mã vận đơn | ✅ | - |
-| | GET | `/api/videos/order/:orderId` | Video theo đơn hàng | ✅ | - |
-| | POST | `/api/videos/upload` | Upload video đóng gói | ✅ | - |
-| | PUT | `/api/videos/:id/approve` | Phê duyệt video | ✅ | - |
-| | DELETE | `/api/videos/:id` | Xóa video | ✅ | - |
-| | POST | `/api/videos/receiving/upload` | Upload video nhận hàng | ✅ | - |
-| | GET | `/api/videos/:id/compare` | So sánh video | ✅ | - |
-| **Shipping** | GET | `/api/shipping/carriers` | Danh sách hãng vận chuyển | ✅ | - |
-| | GET | `/api/shipping/carriers/:id` | Chi tiết hãng | ✅ | - |
-| | POST | `/api/shipping/calculate-fee` | Tính phí vận chuyển | ✅ | - |
-| | GET | `/api/shipping/track/:trackingCode` | Theo dõi vận đơn | ✅ | - |
-| | GET | `/api/shipping/settings/:shopId` | Cài đặt vận chuyển shop | ✅ | - |
-| | POST | `/api/shipping/settings` | Lưu cài đặt vận chuyển | ✅ | - |
-| **Channels** | GET | `/api/channels` | Danh sách kênh | ✅ | - |
-| | GET | `/api/channels/:id` | Chi tiết kênh | ✅ | - |
-| | GET | `/api/channels/shop/:shopId/connections` | Kết nối shop–kênh | ✅ | - |
-| | POST | `/api/channels/:id/connect` | Kết nối kênh | ✅ | - |
-| | DELETE | `/api/channels/:id/disconnect` | Ngắt kết nối | ✅ | - |
-| | POST | `/api/channels/:id/sync-orders` | Đồng bộ đơn hàng | ✅ | - |
-| | POST | `/api/channels/:id/sync-products` | Đồng bộ sản phẩm | ✅ | - |
-| **Reports** | GET | `/api/reports/dashboard` | Dashboard tổng quan | ✅ | - |
-| | GET | `/api/reports/orders` | Báo cáo đơn hàng | ✅ | - |
-| | GET | `/api/reports/videos` | Báo cáo video | ✅ | - |
-| | GET | `/api/reports/revenue` | Báo cáo doanh thu | ✅ | - |
-| | GET | `/api/reports/staff-performance` | Hiệu suất nhân viên | ✅ | - |
-| | GET | `/api/reports/operational` | Báo cáo vận hành | ✅ | - |
-| | POST | `/api/reports/sync-now` | Đồng bộ ngay | ✅ | - |
-| | GET | `/api/reports/export` | Xuất báo cáo | ✅ | - |
-| **Returns** | GET | `/api/returns` | Danh sách yêu cầu hoàn trả | ✅ | - |
-| | GET | `/api/returns/:id` | Chi tiết hoàn trả | ✅ | - |
-| | POST | `/api/returns` | Tạo yêu cầu hoàn trả | ✅ | - |
-| | PUT | `/api/returns/:id/approve` | Duyệt hoàn trả | ✅ | - |
-| | PUT | `/api/returns/:id/reject` | Từ chối hoàn trả | ✅ | - |
-| | PUT | `/api/returns/:id/complete` | Hoàn tất hoàn trả | ✅ | - |
-| **Meta** | GET | `/api/meta/roles` | Danh sách vai trò | ✅ | - |
-| | GET | `/api/meta/shops` | Danh sách shop | ✅ | - |
-| **Settings** | GET | `/api/settings/report-subscriptions` | Đăng ký nhận báo cáo | ✅ | Route dùng `settings.manage`; Super Admin có toàn quyền nên vẫn gọi được |
-| | POST | `/api/settings/report-subscriptions` | Tạo đăng ký | ✅ | - |
-| | PUT | `/api/settings/report-subscriptions/:id` | Cập nhật đăng ký | ✅ | - |
-| | DELETE | `/api/settings/report-subscriptions/:id` | Xóa đăng ký | ✅ | - |
-| **Shops** | GET | `/api/shops` | Danh sách shop | ✅ | - |
-| | POST | `/api/shops` | Tạo shop (Super Admin) | ✅ | - |
-| | DELETE | `/api/shops/:id` | Xóa/vô hiệu hóa shop | ✅ | - |
+Tài liệu này tóm tắt **kiến trúc, API chính, phân quyền vai trò, luồng nghiệp vụ và roadmap tính năng** cho toàn bộ hệ thống EcoHub (backend + frontend).
 
 ---
 
-## 2. Bảng phân quyền hiện tại
+## 1. Kiến trúc tổng quan
 
-**Vai trò trong hệ thống (5 role):** `super_admin`, `admin`, `staff`, `customer_service` (Chăm sóc khách hàng), `customer`.
+- **Backend**
+  - Node.js + Express + TypeScript
+  - Prisma ORM + PostgreSQL
+  - Redis (dự phòng cho cache / queue)
+  - Nền tảng RBAC: `User` – `Role` – `Permission` – `UserRole` – `RolePermission`
+  - Module hóa theo nghiệp vụ: `auth`, `users`, `shops`, `orders`, `products`, `videos`, `shipping`, `channels`, `reports`, `returns`, `settings`, `meta`
+  - Cron job gửi **email báo cáo hằng ngày** (18:00 VN time)
 
-| Permission | Super Admin | Admin | Staff | Customer Service | Khách hàng |
-|------------|:-----------:|:-----:|:-----:|:----------------:|:----------:|
-| **Users** | | | | | |
-| users.view | ✅ | ✅ | ❌ | ❌ | ❌ |
-| users.create | ✅ | ✅ (trong shop) | ❌ | ❌ | ❌ |
-| users.update | ✅ | ✅ (trong shop) | ❌ | ❌ | ❌ |
-| users.delete | ✅ (chỉ Super Admin) | ❌ | ❌ | ❌ | ❌ |
-| **Orders** | | | | | |
-| orders.view | ✅ | ✅ | ✅ | ✅ | ✅ (chỉ đơn của mình) |
-| orders.create | ✅ | ✅ | ❌ | ❌ | ❌ |
-| orders.update | ✅ | ✅ | ❌ | ❌ | ❌ |
-| orders.status | ✅ | ✅ | ✅ | ✅ | ❌ |
-| orders.delete | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Products** | | | | | |
-| products.view | ✅ | ✅ | ✅ | ✅ | ❌ |
-| products.create | ✅ | ✅ | ✅ | ❌ | ❌ |
-| products.update | ✅ | ✅ | ✅ | ❌ | ❌ |
-| products.delete | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Videos** | | | | | |
-| videos.view | ✅ | ✅ | ✅ | ✅ | ✅ |
-| videos.upload | ✅ | ✅ | ✅ | ❌ | ❌ |
-| videos.approve | ✅ | ✅ | ❌ | ❌ | ❌ |
-| videos.delete | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Reports** | | | | | |
-| reports.view | ✅ | ✅ | ❌ | ❌ | ❌ |
-| reports.export | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Settings** | | | | | |
-| settings.view | ✅ | ✅ | ❌ | ❌ | ❌ |
-| settings.update | ✅ | ❌ | ❌ | ❌ | ❌ |
-| settings.manage | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **Shipping** | | | | | |
-| shipping.view | ✅ | ✅ | ❌ | ✅ | ❌ |
-| shipping.manage | ✅ | ✅ | ❌ | ❌ | ❌ |
-| **Returns** | | | | | |
-| returns.view | ✅ | ✅ | ❌ | ✅ | ✅ |
-| returns.process | ✅ | ✅ | ❌ | ✅ | ❌ |
+- **Frontend**
+  - React + TypeScript + Vite
+  - Zustand (`authStore`) quản lý user + token + `activeShop`
+  - React Query quản lý state gọi API
+  - TailwindCSS + bộ component `ui/*` (Button, Card, Modal, Input, Select, Badge, …)
+  - Routing theo module: `auth`, `dashboard`, `users`, `shops`, `orders`, `products`, `videos`, `reports`, `returns`, `settings`, `tracking`
 
-**Route đặc biệt theo role:**
-- **Xóa user:** chỉ `super_admin`.
-- **Gán/Gỡ role:** `super_admin` hoặc `admin`.
-- **Tạo/Cập nhật/Xóa sản phẩm, danh mục:** `admin` hoặc `super_admin`.
-- **Tạo shop, Xóa shop:** chỉ `super_admin`.
-- **Trong shop:** được tạo user với role `staff` hoặc `customer_service`.
+- **Triển khai**
+  - Docker Compose: `backend`, `frontend`, `postgres`, `redis`, `nginx`
+  - Nginx reverse proxy / cache tĩnh / bảo mật cơ bản
 
 ---
 
-## 3. Bảng test case (gợi ý)
+## 2. Vai trò & phân quyền
 
-| ID | Module | Tên test case | Mô tả | Loại | Ưu tiên |
-|----|--------|----------------|-------|------|---------|
-| TC-AUTH-01 | Auth | Đăng ký thành công | Body hợp lệ → 201, user + token | Happy path | Cao |
-| TC-AUTH-02 | Auth | Đăng ký email trùng | Email đã tồn tại → 409 | Negative | Cao |
-| TC-AUTH-03 | Auth | Đăng nhập đúng | Email + password đúng → 200, token | Happy path | Cao |
-| TC-AUTH-04 | Auth | Đăng nhập sai mật khẩu | Password sai → 401 | Negative | Cao |
-| TC-AUTH-05 | Auth | Refresh token hợp lệ | refreshToken còn hạn → 200, accessToken mới | Happy path | Trung bình |
-| TC-AUTH-06 | Auth | Me với token hợp lệ | Bearer token hợp lệ → 200, thông tin user | Happy path | Cao |
-| TC-AUTH-07 | Auth | Me không token | Không Authorization → 401 | Negative | Cao |
-| TC-USER-01 | Users | Danh sách users (Super Admin) | GET /users → 200, có data | Happy path | Cao |
-| TC-USER-02 | Users | Danh sách users (Staff) | GET /users với token Staff → 403 | Negative | Cao |
-| TC-USER-03 | Users | Xóa user không có shop | User không sở hữu shop → DELETE 204 | Happy path | Cao |
-| TC-USER-04 | Users | Xóa user là chủ shop, có Super Admin khác | Tự chuyển shop → 204 | Happy path | Cao |
-| TC-USER-05 | Users | Xóa user là chủ shop + transferShopToUserId | Body transferShopToUserId → 204 | Happy path | Trung bình |
-| TC-USER-06 | Users | Tạo user role customer_service trong shop | POST /users với roleId Customer Service → 201 | Happy path | Trung bình |
-| TC-ORDER-01 | Orders | Tạo đơn hàng hợp lệ | POST /orders body đủ → 201 | Happy path | Cao |
-| TC-ORDER-02 | Orders | Cập nhật trạng thái đơn | PUT /orders/:id/status → 200 | Happy path | Cao |
-| TC-PROD-01 | Products | CRUD sản phẩm (Admin) | Tạo/Sửa/Xóa sản phẩm với Admin → 200/201/204 | Happy path | Cao |
-| TC-VIDEO-01 | Videos | Upload video đóng gói | POST /videos/upload multipart → 201 | Happy path | Cao |
-| TC-VIDEO-02 | Videos | Phê duyệt video | PUT /videos/:id/approve → 200 | Happy path | Trung bình |
-| TC-VIDEO-03 | Videos | Customer Service xem tất cả video shop | GET /videos với token customer_service + shopId → 200, video của shop | Happy path | Trung bình |
-| TC-REPORT-01 | Reports | Dashboard theo shop/ngày | GET /reports/dashboard với query → 200 | Happy path | Trung bình |
-| TC-RETURN-01 | Returns | Tạo yêu cầu hoàn trả | POST /returns body hợp lệ → 201 | Happy path | Trung bình |
-| TC-SHOP-01 | Shops | Tạo shop (Super Admin) | POST /shops → 201 | Happy path | Cao |
-| TC-SHOP-02 | Shops | Danh sách shop (Admin) | GET /shops với token Admin → 200 | Happy path | Trung bình |
+**Role hệ thống:**
 
----
+- `super_admin`
+- `admin`
+- `staff` (nhân viên đóng hàng)
+- `customer_service` (nhân viên chăm sóc khách hàng)
+- `customer` (khách hàng)
 
-## 4. Bảng module tính năng – Đang xây / Đã xong / Sắp xây
+### 2.1. Mục tiêu từng role
 
-| Module | Tính năng | Backend | Frontend | Trạng thái | Ghi chú |
-|--------|-----------|:-------:|:--------:|------------|--------|
-| **Auth** | Đăng ký / Đăng nhập | ✅ | ✅ | Đã xong | Login, Register page |
-| | Refresh token | ✅ | ✅ (axios interceptor) | Đã xong | - |
-| | Profile / Đổi mật khẩu | ✅ | ✅ (ProfilePage) | Đã xong | - |
-| | Chuyển ngữ cảnh shop (assume-shop) | ✅ | ✅ | Đã xong | - |
-| **Users** | Danh sách / Lọc / Phân trang | ✅ | ✅ | Đã xong | UsersPage |
-| | Tạo / Sửa / Xóa user | ✅ | ✅ | Đã xong | Xóa: modal chuyển shop khi lỗi |
-| | Gán / Gỡ vai trò | ✅ | ⚠️ | Đang xây | API có, UI có thể bổ sung |
-| **Shops** | Danh sách shop | ✅ | ✅ | Đã xong | ShopsPage |
-| | Tạo shop (Super Admin) | ✅ | ✅ | Đã xong | - |
-| | Xóa/vô hiệu hóa shop | ✅ | ✅ | Đã xong | - |
-| **Orders** | Danh sách / Chi tiết đơn | ✅ | ✅ | Đã xong | OrdersPage, OrderDetailPage |
-| | Tạo / Cập nhật / Hủy đơn | ✅ | ✅ | Đã xong | - |
-| | Cập nhật trạng thái | ✅ | ✅ | Đã xong | - |
-| | Tra cứu mã vận đơn | ✅ | ✅ | Đã xong | TrackingPage |
-| **Products** | Danh sách / CRUD sản phẩm | ✅ | ✅ | Đã xong | ProductsPage |
-| | Tồn kho / Danh mục | ✅ | ✅ | Đã xong | InventoryPage, categories |
-| **Videos** | Danh sách video / Theo đơn, mã vận đơn | ✅ | ✅ | Đã xong | VideosPage |
-| | Upload video đóng gói | ✅ | ✅ | Đã xong | CreateVideoPage |
-| | Upload video nhận hàng | ✅ | ✅ | Đã xong | ReceivingVideosPage |
-| | Phê duyệt / Xóa / So sánh video | ✅ | ⚠️ | Đang xây | API đủ, UI có thể bổ sung |
-| **Shipping** | Danh sách hãng / Tính phí / Theo dõi | ✅ | ✅ | Đã xong | Dùng trong Orders/Tracking |
-| | Cài đặt vận chuyển theo shop | ✅ | ⚠️ | Đang xây | API có, trang cài đặt riêng có thể chưa đủ |
-| **Channels** | Kết nối kênh / Đồng bộ đơn, sản phẩm | ✅ | ⚠️ | Đang xây | API có, UI tích hợp Settings/Shop |
-| **Reports** | Dashboard / Báo cáo đơn, video, doanh thu | ✅ | ✅ | Đã xong | ReportsPage |
-| | Xuất báo cáo / Hiệu suất nhân viên | ✅ | ⚠️ | Đang xây | API có, UI có thể bổ sung |
-| **Returns** | Danh sách / Tạo / Duyệt / Từ chối hoàn trả | ✅ | ⚠️ | Đang xây | API đủ, trang Returns có thể chưa đầy đủ |
-| **Settings** | Đăng ký nhận báo cáo (email) | ✅ | ✅ | Đã xong | SettingsPage |
-| **Meta** | Roles / Shops (dropdown, filter) | ✅ | ✅ | Đã xong | Dùng trong Users, Shops, Orders |
-| **Dashboard** | Tổng quan số liệu | ✅ | ✅ | Đã xong | DashboardPage |
-| **Role Customer Service** | Role Chăm sóc khách hàng (customer_service) | ✅ | ✅ | Đã xong | Schema, migration, seed, backend, frontend (badge, menu, tạo user) |
-| **Notification** | Thông báo realtime / in-app | ❌ | ❌ | Sắp xây | Model có, chưa có service/push |
-| **Audit log** | Lịch sử thao tác theo user/entity | ❌ | ❌ | Sắp xây | - |
+- **Super Admin**
+  - Toàn quyền hệ thống: user, shop, cấu hình, báo cáo, xóa dữ liệu
+  - Tạo / xóa / quản lý shop
+  - Có thể “vào” shop bất kỳ ở chế độ impersonate (assume-shop)
 
----
+- **Admin (theo shop)**
+  - Quản trị một shop: user, sản phẩm, đơn hàng, vận chuyển trong shop
+  - Xem & thao tác báo cáo ở phạm vi shop
 
-## 5. Bảng tương tác trong hệ thống
+- **Staff (Nhân viên đóng hàng)**
+  - Làm việc trong shop: đóng gói, tạo & cập nhật đơn, upload video đóng gói
+  - Quản lý sản phẩm trong shop (tạo/cập nhật)
 
-| Từ (Actor/Module) | Tương tác | Đến (Module/Entity) | Mô tả |
-|-------------------|------------|---------------------|--------|
-| User (khách) | Đăng ký / Đăng nhập | Auth | Tạo phiên, nhận JWT |
-| User | Gọi API có Bearer token | Auth middleware | Xác thực, gán req.user (userId, roles, shopId) |
-| Auth middleware | Kiểm tra permission | RolePermission (DB) | authorizePermission('x.y') |
-| Super Admin | Tạo shop | Shops | Tạo shop, gán owner = user |
-| Super Admin / Admin | Tạo user / Gán role | Users, UserRole | Admin / Staff / Customer Service gắn với shop |
-| Admin / Staff / Customer Service | Chọn "Làm việc tại shop X" | Auth (assume-shop) | Đặt shopId vào token/context |
-| Admin / Staff / Customer Service | Xem đơn, sản phẩm, video (theo shop) | Orders, Products, Videos | Lọc theo shopId trong token |
-| Staff | Upload video đóng gói | Videos, Order, PackageVideo | Gắn video với order, trackingCode |
-| Staff / Khách | Upload video nhận hàng | Videos, ReceivingVideo | Gắn với order, customerId |
-| Admin / Super Admin | Phê duyệt video | PackageVideo | approvedBy, approvedAt |
-| Customer Service | Xem tất cả video trong shop | Videos | Logic giống Admin (isAdminLike), không filter recordedBy |
-| Order | Tạo / Cập nhật trạng thái | OrderStatusHistory | changedBy = user |
-| Order | Tạo đơn | Product, OrderItem | Tham chiếu sản phẩm, đơn vị |
-| Shipping | Tính phí / Theo dõi | ShippingCarrier, ShopCarrierSetting | Theo shop, carrier |
-| Channel | Kết nối / Đồng bộ đơn | ShopChannelConnection, Order | Kéo đơn từ kênh vào Orders |
-| Report | Dashboard / Báo cáo | Order, Video, Product, User | Tổng hợp theo shop, ngày |
-| Settings | Đăng ký nhận báo cáo | ReportSubscription, Email | Gửi email báo cáo theo lịch |
-| User (khách) | Tạo yêu cầu hoàn trả | ReturnRequest | customerId, orderId |
-| Admin / Customer Service | Duyệt / Từ chối / Hoàn tất hoàn trả | ReturnRequest | reviewedBy, status |
-| Super Admin | Xóa user | Users, Shops, Orders, Videos, … | Transaction: chuyển shop (nếu có), null FK, xóa phụ thuộc, xóa user |
-| Frontend | Gọi API | Backend (Express) | Axios, baseURL /api, interceptors refresh token |
-| Backend | Ghi DB | PostgreSQL (Prisma) | Migrations, schema.prisma |
-| Backend | Cache / queue (nếu dùng) | Redis | Cấu hình REDIS_URL |
+- **Customer Service (CSKH)**
+  - Làm việc trong shop: xem đơn, cập nhật trạng thái, xử lý hoàn trả, xem vận chuyển
+  - Xem video đóng gói / nhận hàng để hỗ trợ khách
+
+- **Customer (Khách hàng)**
+  - Đăng ký / đăng nhập
+  - Xem đơn của chính mình, xem video đóng gói
+  - Tạo yêu cầu hoàn trả, upload video nhận hàng
+
+### 2.2. Ma trận quyền (rút gọn)
+
+| Permission            | Super Admin | Admin                     | Staff                                   | CSKH                                     | Customer                          |
+|-----------------------|:-----------:|:-------------------------:|:---------------------------------------:|:----------------------------------------:|:----------------------------------:|
+| **Users**             |             |                           |                                         |                                          |                                    |
+| `users.view`          | ✅          | ✅                         | ❌                                       | ❌                                        | ❌                                  |
+| `users.create`        | ✅          | ✅ (trong shop)           | ❌                                       | ❌                                        | ❌                                  |
+| `users.update`        | ✅          | ✅ (trong shop)           | ❌                                       | ❌                                        | ❌                                  |
+| `users.delete`        | ✅ (only SA)| ❌                         | ❌                                       | ❌                                        | ❌                                  |
+| **Orders**            |             |                           |                                         |                                          |                                    |
+| `orders.view`         | ✅          | ✅                         | ✅                                       | ✅                                        | ✅ (đơn của mình)                  |
+| `orders.status`       | ✅          | ✅                         | ✅                                       | ✅                                        | ❌                                  |
+| **Products**          |             |                           |                                         |                                          |                                    |
+| `products.view`       | ✅          | ✅                         | ✅                                       | ✅                                        | ❌                                  |
+| `products.create`     | ✅          | ✅                         | ✅                                       | ❌                                        | ❌                                  |
+| `products.update`     | ✅          | ✅                         | ✅                                       | ❌                                        | ❌                                  |
+| **Videos**            |             |                           |                                         |                                          |                                    |
+| `videos.view`         | ✅          | ✅                         | ✅                                       | ✅                                        | ✅                                  |
+| `videos.upload`       | ✅          | ✅                         | ✅                                       | ❌                                        | ❌                                  |
+| `videos.approve`      | ✅          | ✅                         | ❌                                       | ❌                                        | ❌                                  |
+| **Reports**           |             |                           |                                         |                                          |                                    |
+| `reports.view`        | ✅          | ✅                         | ❌                                       | ❌                                        | ❌                                  |
+| `reports.export`      | ✅          | ✅                         | ❌                                       | ❌                                        | ❌                                  |
+| **Settings**          |             |                           |                                         |                                          |                                    |
+| `settings.view`       | ✅          | ✅                         | ❌                                       | ❌                                        | ❌                                  |
+| `settings.update`     | ✅          | ❌                         | ❌                                       | ❌                                        | ❌                                  |
+| `settings.manage`     | ✅          | ❌                         | ❌                                       | ❌                                        | ❌                                  |
+| **Shipping**          |             |                           |                                         |                                          |                                    |
+| `shipping.view`       | ✅          | ✅                         | ❌                                       | ✅                                        | ❌                                  |
+| `shipping.manage`     | ✅          | ✅                         | ❌                                       | ❌                                        | ❌                                  |
+| **Returns**           |             |                           |                                         |                                          |                                    |
+| `returns.view`        | ✅          | ✅                         | ❌                                       | ✅                                        | ✅                                  |
+| `returns.process`     | ✅          | ✅                         | ❌                                       | ✅                                        | ❌                                  |
+
+**Lưu ý đặc biệt:**
+
+- Xóa user / xóa shop: **chỉ Super Admin**
+- Tạo user trong **ngữ cảnh shop**: chỉ cho phép role `staff`, `customer_service`, `customer`
+- Super Admin có thể **assume shop** để thao tác như admin của shop đó, nhưng vẫn bị giới hạn bởi shop hiện tại.
 
 ---
 
-## Chạy lại migration và seed
+## 3. API theo module (tóm tắt)
 
-Khi đã có database (ví dụ Docker: `docker compose up -d` postgres) và file `.env` với `DATABASE_URL`:
+### 3.1 Auth
+
+- `POST /api/auth/register` – Đăng ký
+- `POST /api/auth/login` – Đăng nhập
+- `POST /api/auth/refresh-token` – Làm mới access token
+- `POST /api/auth/logout` – Đăng xuất
+- `GET /api/auth/me` – Thông tin user hiện tại
+- `PUT /api/auth/me` – Cập nhật profile
+- `PUT /api/auth/change-password` – Đổi mật khẩu
+- `POST /api/auth/assume-shop` – Chuyển ngữ cảnh shop (impersonate Admin shop)
+
+### 3.2 Users
+
+- `GET /api/users` – Danh sách user (Super Admin/Admin)
+- `GET /api/users/:id` – Chi tiết user
+- `POST /api/users` – Tạo user (Super Admin/Admin)
+  - Trong shop context: bắt buộc chọn role `staff` / `customer_service` / `customer`
+  - `shopId` auto lấy từ context nếu đang assume shop
+- `PUT /api/users/:id` – Cập nhật thông tin
+- `DELETE /api/users/:id` – Xóa user
+  - Nếu user là chủ shop: dùng `transferShopToUserId` hoặc backend tự tìm Super Admin khác để chuyển shop
+- `POST /api/users/:id/roles` – Gán vai trò (Super Admin/Admin)
+- `DELETE /api/users/:id/roles/:roleId` – Gỡ vai trò
+
+### 3.3 Shops
+
+- `GET /api/shops` – Danh sách shop user có thể quản lý
+- `POST /api/shops` – Tạo shop mới (Super Admin)
+- `DELETE /api/shops/:id` – Xóa/vô hiệu hóa shop (Super Admin, có xác nhận mật khẩu)
+
+### 3.4 Orders
+
+- `GET /api/orders` – Danh sách đơn (filter theo shop, status, search)
+- `GET /api/orders/:id` – Chi tiết đơn
+- `GET /api/orders/tracking/:code` – Tra mã vận đơn (public)
+- `POST /api/orders` – Tạo đơn
+- `PUT /api/orders/:id` – Cập nhật đơn
+- `PUT /api/orders/:id/status` – Cập nhật trạng thái
+- `DELETE /api/orders/:id` – Hủy đơn
+
+### 3.5 Products
+
+- CRUD sản phẩm, danh mục, tồn kho:
+  - `GET /api/products`
+  - `GET /api/products/:id`
+  - `POST /api/products`
+  - `PUT /api/products/:id`
+  - `DELETE /api/products/:id`
+  - `PUT /api/products/:id/stock`
+  - `GET/POST /api/products/categories`
+
+### 3.6 Videos
+
+- `GET /api/videos` – Danh sách video (filter theo shop, order, trackingCode,…)
+- `GET /api/videos/:id` – Chi tiết video
+- `GET /api/videos/tracking/:code` – Video theo mã vận đơn
+- `POST /api/videos/upload` – Upload video đóng gói (Staff)
+- `POST /api/videos/receiving/upload` – Upload video nhận hàng (Customer/Staff)
+- `PUT /api/videos/:id/approve` – Phê duyệt video (Admin/Super Admin)
+- `DELETE /api/videos/:id` – Xóa video
+- `GET /api/videos/:id/compare` – So sánh video đóng gói vs nhận hàng
+
+### 3.7 Shipping
+
+- `GET /api/shipping/carriers` – Danh sách hãng vận chuyển
+- `POST /api/shipping/calculate-fee` – Tính phí vận chuyển
+- `GET /api/shipping/track/:trackingCode` – Theo dõi vận đơn
+- `GET/POST /api/shipping/settings` – Cài đặt vận chuyển theo shop
+
+### 3.8 Channels
+
+- `GET /api/channels` – Danh sách kênh bán hàng
+- `POST /api/channels/:id/connect` – Kết nối kênh
+- `POST /api/channels/:id/sync-orders` – Đồng bộ đơn
+- `POST /api/channels/:id/sync-products` – Đồng bộ sản phẩm
+
+### 3.9 Reports
+
+- `GET /api/reports/dashboard` – Dashboard tổng quan (theo shop/ngày)
+- `GET /api/reports/orders` – Báo cáo đơn hàng
+- `GET /api/reports/videos` – Báo cáo video
+- `GET /api/reports/revenue` – Báo cáo doanh thu
+- `GET /api/reports/staff-performance` – Hiệu suất nhân viên
+- `GET /api/reports/operational` – Báo cáo vận hành
+- `POST /api/reports/sync-now` – Đồng bộ số liệu ngay
+- `GET /api/reports/export` – Xuất báo cáo
+
+### 3.10 Returns
+
+- `GET /api/returns` – Danh sách yêu cầu hoàn trả
+- `POST /api/returns` – Tạo yêu cầu hoàn trả (Customer)
+- `PUT /api/returns/:id/approve` – Duyệt hoàn trả (Admin/CSKH)
+- `PUT /api/returns/:id/reject` – Từ chối
+- `PUT /api/returns/:id/complete` – Hoàn tất
+
+### 3.11 Settings – Email báo cáo
+
+- `GET /api/settings/report-subscriptions` – Lấy danh sách email nhận báo cáo theo shop
+  - Super Admin không assume shop: có thể truyền `shopId` để xem theo shop
+  - Khi assume shop: luôn khóa theo shop hiện tại
+- `POST /api/settings/report-subscriptions` – Tạo đăng ký nhận báo cáo
+  - Chặn tạo cho shop khác khi đang assume shop
+- `PUT /api/settings/report-subscriptions/:id` – Cập nhật
+- `DELETE /api/settings/report-subscriptions/:id` – Xóa
+
+### 3.12 Meta
+
+- `GET /api/meta/roles` – Danh sách role (cho dropdown)
+- `GET /api/meta/shops` – Danh sách shop (active)
+
+---
+
+## 4. Luồng nghiệp vụ chính
+
+### 4.1. Đăng nhập & chuyển ngữ cảnh shop
+
+1. User đăng nhập `POST /auth/login` → backend trả:
+   - `user` (id, email, roles, `activeShop` nếu có)
+   - `accessToken`, `refreshToken`
+2. Frontend lưu vào `authStore`
+3. Khi Super Admin cần quản lý 1 shop:
+   - Gọi `POST /auth/assume-shop` với `shopId`
+   - Backend:
+     - Kiểm tra quyền Super Admin / quyền trong shop
+     - Sinh lại token với `shopId` + `impersonating = true`
+4. Từ đây, mọi API (Users/Orders/Products/Videos/Reports) sẽ **tự filter theo shopId trong token**.
+
+### 4.2. Tạo user trong shop
+
+1. Super Admin hoặc Admin đang ở:
+   - **Không assume shop**: tạo user với `shopId` bắt buộc trong body
+   - **Assume shop**: backend tự set `shopId = shopId trong token`
+2. Role cho phép trong shop:
+   - `staff` – Nhân viên đóng hàng
+   - `customer_service` – CSKH
+   - `customer` – Khách hàng
+3. Backend validate:
+   - Không cho phép tạo `admin` / `super_admin` trong shop context
+   - Không cho phép tạo user cho shop khác khi đang quản lý shop A
+
+### 4.3. Gửi báo cáo email hằng ngày
+
+1. Cron job lúc 18:00 VN time:
+   - Lấy danh sách `ReportSubscription` đang `enabled`
+   - Tổng hợp số liệu:
+     - Đơn mới trong ngày, doanh thu, trạng thái đơn
+     - Video đóng gói/nhận hàng
+     - Hàng tồn kho thấp
+     - Hiệu suất theo kênh / carrier
+2. Gửi email theo `reportType` (`financial` / `operational` / `both`)
+3. Lỗi phổ biến trong dev:
+   - `getaddrinfo ENOTFOUND e2.vinahost.vn` → cấu hình SMTP demo không resolve được; **không ảnh hưởng** logic hệ thống, chỉ ảnh hưởng gửi email.
+
+### 4.4. Luồng video đóng gói – nhận hàng – so sánh
+
+1. Staff upload video đóng gói:
+   - `POST /videos/upload` → `PackageVideo` gắn với `Order`
+2. Customer/Staff upload video nhận hàng:
+   - `POST /videos/receiving/upload` → `ReceivingVideo` gắn với `Order` / `Customer`
+3. So sánh:
+   - `GET /videos/:id/compare` → backend đọc dữ liệu, trả thông tin so sánh (logic có thể mở rộng sau).
+
+---
+
+## 5. Bảng test case gợi ý (ưu tiên)
+
+| ID           | Module  | Tên test case                                     | Kỳ vọng                                                        |
+|--------------|---------|---------------------------------------------------|----------------------------------------------------------------|
+| TC-AUTH-01   | Auth    | Đăng ký thành công                               | 201, trả user + token                                          |
+| TC-AUTH-02   | Auth    | Đăng ký email trùng                              | 409, message “Email đã được sử dụng”                           |
+| TC-AUTH-03   | Auth    | Đăng nhập đúng                                   | 200, trả accessToken + refreshToken                            |
+| TC-AUTH-04   | Auth    | Me với token hết hạn                             | 401 → axios interceptor gọi refresh, sau đó lặp lại request    |
+| TC-ASSUME-01 | Auth    | Super Admin assume shop                          | 200, `user.activeShop` có giá trị, token mới có `shopId`       |
+| TC-USER-01   | Users   | Super Admin xem danh sách user                   | GET `/users` → 200, có phân trang                              |
+| TC-USER-02   | Users   | Staff gọi `/users`                               | 403 (không có quyền)                                           |
+| TC-USER-03   | Users   | Tạo Staff trong shop A                           | POST `/users` (assume shop A) → 201, UserRole (staff, shop A)  |
+| TC-USER-04   | Users   | Tạo Admin trong shop A (assume shop)             | 400, message “chỉ được tạo Nhân viên/CSKH/Khách hàng”          |
+| TC-USER-05   | Users   | Xóa user là chủ shop                             | Nếu có Super Admin khác → tự chuyển shop, 204                  |
+| TC-ORD-01    | Orders  | Tạo đơn + cập nhật trạng thái                    | 201 → 200, `OrderStatusHistory` có log                         |
+| TC-VID-01    | Videos  | Staff upload video đóng gói                      | 201, `PackageVideo` gắn với `Order`                            |
+| TC-VID-02    | Videos  | Customer upload video nhận hàng                  | 201, `ReceivingVideo` gắn với `Order` + `customerId`           |
+| TC-VID-03    | Videos  | CSKH xem tất cả video trong shop                 | GET `/videos` (assume shop) → chỉ video của shop               |
+| TC-RET-01    | Returns | Customer tạo yêu cầu hoàn trả                    | 201, `ReturnRequest` ở trạng thái `pending`                    |
+| TC-RET-02    | Returns | CSKH duyệt từ chối hoàn trả                      | `PUT /returns/:id/reject` → status `rejected`                  |
+| TC-SET-01    | Settings| Tạo email nhận báo cáo trong shop A              | POST `/settings/report-subscriptions` (assume shop A) → 201    |
+| TC-SET-02    | Settings| Tạo email cho shop B khi đang ở shop A           | 403, message “Không thể thêm email cho shop khác …”            |
+| TC-REP-01    | Reports | Dashboard theo shop                              | GET `/reports/dashboard` với Super Admin/Assume shop → 200     |
+
+---
+
+## 6. Bảng module & trạng thái triển khai
+
+| Module        | Tính năng chính                                         | Backend | Frontend | Ghi chú ngắn                                      |
+|---------------|---------------------------------------------------------|:-------:|:--------:|--------------------------------------------------|
+| Auth          | Đăng nhập/Đăng ký/Refresh/Me/Change password           | ✅       | ✅        | Hoàn chỉnh                                       |
+| Auth – Assume | Chuyển ngữ cảnh shop                                   | ✅       | ✅        | Dùng trên `ShopsPage`                            |
+| Users         | Danh sách, CRUD, gán/gỡ role                           | ✅       | ✅        | UI quản lý role đã cải thiện                     |
+| Shops         | Danh sách, tạo, xóa/vô hiệu hóa                        | ✅       | ✅        | Chỉ Super Admin tạo/xóa                          |
+| Orders        | CRUD, trạng thái, tracking                             | ✅       | ✅        | Đã nối Dashboard/Reports                         |
+| Products      | CRUD, tồn kho, danh mục                                | ✅       | ✅        | Hoạt động trong phạm vi shop                     |
+| Videos        | Danh sách, upload, approve, compare                    | ✅       | ⚠️        | UI so sánh có thể tiếp tục nâng cấp              |
+| Shipping      | Hãng VC, tính phí, tracking, cấu hình shop             | ✅       | ⚠️        | CẤU HÌNH UI chưa đầy đủ                          |
+| Channels      | Kết nối kênh, đồng bộ đơn/sản phẩm                     | ✅       | ⚠️        | Dừng ở mức API + tích hợp cơ bản                 |
+| Reports       | Dashboard, báo cáo orders/videos/revenue/operational   | ✅       | ✅        | Giao diện ReportsPage                            |
+| Returns       | Tạo & xử lý hoàn trả                                   | ✅       | ⚠️        | UI chưa full tất cả nhánh trạng thái             |
+| Settings      | Email nhận báo cáo theo shop                           | ✅       | ✅        | Đã khóa theo shop context                        |
+| Meta          | Roles, Shops (cho dropdown)                            | ✅       | ✅        | Dùng rộng khắp FE                                |
+| Dashboard     | Thống kê tổng quan theo shop/ngày                      | ✅       | ✅        | Trang DashboardPage                              |
+| Notification  | Thông báo realtime / in-app                            | ❌       | ❌        | Dự kiến dùng websockets / SSE                    |
+| Audit log     | Ghi lịch sử thao tác                                   | ❌       | ❌        | Dự kiến log theo entity                          |
+
+---
+
+## 7. Tương tác hệ thống (high-level)
+
+| Từ (Actor/Module)               | Tới (Module/Entity)                | Mô tả ngắn                                                                 |
+|---------------------------------|------------------------------------|----------------------------------------------------------------------------|
+| User (khách)                    | Auth                               | Đăng ký/Đăng nhập, nhận JWT                                               |
+| Frontend                        | Auth middleware (backend)          | Gửi Bearer token, backend decode & map `req.user`                         |
+| Auth middleware                 | RolePermission                     | Kiểm tra quyền dựa trên role + shopId                                     |
+| Super Admin                     | Shops, Users                       | Tạo shop, tạo Admin, gán Admin cho shop                                   |
+| Admin/SA trong shop            | Users                              | Tạo Staff/CSKH/Customer, gán role scoped theo shop                        |
+| Staff                           | Orders, Products, PackageVideo     | Tạo đơn, cập nhật trạng thái, upload video đóng gói                       |
+| Customer/Staff                  | ReceivingVideo, Returns            | Upload video nhận hàng, tạo request hoàn trả                              |
+| CSKH                            | Returns, Orders, Shipping          | Xử lý hoàn trả, cập nhật đơn, xem vận chuyển                              |
+| Reports scheduler               | ReportSubscription, Orders,…       | Chạy hằng ngày, gửi email báo cáo                                         |
+| Channels                        | Orders, Products                   | Đồng bộ đơn & sản phẩm từ sàn về EcoHub                                   |
+| Shipping                        | Carriers, ShopCarrierSetting       | Tính phí, tracking theo hãng + cấu hình shop                              |
+| Dashboard/ReportsPage           | Orders, Products, Videos, Users    | Render biểu đồ + bảng thống kê                                            |
+
+---
+
+## 8. Migration & seed
+
+Khi setup mới (đặc biệt sau khi đổi schema: thêm role, field mới,…):
 
 ```bash
 cd backend
-npx prisma migrate deploy    # Áp dụng migration (thêm role customer_service)
-npx prisma generate          # Sinh lại Prisma Client
-npx prisma db seed           # Seed roles, permissions, dữ liệu mẫu
+
+# Áp dụng migration DB
+npx prisma migrate deploy
+
+# Sinh lại Prisma Client
+npx prisma generate
+
+# Seed dữ liệu: roles, permissions, super admin, demo shop & data
+npx prisma db seed
 ```
 
-Nếu dùng `migrate dev` (môi trường dev): `npx prisma migrate dev` rồi `npx prisma db seed`.
+Khi làm việc ở môi trường dev, có thể dùng:
+
+```bash
+npx prisma migrate dev
+npx prisma db seed
+```
 
 ---
 
-*Tài liệu tổng hợp từ codebase; cập nhật theo trạng thái dự án (đã thêm role Customer Service).*
+_Tài liệu này được sinh từ trạng thái code hiện tại, đã cập nhật các thay đổi mới nhất về quyền role, ngữ cảnh shop và email báo cáo._ 

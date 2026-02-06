@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as videoService from './videos.service';
+import * as videoS3Service from './videos.s3.service';
 import { success, created, paginated, noContent } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 
@@ -112,6 +113,104 @@ export const compareVideos = async (req: AuthRequest, res: Response, next: NextF
   try {
     const comparison = await videoService.compareVideos(req.params.id);
     success(res, comparison);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const initS3Upload = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await videoS3Service.initUpload(
+      {
+        orderId: req.body.orderId,
+        module: req.body.module,
+        contentType: req.body.contentType,
+        fileName: req.body.fileName,
+        sizeBytes: req.body.sizeBytes,
+      },
+      req.user && {
+        userId: req.user.userId,
+        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        roles: req.user.roles,
+        shopId: req.user.shopId ?? null,
+      }
+    );
+
+    created(res, result, 'Khởi tạo upload video S3 thành công');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const completeS3Upload = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await videoS3Service.completeUpload(
+      {
+        videoId: req.body.videoId,
+        sizeBytes: req.body.sizeBytes,
+        durationSec: req.body.durationSec,
+        success: req.body.success,
+        errorCode: req.body.errorCode,
+        errorMessage: req.body.errorMessage,
+      },
+      req.user && {
+        userId: req.user.userId,
+        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        roles: req.user.roles,
+        shopId: req.user.shopId ?? null,
+      }
+    );
+
+    success(res, result, 'Xác nhận upload video S3 thành công');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listS3Videos = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 10;
+
+    const result = await videoS3Service.listVideos(
+      {
+        page,
+        limit,
+        shopId: (req.query.shopId as string) || undefined,
+        uploaderUserId: (req.query.uploaderUserId as string) || undefined,
+        orderId: (req.query.orderId as string) || undefined,
+        module: (req.query.module as string) || undefined,
+        status: (req.query.status as string) || undefined,
+        startDate: (req.query.startDate as string) || undefined,
+        endDate: (req.query.endDate as string) || undefined,
+      },
+      req.user && {
+        userId: req.user.userId,
+        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        roles: req.user.roles,
+        shopId: req.user.shopId ?? null,
+      }
+    );
+
+    paginated(res, result.videos, result.total, result.page, result.limit);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getS3VideoViewUrl = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await videoS3Service.getVideoViewUrl(
+      req.params.videoId,
+      req.user && {
+        userId: req.user.userId,
+        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        roles: req.user.roles,
+        shopId: req.user.shopId ?? null,
+      }
+    );
+
+    success(res, result);
   } catch (error) {
     next(error);
   }

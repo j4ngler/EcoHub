@@ -85,6 +85,19 @@ enum ComparisonStatus {
   disputed
 }
 
+enum VideoModule {
+  packaging
+  receiving
+  other
+}
+
+enum VideoUploadStatus {
+  UPLOADING
+  READY
+  FAILED
+  DELETED
+}
+
 enum ReturnReason {
   damaged
   wrong_item
@@ -135,6 +148,7 @@ model User {
   packageVideos         PackageVideo[]      @relation("RecordedBy")
   approvedVideos        PackageVideo[]      @relation("ApprovedBy")
   receivingVideos       ReceivingVideo[]
+   uploadedVideos        Video[]
   returnRequests        ReturnRequest[]     @relation("CustomerReturns")
   reviewedReturns       ReturnRequest[]     @relation("ReviewedBy")
   inventoryTransactions InventoryTransaction[]
@@ -225,6 +239,7 @@ model Shop {
   orders               Order[]
   warehouses           Warehouse[]
   reportSubscriptions  ReportSubscription[]
+  videos               Video[]
 
   @@map("shops")
 }
@@ -425,6 +440,7 @@ model Order {
   packageVideos  PackageVideo[]
   receivingVideos ReceivingVideo[]
   returnRequests ReturnRequest[]
+  videos         Video[]
 
   @@index([shopId])
   @@index([trackingCode])
@@ -545,6 +561,50 @@ model ReceivingVideo {
   packageVideo PackageVideo? @relation(fields: [packageVideoId], references: [id])
 
   @@map("receiving_videos")
+}
+
+model Video {
+  id             String            @id @default(uuid())
+  shopId         String            @map("shop_id")
+  orderId        String            @map("order_id")
+  uploaderUserId String            @map("uploader_user_id")
+  module         VideoModule
+  s3Bucket       String            @map("s3_bucket")
+  s3Key          String            @unique @map("s3_key")
+  contentType    String            @map("content_type")
+  sizeBytes      BigInt?           @map("size_bytes")
+  durationSec    Int?              @map("duration_sec")
+  status         VideoUploadStatus
+  errorCode      String?           @map("error_code")
+  errorMessage   String?           @map("error_message")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  uploadedAt     DateTime?         @map("uploaded_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+
+  shop           Shop              @relation(fields: [shopId], references: [id])
+  order          Order             @relation(fields: [orderId], references: [id])
+  uploader       User              @relation(fields: [uploaderUserId], references: [id])
+  events         VideoEvent[]
+
+  @@map("videos")
+  @@index([shopId, createdAt(sort: Desc)], name: "idx_videos_shop_created_at")
+  @@index([shopId, uploaderUserId, createdAt(sort: Desc)], name: "idx_videos_shop_user_created_at")
+  @@index([shopId, module, createdAt(sort: Desc)], name: "idx_videos_shop_module_created_at")
+  @@index([shopId, orderId], name: "idx_videos_shop_order")
+  @@index([shopId, status], name: "idx_videos_shop_status")
+}
+
+model VideoEvent {
+  id        String   @id @default(uuid())
+  videoId   String   @map("video_id")
+  type      String
+  payload   Json?    @db.JsonB
+  createdAt DateTime @default(now()) @map("created_at")
+
+  video     Video    @relation(fields: [videoId], references: [id])
+
+  @@map("video_events")
+  @@index([videoId, createdAt(sort: Desc)], name: "idx_video_events_video_created_at")
 }
 
 // ============================================

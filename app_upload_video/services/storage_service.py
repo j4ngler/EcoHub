@@ -134,6 +134,7 @@ def finish_recording_for_order(order_code: str, duration_seconds: int):
 def get_videos_info(videos_dir: str) -> Tuple[List[VideoInfo], int]:
     """
     Quét thư mục videos, trả về danh sách video + tổng dung lượng.
+    Video được sắp xếp theo thời gian (MỚI NHẤT lên đầu).
     Tính trạng thái:
       - "An toàn"
       - "Sắp tràn dung lượng" (dung lượng > 80% MAX_TOTAL_BYTES)
@@ -145,7 +146,7 @@ def get_videos_info(videos_dir: str) -> Tuple[List[VideoInfo], int]:
     total_size = 0
     now = time.time()
 
-    for name in sorted(os.listdir(videos_dir)):
+    for name in os.listdir(videos_dir):
         # Hỗ trợ cả .mp4 và .avi
         if not (name.lower().endswith(".mp4") or name.lower().endswith(".avi")):
             continue
@@ -167,6 +168,9 @@ def get_videos_info(videos_dir: str) -> Tuple[List[VideoInfo], int]:
 
         videos.append(VideoInfo(name=name, path=path, size_bytes=size, created_at=created_at, status=status))
 
+    # Sắp xếp theo thời gian tạo (mới nhất lên đầu)
+    videos.sort(key=lambda v: v.created_at, reverse=True)
+
     return videos, total_size
 
 
@@ -181,10 +185,27 @@ def get_storage_status(total_size: int, max_bytes: int) -> str:
 def delete_video(videos_dir: str, filename: str):
     """
     Xóa video thủ công, chống path traversal.
+    Thử xóa nhiều lần nếu file đang được sử dụng.
     """
     if "/" in filename or "\\" in filename:
-        return
+        raise ValueError("Tên file không hợp lệ")
+    
     path = os.path.join(videos_dir, filename)
-    if os.path.isfile(path):
-        os.remove(path)
+    if not os.path.isfile(path):
+        raise FileNotFoundError(f"File không tồn tại: {filename}")
+    
+    # Thử xóa file với retry (file có thể đang được serve)
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            os.remove(path)
+            return  # Xóa thành công
+        except PermissionError:
+            if attempt < max_retries - 1:
+                time.sleep(0.5)  # Đợi 500ms rồi thử lại
+            else:
+                raise PermissionError(
+                    f"Không thể xóa video '{filename}'. "
+                    "File đang được sử dụng. Vui lòng đóng video và thử lại."
+                )
 

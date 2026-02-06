@@ -15,7 +15,10 @@ class AIBarcodeScanner:
     """
     Chạy thread riêng đọc frame từ CameraManager và dùng pyzbar để detect QR/barcode.
     - Độ nhạy: low / normal / high (tần suất quét + tiền xử lý ảnh).
+    - Cooldown: Không quét lại cùng mã trong COOLDOWN_SECONDS giây.
     """
+    
+    COOLDOWN_SECONDS = 5 * 60  # 5 phút cooldown cho mỗi mã
 
     def __init__(
         self,
@@ -35,6 +38,7 @@ class AIBarcodeScanner:
         self._lock = threading.Lock()
         self._locked_code = None
         self._last_detections: List[Dict[str, Any]] = []
+        self._code_history: Dict[str, float] = {}  # {code: last_detected_timestamp}
 
     def set_sensitivity(self, scan_interval_sec: float = None, sensitivity: str = None):
         """Cập nhật độ nhạy (có hiệu lực ngay trong vòng lặp)."""
@@ -81,14 +85,29 @@ class AIBarcodeScanner:
                     gray = self._preprocess(gray)
                     decoded = pyzbar.decode(gray)
                     detections = []
+                    current_time = time.time()
+                    
                     for obj in decoded:
                         x, y, w, h = obj.rect
                         code_data = obj.data.decode("utf-8", errors="ignore")
                         detections.append({"x": x, "y": y, "w": w, "h": h, "text": code_data})
+                        
                         with self._lock:
+                            # Kiểm tra xem code này đã bị lock chưa
                             if self._locked_code is None:
-                                self._locked_code = code_data
-                                self.on_code_detected(code_data)
+                                # Kiểm tra cooldown: đã quét mã này trong vòng COOLDOWN_SECONDS giây chưa?
+                                last_detected = self._code_history.get(code_data, 0)
+                                if current_time - last_detected >= self.COOLDOWN_SECONDS:
+                                    # OK, có thể quét mã này
+                                    self._locked_code = code_data
+                                    self._code_history[code_data] = current_time
+                                    self.on_code_detected(code_data)
+                                else:
+                                    # Mã này đã được quét gần đây, bỏ qua
+                                    remaining = int(self.COOLDOWN_SECONDS - (current_time - last_detected))
+                                    print(f"[SCANNER COOLDOWN] QR code '{code_data}' đã được quét gần đây. "
+                                          f"Còn {remaining}s cooldown.")
+                    
                     with self._lock:
                         self._last_detections = detections
                 except Exception:
@@ -116,8 +135,24 @@ class AIBarcodeScanner:
         self._paused = False
 
     def reset(self):
-        """Cho phép reset mã đã lock trong phiên hiện tại."""
+        """
+        Cho phép reset mã đã lock trong phiên hiện tại.
+        Lưu ý: Mã vừa quét vẫn trong cooldown, không quét lại ngay.
+        """
         with self._lock:
             self._locked_code = None
             self._last_detections = []
+    
+    def clear_cooldown(self, code: str = None):
+        """
+        Xóa cooldown cho một mã cụ thể hoặc tất cả mã.
+        Dùng khi cần quét lại mã ngay lập tức.
+        """
+        with self._lock:
+            if code:
+                self._code_history.pop(code, None)
+                print(f"[SCANNER] Cleared cooldown for code: {code}")
+            else:
+                self._code_history.clear()
+                print("[SCANNER] Cleared all code cooldowns")
 

@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+{% block title %}EcoHub - Cài đặt lưu trữ{% endblock %}
+{% block content %}
+
+<style>
+/* ===== STORAGE SETTINGS STYLES ===== */
+.settings-header {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: white;
+  padding: 1.25rem 1.5rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
+}
+
+.settings-header h4 {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.settings-header p {
+  margin: 0.25rem 0 0 0;
+  opacity: 0.9;
+  font-size: 0.875rem;
+}
+
+.config-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.info-box {
+  background: #f0fdfa;
+  border-left: 3px solid #0d9488;
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.25rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #0f766e;
+}
+
+.info-box.warning {
+  background: #fef2f2;
+  border-left-color: #dc2626;
+  color: #991b1b;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #334155;
+  font-size: 0.875rem;
+  margin-bottom: 0.4rem;
+  display: block;
+}
+
+.form-group label.required::after {
+  content: " *";
+  color: #dc2626;
+}
+
+.form-group input[type="text"],
+.form-group input[type="password"] {
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  padding: 0.6rem 0.875rem;
+  font-size: 0.875rem;
+  width: 100%;
+  transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  outline: none;
+}
+
+.form-group .form-text {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+.password-toggle {
+  position: relative;
+}
+
+.password-toggle input {
+  padding-right: 2.5rem;
+}
+
+.password-toggle-btn {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0.25rem;
+  font-size: 1rem;
+}
+
+.password-toggle-btn:hover {
+  color: #0d9488;
+}
+
+
+.action-buttons {
+  display: flex;
+  gap: 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.btn-test {
+  background: #6366f1;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.btn-test:hover {
+  background: #4f46e5;
+  color: white;
+}
+
+.btn-apply {
+  background: #0d9488;
+  color: white;
+  border: none;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: background 0.2s;
+}
+
+.btn-apply:hover {
+  background: #0f766e;
+  color: white;
+}
+
+.btn-back {
+  background: white;
+  color: #64748b;
+  border: 1px solid #e2e8f0;
+  padding: 0.6rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 500;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.btn-back:hover {
+  border-color: #0d9488;
+  color: #0d9488;
+}
+
+@media (max-width: 768px) {
+  
+  .action-buttons {
+    flex-direction: column;
+  }
+  
+  .btn-test,
+  .btn-apply,
+  .btn-back {
+    width: 100%;
+  }
+}
+</style>
+
+<!-- Header -->
+<div class="settings-header">
+  <h4>☁️ Cài đặt tài khoản S3</h4>
+  <p>Cấu hình tài khoản S3 để lưu trữ video trên cloud</p>
+</div>
+
+<!-- S3 Configuration -->
+<div class="config-card">
+  <div class="section-title">🔐 Thông tin tài khoản S3</div>
+  
+  <form method="post" action="{{ url_for('storage_settings') }}" id="storageForm">
+    <!-- Hidden field: storage_mode = s3 -->
+    <input type="hidden" name="storage_mode" value="s3">
+    
+    {% if s3_config %}
+    <!-- TRƯỜNG HỢP ĐÃ CẤU HÌNH: CHỈ HIỆN INFO + PREFIX -->
+    <div class="info-box" style="background: #f0fdf4; border-left-color: #10b981;">
+      <strong>✅ Đã cấu hình tài khoản S3:</strong>
+      <div style="margin-top: 0.75rem; font-size: 0.875rem; display: grid; gap: 0.4rem;">
+        <div><strong>Endpoint:</strong> {{ s3_config.endpoint }}</div>
+        <div><strong>Bucket:</strong> {{ s3_config.bucket }}</div>
+        <div><strong>Region:</strong> {{ s3_config.region }}</div>
+        <div><strong>👤 Nhân viên:</strong> {{ s3_config.prefix if s3_config.prefix else '(chưa đặt)' }}</div>
+        <div style="margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid #d1fae5; color: #6b7280;">
+          <em>Access Key & Secret Key đã được mã hóa an toàn</em>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Chỉ cho phép sửa Prefix/Nhân viên -->
+    <div class="form-group" style="margin-top: 1.25rem;">
+      <label for="s3_prefix">👤 Nhân viên</label>
+      <input type="text" 
+             id="s3_prefix" 
+             name="s3_prefix" 
+             class="form-control"
+             value="{{ s3_config.prefix if s3_config.prefix else '' }}"
+             placeholder="Tên nhân viên (vd: nguyen-van-a, nva)"
+             maxlength="50">
+      <span class="form-text">
+        Tên nhân viên sẽ được thêm vào đầu tên file. 
+        VD: <code>nva_012345_20260206_090920.mp4</code>
+      </span>
+    </div>
+    
+    {% else %}
+    <!-- TRƯỜNG HỢP CHƯA CẤU HÌNH: HIỆN FULL FORM -->
+    <div class="info-box warning">
+      <strong>⚠️ Bảo mật:</strong> Thông tin S3 sẽ được mã hóa và lưu an toàn trên máy tính này.
+      Không chia sẻ Access Key và Secret Key với người khác.
+    </div>
+      
+    <div class="row">
+      <div class="col-md-6">
+        <div class="form-group">
+          <label for="s3_endpoint" class="required">S3 Endpoint</label>
+          <input type="text" 
+                 id="s3_endpoint" 
+                 name="s3_endpoint" 
+                 class="form-control"
+                 value=""
+                 placeholder="https://s3.hn-2.cloud.cmctelecom.vn">
+          <span class="form-text">URL của S3-compatible storage</span>
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="form-group">
+          <label for="s3_region" class="required">Region</label>
+          <input type="text" 
+                 id="s3_region" 
+                 name="s3_region" 
+                 class="form-control"
+                 value=""
+                 placeholder="hn-2">
+        </div>
+      </div>
+      
+      <div class="col-md-3">
+        <div class="form-group">
+          <label for="s3_bucket" class="required">Bucket</label>
+          <input type="text" 
+                 id="s3_bucket" 
+                 name="s3_bucket" 
+                 class="form-control"
+                 value=""
+                 placeholder="my-bucket">
+        </div>
+      </div>
+    </div>
+    
+    <div class="row">
+      <div class="col-md-6">
+        <div class="form-group">
+          <label for="s3_access_key" class="required">Access Key</label>
+          <input type="text" 
+                 id="s3_access_key" 
+                 name="s3_access_key" 
+                 class="form-control"
+                 value=""
+                 placeholder="Nhập Access Key">
+          <span class="form-text">Quyền truy cập S3</span>
+        </div>
+      </div>
+      
+      <div class="col-md-6">
+        <div class="form-group">
+          <label for="s3_secret_key" class="required">Secret Key</label>
+          <div class="password-toggle">
+            <input type="password" 
+                   id="s3_secret_key" 
+                   name="s3_secret_key" 
+                   class="form-control"
+                   value=""
+                   placeholder="Nhập Secret Key">
+            <button type="button" class="password-toggle-btn" onclick="togglePassword('s3_secret_key')">
+              👁️
+            </button>
+          </div>
+          <span class="form-text">Khóa bí mật (sẽ được mã hóa)</span>
+        </div>
+      </div>
+    </div>
+    
+    <div class="form-group">
+      <label for="s3_prefix">👤 Nhân viên</label>
+      <input type="text" 
+             id="s3_prefix" 
+             name="s3_prefix" 
+             class="form-control"
+             value=""
+             placeholder="Tên nhân viên (vd: nguyen-van-a, nva)"
+             maxlength="50">
+      <span class="form-text">
+        Tên nhân viên sẽ được thêm vào đầu tên file. 
+        VD: <code>nva_012345_20260206_090920.mp4</code>
+      </span>
+    </div>
+    
+    <div class="info-box">
+      <strong>📝 Định dạng tên file:</strong> 
+      <code>{nhân_viên}_{mã_đơn}_{timestamp}.mp4</code>
+      <br>
+      Ví dụ: <code>nva_SPXVN01450782683B_20260206_143052.mp4</code>
+    </div>
+    {% endif %}
+    
+    <div class="action-buttons">
+      {% if s3_config %}
+        <!-- Đã cấu hình: chỉ cần lưu prefix -->
+        <button type="submit" class="btn btn-apply">💾 Lưu thay đổi</button>
+        <button type="button" class="btn btn-back" style="background: #dc2626; border-color: #dc2626; color: white;" onclick="deleteS3Account()">
+          🗑️ Xóa tài khoản
+        </button>
+      {% else %}
+        <!-- Chưa cấu hình: test + lưu mới -->
+        <button type="button" class="btn btn-test" id="testBtn" onclick="testS3Connection()">
+          🔍 Test kết nối
+        </button>
+        <button type="submit" class="btn btn-apply">💾 Lưu tài khoản</button>
+      {% endif %}
+      <a href="{{ url_for('dashboard') }}" class="btn btn-back">← Dashboard</a>
+    </div>
+  </form>
+</div>
+
+<script>
+// Toggle password visibility
+function togglePassword(fieldId) {
+  const field = document.getElementById(fieldId);
+  if (field.type === 'password') {
+    field.type = 'text';
+  } else {
+    field.type = 'password';
+  }
+}
+
+// Test S3 connection (chỉ khi chưa có config)
+async function testS3Connection() {
+  const btn = document.getElementById('testBtn');
+  if (!btn) return;
+  
+  const originalText = btn.innerHTML;
+  
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Đang kiểm tra...';
+  
+  const formData = new FormData();
+  formData.append('action', 'test');
+  formData.append('s3_endpoint', document.getElementById('s3_endpoint').value);
+  formData.append('s3_region', document.getElementById('s3_region').value);
+  formData.append('s3_bucket', document.getElementById('s3_bucket').value);
+  formData.append('s3_access_key', document.getElementById('s3_access_key').value);
+  formData.append('s3_secret_key', document.getElementById('s3_secret_key').value);
+  
+  try {
+    const response = await fetch('{{ url_for("test_s3_connection") }}', {
+      method: 'POST',
+      body: formData
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      alert('✅ ' + result.message);
+    } else {
+      alert('❌ ' + result.message);
+    }
+  } catch (error) {
+    alert('❌ Lỗi kết nối: ' + error.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
+}
+
+// Delete S3 account
+async function deleteS3Account() {
+  if (!confirm('Bạn có chắc muốn xóa tài khoản S3?\n\nVideo trên S3 vẫn tồn tại, nhưng ứng dụng sẽ không thể truy cập được nữa.')) {
+    return;
+  }
+  
+  try {
+    const response = await fetch('{{ url_for("delete_s3_account") }}', {
+      method: 'POST'
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      alert('✅ ' + result.message);
+      window.location.reload();
+    } else {
+      alert('❌ ' + result.message);
+    }
+  } catch (error) {
+    alert('❌ Lỗi: ' + error.message);
+  }
+}
+</script>
+{% endblock %}
