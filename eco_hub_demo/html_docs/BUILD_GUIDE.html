@@ -1,0 +1,340 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>BUILD_GUIDE</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 24pt;
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            font-size: 18pt;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            font-size: 14pt;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+            background-color: #f9f9f9;
+            padding: 10px 15px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 10pt;
+        }
+        
+        table th {
+            background-color: #3498db;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin: 5px 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<h1 id="huong-dan-build-ecohub-qr-scanner">🔨 HƯỚNG DẪN BUILD ECOHUB QR SCANNER</h1>
+<h2 id="yeu-cau">📋 <strong>YÊU CẦU:</strong></h2>
+<h3 id="1-python-dependencies"><strong>1. Python Dependencies</strong></h3>
+<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+pip<span class="w"> </span>install<span class="w"> </span>pyinstaller&gt;<span class="o">=</span><span class="m">6</span>.0.0
+</code></pre></div>
+
+<h3 id="2-inno-setup-tao-installer"><strong>2. Inno Setup (Tạo installer)</strong></h3>
+<ul>
+<li>Download: https://jrsoftware.org/isdl.php</li>
+<li>Cài đặt vào: <code>C:\Program Files (x86)\Inno Setup 6\</code></li>
+</ul>
+<hr />
+<h2 id="cach-build">🚀 <strong>CÁCH BUILD:</strong></h2>
+<h3 id="buoc-1-build-file-exe"><strong>Bước 1: Build file .EXE</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Windows (Tự động):</span>
+build_exe.bat
+
+<span class="c1"># Hoặc manual:</span>
+pip<span class="w"> </span>install<span class="w"> </span>pyinstaller
+pyinstaller<span class="w"> </span>build.spec<span class="w"> </span>--clean
+</code></pre></div>
+
+<p><strong>Script sẽ:</strong>
+1. Check PyInstaller
+2. Install dependencies
+3. Clean old build folders
+4. Build EXE với PyInstaller</p>
+<p><strong>Kết quả:</strong>
+- File EXE: <code>dist\EcoHub_QR_Scanner\EcoHub_QR_Scanner.exe</code> (19 MB)
+- Internal: <code>dist\EcoHub_QR_Scanner\_internal\</code> (200+ MB)
+  - ✅ <code>static/</code> folder
+  - ✅ <code>templates/</code> folder
+  - ✅ <code>config.json</code> (default)
+  - ✅ <code>config.key</code> (encryption key)
+  - Python runtime + dependencies</p>
+<p><strong>Tổng kích thước:</strong> ~220-250 MB</p>
+<hr />
+<h3 id="buoc-2-test-exe"><strong>Bước 2: Test EXE</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>dist<span class="se">\E</span>coHub_QR_Scanner
+EcoHub_QR_Scanner.exe
+</code></pre></div>
+
+<p><strong>Console output mong đợi:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="nl">BASE_DIR</span><span class="p">:</span><span class="w"> </span><span class="nl">C</span><span class="p">:</span><span class="err">\</span><span class="n">Users</span><span class="err">\</span><span class="p">...</span><span class="err">\</span><span class="n">AppData</span><span class="err">\</span><span class="k">Local</span><span class="err">\</span><span class="n">Temp</span><span class="err">\</span><span class="n">_MEI123456</span>
+<span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="nl">Templates</span><span class="p">:</span><span class="w"> </span><span class="p">...</span><span class="err">\</span><span class="n">Temp</span><span class="err">\</span><span class="n">_MEI123456</span><span class="err">\</span><span class="n">templates</span>
+<span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="k">Static</span><span class="err">:</span><span class="w"> </span><span class="p">...</span><span class="err">\</span><span class="n">Temp</span><span class="err">\</span><span class="n">_MEI123456</span><span class="err">\</span><span class="k">static</span>
+<span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="nl">Videos</span><span class="p">:</span><span class="w"> </span><span class="nl">C</span><span class="p">:</span><span class="err">\</span><span class="n">Users</span><span class="err">\</span><span class="o">&lt;</span><span class="k">user</span><span class="o">&gt;</span><span class="err">\</span><span class="n">EcoHub_QR_Scanner</span><span class="err">\</span><span class="n">videos</span>
+<span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="n">Copied</span><span class="w"> </span><span class="k">default</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="n">json</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="nl">C</span><span class="p">:</span><span class="err">\</span><span class="n">Users</span><span class="err">\</span><span class="o">&lt;</span><span class="k">user</span><span class="o">&gt;</span><span class="err">\</span><span class="n">EcoHub_QR_Scanner</span><span class="err">\</span><span class="n">config</span><span class="p">.</span><span class="n">json</span>
+<span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="n">Copied</span><span class="w"> </span><span class="n">config</span><span class="p">.</span><span class="k">key</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="nl">C</span><span class="p">:</span><span class="err">\</span><span class="n">Users</span><span class="err">\</span><span class="o">&lt;</span><span class="k">user</span><span class="o">&gt;</span><span class="err">\</span><span class="n">EcoHub_QR_Scanner</span><span class="err">\</span><span class="n">config</span><span class="p">.</span><span class="k">key</span>
+
+<span class="o">============================================================</span>
+<span class="w">  </span><span class="n">ECOHUB</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">SCANNER</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">READY</span>
+<span class="o">============================================================</span>
+<span class="w">  </span><span class="nl">URL</span><span class="p">:</span><span class="w"> </span><span class="nl">http</span><span class="p">:</span><span class="o">//</span><span class="mf">127.0.0.1</span><span class="err">:</span><span class="mi">5000</span>
+<span class="w">  </span><span class="n">Camera</span><span class="w"> </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="ow">NOT</span><span class="w"> </span><span class="n">STARTED</span><span class="w"> </span><span class="p">(</span><span class="n">manual</span><span class="w"> </span><span class="k">start</span><span class="w"> </span><span class="n">required</span><span class="p">)</span>
+<span class="w">  </span><span class="n">S3</span><span class="w"> </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="ow">NOT</span><span class="w"> </span><span class="n">CONFIGURED</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">CONFIGURED</span>
+<span class="o">============================================================</span>
+
+<span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">Running</span><span class="w"> </span><span class="k">on</span><span class="w"> </span><span class="nl">http</span><span class="p">:</span><span class="o">//</span><span class="mf">127.0.0.1</span><span class="err">:</span><span class="mi">5000</span>
+</code></pre></div>
+
+<p><strong>Kiểm tra:</strong>
+- ✅ App mở được (không lỗi Templates/Static)
+- ✅ Console hiện logs
+- ✅ Browser tự động mở http://127.0.0.1:5000
+- ✅ Templates render được (không lỗi TemplateNotFound)
+- ✅ Static files load được (CSS/JS)
+- ✅ Config files copy vào <code>C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\</code>
+- ✅ Camera test được (từ Settings)
+- ✅ S3 config lưu được</p>
+<hr />
+<h3 id="buoc-3-build-installer-setup"><strong>Bước 3: Build Installer Setup</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Windows (Tự động):</span>
+build_installer.bat
+
+<span class="c1"># Hoặc manual:</span>
+<span class="s2">&quot;C:\Program Files (x86)\Inno Setup 6\ISCC.exe&quot;</span><span class="w"> </span>setup.iss
+</code></pre></div>
+
+<p><strong>Script sẽ:</strong>
+1. Check Inno Setup installation
+2. Check EXE exists
+3. Compress tất cả files (LZMA)
+4. Build installer</p>
+<p><strong>Kết quả:</strong>
+- File installer: <code>installer_output\EcoHub_QR_Scanner_Setup_v1.0.0.exe</code>
+- Kích thước: ~88 MB (compressed từ 220 MB)
+- Người dùng chỉ cần double-click để cài đặt!</p>
+<hr />
+<h2 id="cau-truc-sau-khi-build">📦 <strong>CẤU TRÚC SAU KHI BUILD:</strong></h2>
+<div class="codehilite"><pre><span></span><code>eco_hub_demo/
+├── dist/
+│   └── EcoHub_QR_Scanner/       ← Folder chứa EXE + dependencies
+│       ├── EcoHub_QR_Scanner.exe  ← File chạy chính
+│       ├── templates/
+│       ├── static/
+│       ├── config.json
+│       ├── _internal/            ← Python runtime + libraries
+│       │   ├── python311.dll
+│       │   ├── cv2/
+│       │   ├── flask/
+│       │   ├── boto3/
+│       │   └── ...
+│       └── videos/              ← Folder lưu videos
+│
+├── installer_output/
+│   └── EcoHub_QR_Scanner_Setup_v1.0.0.exe  ← INSTALLER
+│
+├── build.spec                   ← PyInstaller config
+├── build_exe.bat                ← Script build EXE
+├── build_installer.bat          ← Script build installer
+└── setup.iss                    ← Inno Setup config
+</code></pre></div>
+
+<hr />
+<h2 id="sau-khi-cai-at">🎯 <strong>SAU KHI CÀI ĐẶT:</strong></h2>
+<p>User chạy installer → Cài vào <code>C:\Program Files\EcoHub QR Scanner\</code></p>
+<div class="codehilite"><pre><span></span><code>C:\Program Files\EcoHub QR Scanner\
+├── EcoHub_QR_Scanner.exe  ← Double-click để chạy
+├── config.json
+├── templates/
+├── static/
+├── videos/                ← Tự động tạo
+└── _internal/
+</code></pre></div>
+
+<hr />
+<h2 id="tuy-chinh">⚙️ <strong>TÙY CHỈNH:</strong></h2>
+<h3 id="oi-ten-app"><strong>Đổi tên app:</strong></h3>
+<p>Sửa trong <code>setup.iss</code>:</p>
+<div class="codehilite"><pre><span></span><code>#define MyAppName &quot;Tên App Của Bạn&quot;
+#define MyAppVersion &quot;1.0.0&quot;
+</code></pre></div>
+
+<h3 id="them-icon"><strong>Thêm icon:</strong></h3>
+<ol>
+<li>Tạo file <code>icon.ico</code> (256x256)</li>
+<li>Sửa <code>build.spec</code>: <code>icon='icon.ico'</code></li>
+<li>Sửa <code>setup.iss</code>: <code>SetupIconFile=icon.ico</code></li>
+</ol>
+<h3 id="an-console"><strong>Ẩn console:</strong></h3>
+<p>Sửa <code>build.spec</code>: <code>console=False</code> (chỉ hiện GUI)</p>
+<hr />
+<h2 id="xu-ly-loi">🐛 <strong>XỬ LÝ LỖI:</strong></h2>
+<h3 id="loi-1-python-not-found"><strong>Lỗi 1: "Python not found"</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Cài Python 3.11</span>
+<span class="c1"># Add Python to PATH</span>
+</code></pre></div>
+
+<h3 id="loi-2-module-not-found"><strong>Lỗi 2: "Module not found"</strong></h3>
+<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+pip<span class="w"> </span>install<span class="w"> </span>pyinstaller
+</code></pre></div>
+
+<h3 id="loi-3-inno-setup-not-found"><strong>Lỗi 3: "Inno Setup not found"</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Download: https://jrsoftware.org/isdl.php</span>
+<span class="c1"># Cài vào: C:\Program Files (x86)\Inno Setup 6\</span>
+</code></pre></div>
+
+<h3 id="loi-4-opencv-dll-error"><strong>Lỗi 4: "OpenCV DLL error"</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Thêm vào build.spec:</span>
+<span class="nv">binaries</span><span class="o">=[</span>
+<span class="w">    </span><span class="o">(</span><span class="s1">&#39;C:/path/to/opencv_videoio_ffmpeg470_64.dll&#39;</span>,<span class="w"> </span><span class="s1">&#39;.&#39;</span><span class="o">)</span>,
+<span class="o">]</span>,
+</code></pre></div>
+
+<hr />
+<h2 id="checklist-truoc-khi-phan-phoi">📝 <strong>CHECKLIST TRƯỚC KHI PHÂN PHỐI:</strong></h2>
+<ul>
+<li>[ ] Test EXE trên máy không có Python</li>
+<li>[ ] Test camera USB và RTSP</li>
+<li>[ ] Test S3 upload/download/delete</li>
+<li>[ ] Test tất cả tính năng (QR scan, record, settings)</li>
+<li>[ ] Thêm icon cho app (icon.ico)</li>
+<li>[ ] Tạo README cho user</li>
+<li>[ ] Test installer trên máy sạch (fresh Windows)</li>
+</ul>
+<hr />
+<h2 id="file-phan-phoi">🎁 <strong>FILE PHÂN PHỐI:</strong></h2>
+<p><strong>Gửi cho user:</strong></p>
+<div class="codehilite"><pre><span></span><code>EcoHub_QR_Scanner_Setup_v1.0.0.exe  (200-300 MB)
+</code></pre></div>
+
+<p><strong>User làm gì:</strong>
+1. Double-click installer
+2. Next → Next → Install
+3. Chạy app từ Desktop hoặc Start Menu
+4. Cấu hình camera + S3
+5. Bắt đầu sử dụng!</p>
+<hr />
+<h2 id="build-ngay">🚀 <strong>BUILD NGAY:</strong></h2>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Bước 1: Build EXE</span>
+build_exe.bat
+
+<span class="c1"># Bước 2: Test EXE</span>
+dist<span class="se">\E</span>coHub_QR_Scanner<span class="se">\E</span>coHub_QR_Scanner.exe
+
+<span class="c1"># Bước 3: Build Installer</span>
+build_installer.bat
+
+<span class="c1"># Kết quả:</span>
+installer_output<span class="se">\E</span>coHub_QR_Scanner_Setup_v1.0.0.exe
+</code></pre></div>
+
+<p><strong>Xong!</strong> 🎉</p>
+</body>
+</html>

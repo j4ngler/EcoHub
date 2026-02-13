@@ -1,0 +1,869 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DEVELOPER_GUIDE</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 24pt;
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            font-size: 18pt;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            font-size: 14pt;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+            background-color: #f9f9f9;
+            padding: 10px 15px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 10pt;
+        }
+        
+        table th {
+            background-color: #3498db;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin: 5px 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<h1 id="developer-guide-ecohub-qr-scanner">👨‍💻 DEVELOPER GUIDE - ECOHUB QR SCANNER</h1>
+<p><strong>Dành cho developers muốn customize hoặc extend hệ thống</strong></p>
+<hr />
+<h2 id="setup-development">🚀 SETUP DEVELOPMENT</h2>
+<h3 id="1-clonedownload-project">1. Clone/Download project</h3>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>eco_hub_demo
+</code></pre></div>
+
+<h3 id="2-install-dependencies">2. Install dependencies</h3>
+<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</code></pre></div>
+
+<h3 id="3-run-development-server">3. Run development server</h3>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>app.py
+</code></pre></div>
+
+<p><strong>Output:</strong></p>
+<div class="codehilite"><pre><span></span><code>============================================================
+  ECOHUB QR SCANNER - READY
+============================================================
+  URL: http://127.0.0.1:5000
+  Camera Status: NOT STARTED (manual start required)
+  S3 Status: CONFIGURED
+============================================================
+
+ <span class="k">*</span> Running on http://127.0.0.1:5000
+ <span class="k">*</span> Debug mode: on
+</code></pre></div>
+
+<h3 id="4-hot-reload">4. Hot reload</h3>
+<p>Flask debug mode enabled → Code changes auto-reload</p>
+<hr />
+<h2 id="code-structure">📁 CODE STRUCTURE</h2>
+<h3 id="main-application-apppy">Main Application (<code>app.py</code>)</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Global state</span>
+<span class="n">app_state</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;current_order_code&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;is_recording&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="o">...</span>
+<span class="p">}</span>
+
+<span class="c1"># Upload queue system</span>
+<span class="n">upload_queue</span> <span class="o">=</span> <span class="n">Queue</span><span class="p">()</span>
+<span class="n">upload_status_dict</span> <span class="o">=</span> <span class="p">{}</span>
+<span class="n">upload_worker</span><span class="p">()</span>  <span class="c1"># Background thread</span>
+
+<span class="c1"># Camera management</span>
+<span class="n">camera_managers</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># CameraManager instances</span>
+<span class="n">ai_scanners</span> <span class="o">=</span> <span class="p">[]</span>      <span class="c1"># AIBarcodeScanner instances</span>
+
+<span class="c1"># Flask routes</span>
+<span class="nd">@app</span><span class="o">.</span><span class="n">route</span><span class="p">(</span><span class="s2">&quot;/dashboard&quot;</span><span class="p">)</span>
+<span class="nd">@app</span><span class="o">.</span><span class="n">route</span><span class="p">(</span><span class="s2">&quot;/start_recording&quot;</span><span class="p">,</span> <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;POST&quot;</span><span class="p">])</span>
+<span class="o">...</span>
+</code></pre></div>
+
+<h3 id="camera-module">Camera Module</h3>
+<h4 id="cameracamera_managerpy"><strong><code>camera/camera_manager.py</code></strong></h4>
+<ul>
+<li>Camera stream management</li>
+<li>Frame reading loop (10ms interval)</li>
+<li>Queue management (AI + Recorder)</li>
+<li>MJPEG encoding</li>
+<li>RTSP buffer optimization</li>
+</ul>
+<p><strong>Key methods:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CameraManager</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">()</span>                      <span class="c1"># Start camera thread</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">()</span>                       <span class="c1"># Stop camera thread</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_latest_frame</span><span class="p">()</span>           <span class="c1"># Get frame for display</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">get_frame_from_queue</span><span class="p">()</span>       <span class="c1"># Get frame for AI</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_loop</span><span class="p">()</span>                      <span class="c1"># Main camera loop</span>
+</code></pre></div>
+
+<h4 id="cameraai_scannerpy"><strong><code>camera/ai_scanner.py</code></strong></h4>
+<ul>
+<li>QR/Barcode detection with ZXing-CPP</li>
+<li>Timestamp-based FPS control (5 FPS)</li>
+<li>Cooldown mechanism (5 minutes)</li>
+<li>Memory leak prevention (periodic cleanup)</li>
+</ul>
+<p><strong>Key methods:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AIBarcodeScanner</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">()</span>                      <span class="c1"># Start AI thread</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">()</span>                       <span class="c1"># Stop AI thread</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pause</span><span class="p">()</span>                      <span class="c1"># Pause during recording</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">resume</span><span class="p">()</span>                     <span class="c1"># Resume after recording</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">reset</span><span class="p">()</span>                      <span class="c1"># Clear queue for fresh frames</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_loop</span><span class="p">()</span>                      <span class="c1"># Main AI loop</span>
+</code></pre></div>
+
+<h4 id="camerarecorderpy"><strong><code>camera/recorder.py</code></strong></h4>
+<ul>
+<li>Async video recording</li>
+<li>Separate writer thread</li>
+<li>90-frame buffer (non-blocking)</li>
+<li>VideoWriter management</li>
+</ul>
+<p><strong>Key methods:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">VideoRecorder</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">start</span><span class="p">(</span><span class="n">path</span><span class="p">,</span> <span class="n">frame_size</span><span class="p">,</span> <span class="n">fps</span><span class="p">)</span> <span class="c1"># Start recording</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">write_frame</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>           <span class="c1"># Write frame (non-blocking)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">stop</span><span class="p">()</span>                       <span class="c1"># Stop recording</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_write_loop</span><span class="p">()</span>                <span class="c1"># Writer thread loop</span>
+</code></pre></div>
+
+<h4 id="cameracamera_streampy"><strong><code>camera/camera_stream.py</code></strong></h4>
+<ul>
+<li>MJPEG stream generation</li>
+<li>Bounding box overlay</li>
+<li>Real-time FPS calculation</li>
+</ul>
+<p><strong>Key function:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">generate_mjpeg</span><span class="p">(</span><span class="n">camera_manager</span><span class="p">,</span> <span class="n">ai_scanner</span><span class="p">):</span>
+    <span class="c1"># Yield MJPEG frames</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="n">frame</span> <span class="o">=</span> <span class="n">camera_manager</span><span class="o">.</span><span class="n">get_latest_frame</span><span class="p">()</span>
+        <span class="c1"># Draw bounding boxes</span>
+        <span class="c1"># Encode to JPEG</span>
+        <span class="k">yield</span> <span class="p">(</span><span class="sa">b</span><span class="s1">&#39;--frame</span><span class="se">\r\n</span><span class="s1">&#39;</span>
+               <span class="sa">b</span><span class="s1">&#39;Content-Type: image/jpeg</span><span class="se">\r\n\r\n</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="n">jpeg</span> <span class="o">+</span> <span class="sa">b</span><span class="s1">&#39;</span><span class="se">\r\n</span><span class="s1">&#39;</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h3 id="services-module">Services Module</h3>
+<h4 id="servicess3_servicepy"><strong><code>services/s3_service.py</code></strong></h4>
+<ul>
+<li>S3 operations (upload, list, delete, download)</li>
+<li>Multipart upload (50MB threshold, 10MB chunks)</li>
+<li>Presigned URL generation</li>
+<li>Retry mechanism</li>
+</ul>
+<p><strong>Key methods:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">S3Service</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">upload_file</span><span class="p">(</span><span class="n">filepath</span><span class="p">,</span> <span class="n">object_key</span><span class="p">)</span>        <span class="c1"># Upload</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">list_videos</span><span class="p">()</span>                            <span class="c1"># List S3 objects</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">delete_video</span><span class="p">(</span><span class="n">object_key</span><span class="p">)</span>                 <span class="c1"># Delete</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">generate_presigned_url</span><span class="p">(</span><span class="n">object_key</span><span class="p">)</span>       <span class="c1"># Download URL</span>
+</code></pre></div>
+
+<h4 id="servicesconfig_encryptionpy"><strong><code>services/config_encryption.py</code></strong></h4>
+<ul>
+<li>Fernet symmetric encryption</li>
+<li>Key generation (PBKDF2-HMAC-SHA256)</li>
+<li>Encrypt/decrypt credentials</li>
+</ul>
+<p><strong>Key methods:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">ConfigEncryption</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">encrypt</span><span class="p">(</span><span class="n">plaintext</span><span class="p">)</span>                       <span class="c1"># Encrypt string</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">decrypt</span><span class="p">(</span><span class="n">encrypted</span><span class="p">)</span>                       <span class="c1"># Decrypt string</span>
+</code></pre></div>
+
+<h4 id="servicesstorage_servicepy"><strong><code>services/storage_service.py</code></strong></h4>
+<ul>
+<li>Local file management</li>
+<li>Recording filename generation</li>
+<li>Mock implementation</li>
+</ul>
+<h4 id="servicesorder_servicepy"><strong><code>services/order_service.py</code></strong></h4>
+<ul>
+<li>Order info retrieval</li>
+<li>Mock implementation (API integration point)</li>
+</ul>
+<hr />
+<h2 id="customization">🔧 CUSTOMIZATION</h2>
+<h3 id="1-change-cooldown-time">1. Change Cooldown Time</h3>
+<p><strong>File:</strong> <code>camera/ai_scanner.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Line ~16</span>
+<span class="n">COOLDOWN_SECONDS</span> <span class="o">=</span> <span class="mi">5</span> <span class="o">*</span> <span class="mi">60</span>  <span class="c1"># Change to 2 * 60 (2 minutes)</span>
+</code></pre></div>
+
+<hr />
+<h3 id="2-change-ai-fps">2. Change AI FPS</h3>
+<p><strong>File:</strong> <code>camera/ai_scanner.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Line ~15</span>
+<span class="n">TARGET_INTERVAL</span> <span class="o">=</span> <span class="mf">0.2</span>  <span class="c1"># 5 FPS → Change to 0.1 (10 FPS)</span>
+</code></pre></div>
+
+<hr />
+<h3 id="3-change-recording-fps">3. Change Recording FPS</h3>
+<p><strong>File:</strong> <code>app.py</code> → <code>start_recording()</code></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Line ~1205</span>
+<span class="n">recorder</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">video_path</span><span class="p">,</span> <span class="n">frame_size</span><span class="o">=</span><span class="n">frame_size</span><span class="p">,</span> <span class="n">fps</span><span class="o">=</span><span class="mf">15.0</span><span class="p">)</span>
+<span class="c1"># Change to fps=20.0</span>
+</code></pre></div>
+
+<hr />
+<h3 id="4-change-max-cameras">4. Change Max Cameras</h3>
+<p><strong>File:</strong> <code>app.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Line ~53</span>
+<span class="n">MAX_CAMERAS</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># Change to 3 or 4</span>
+</code></pre></div>
+
+<hr />
+<h3 id="5-change-upload-threshold">5. Change Upload Threshold</h3>
+<p><strong>File:</strong> <code>services/s3_service.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Line ~22-23</span>
+<span class="n">MULTIPART_THRESHOLD</span> <span class="o">=</span> <span class="mi">50</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>  <span class="c1"># 50 MB → 100 MB</span>
+<span class="n">MULTIPART_CHUNKSIZE</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>  <span class="c1"># 10 MB → 20 MB</span>
+</code></pre></div>
+
+<hr />
+<h3 id="6-add-custom-order-api">6. Add Custom Order API</h3>
+<p><strong>File:</strong> <code>services/order_service.py</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">get_order_info</span><span class="p">(</span><span class="n">order_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="c1"># Current: Mock data</span>
+
+    <span class="c1"># Replace with real API:</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+    <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;https://api.example.com/orders/</span><span class="si">{</span><span class="n">order_code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h3 id="7-add-custom-video-processing">7. Add Custom Video Processing</h3>
+<p><strong>File:</strong> <code>app.py</code> → <code>stop_recording()</code></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># After recording stops, before upload</span>
+
+<span class="c1"># Add watermark</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">cv2</span>
+<span class="n">video</span> <span class="o">=</span> <span class="n">cv2</span><span class="o">.</span><span class="n">VideoCapture</span><span class="p">(</span><span class="n">video_path</span><span class="p">)</span>
+<span class="c1"># ... process frames ...</span>
+
+<span class="c1"># Add audio</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">moviepy</span>
+<span class="c1"># ... add audio track ...</span>
+
+<span class="c1"># Compress video</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">ffmpeg</span>
+<span class="n">ffmpeg</span><span class="o">.</span><span class="n">input</span><span class="p">(</span><span class="n">video_path</span><span class="p">)</span><span class="o">.</span><span class="n">output</span><span class="p">(</span><span class="n">compressed_path</span><span class="p">,</span> <span class="n">vcodec</span><span class="o">=</span><span class="s1">&#39;h264&#39;</span><span class="p">)</span><span class="o">.</span><span class="n">run</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="testing">🧪 TESTING</h2>
+<h3 id="unit-tests-todo">Unit Tests (TODO)</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Install pytest</span>
+pip<span class="w"> </span>install<span class="w"> </span>pytest
+
+<span class="c1"># Run tests</span>
+pytest<span class="w"> </span>tests/
+</code></pre></div>
+
+<h3 id="manual-testing">Manual Testing</h3>
+<p><strong>Test Camera:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">camera.camera_manager</span><span class="w"> </span><span class="kn">import</span> <span class="n">CameraManager</span><span class="p">,</span> <span class="n">SOURCE_USB</span>
+
+<span class="n">mgr</span> <span class="o">=</span> <span class="n">CameraManager</span><span class="p">(</span><span class="n">camera_index</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">source_type</span><span class="o">=</span><span class="n">SOURCE_USB</span><span class="p">)</span>
+<span class="n">mgr</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+<span class="n">frame</span> <span class="o">=</span> <span class="n">mgr</span><span class="o">.</span><span class="n">get_latest_frame</span><span class="p">()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Frame shape: </span><span class="si">{</span><span class="n">frame</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="n">mgr</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+</code></pre></div>
+
+<p><strong>Test AI Scanner:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">camera.ai_scanner</span><span class="w"> </span><span class="kn">import</span> <span class="n">AIBarcodeScanner</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">callback</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">bbox</span><span class="p">):</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Detected: </span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+<span class="n">scanner</span> <span class="o">=</span> <span class="n">AIBarcodeScanner</span><span class="p">(</span><span class="n">camera_manager</span><span class="o">=</span><span class="n">mgr</span><span class="p">,</span> <span class="n">on_code_detected</span><span class="o">=</span><span class="n">callback</span><span class="p">)</span>
+<span class="n">scanner</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+<span class="c1"># ... wait for QR detection ...</span>
+<span class="n">scanner</span><span class="o">.</span><span class="n">stop</span><span class="p">()</span>
+</code></pre></div>
+
+<p><strong>Test S3:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="kn">from</span><span class="w"> </span><span class="nn">services.s3_service</span><span class="w"> </span><span class="kn">import</span> <span class="n">S3Service</span><span class="p">,</span> <span class="n">S3Config</span>
+
+<span class="n">config</span> <span class="o">=</span> <span class="n">S3Config</span><span class="p">(</span>
+    <span class="n">endpoint</span><span class="o">=</span><span class="s2">&quot;https://...&quot;</span><span class="p">,</span>
+    <span class="n">region</span><span class="o">=</span><span class="s2">&quot;ap-southeast-1&quot;</span><span class="p">,</span>
+    <span class="n">bucket</span><span class="o">=</span><span class="s2">&quot;test-bucket&quot;</span><span class="p">,</span>
+    <span class="n">access_key</span><span class="o">=</span><span class="s2">&quot;AKIA...&quot;</span><span class="p">,</span>
+    <span class="n">secret_key</span><span class="o">=</span><span class="s2">&quot;wJalr...&quot;</span>
+<span class="p">)</span>
+
+<span class="n">service</span> <span class="o">=</span> <span class="n">S3Service</span><span class="p">(</span><span class="n">config</span><span class="p">)</span>
+<span class="n">result</span> <span class="o">=</span> <span class="n">service</span><span class="o">.</span><span class="n">upload_file</span><span class="p">(</span><span class="s2">&quot;test.mp4&quot;</span><span class="p">,</span> <span class="s2">&quot;test_video.mp4&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Upload: </span><span class="si">{</span><span class="n">result</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="debugging">🐛 DEBUGGING</h2>
+<h3 id="enable-debug-logs">Enable Debug Logs</h3>
+<p><strong>Camera Debug:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/camera_manager.py (line ~150)</span>
+<span class="k">if</span> <span class="n">frame_count</span> <span class="o">%</span> <span class="mi">150</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>  <span class="c1"># Change to % 30 (more frequent)</span>
+    <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[CAMERA DEBUG] ...&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<p><strong>AI Debug:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/ai_scanner.py (line ~145)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[AI DEBUG] fps=</span><span class="si">{</span><span class="n">fps</span><span class="si">:</span><span class="s2">.1f</span><span class="si">}</span><span class="s2">, t_total=</span><span class="si">{</span><span class="n">t_total</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">s, ...&quot;</span><span class="p">)</span>
+<span class="c1"># Always on</span>
+</code></pre></div>
+
+<p><strong>Upload Debug:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># app.py → upload_worker()</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[UPLOAD WORKER] Uploading </span><span class="si">{</span><span class="n">task</span><span class="o">.</span><span class="n">filename</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[UPLOAD WORKER] Result: </span><span class="si">{</span><span class="n">result</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+<span class="c1"># Always on</span>
+</code></pre></div>
+
+<h3 id="visual-studio-code">Visual Studio Code</h3>
+<p><strong><code>.vscode/launch.json</code>:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;0.2.0&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;configurations&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Python: Flask&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;debugpy&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;request&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;launch&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;module&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;flask&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;env&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">        </span><span class="nt">&quot;FLASK_APP&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;app.py&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="nt">&quot;FLASK_DEBUG&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1&quot;</span>
+<span class="w">      </span><span class="p">},</span>
+<span class="w">      </span><span class="nt">&quot;args&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;run&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;--host=127.0.0.1&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;--port=5000&quot;</span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;jinja&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h2 id="security-considerations">🔐 SECURITY CONSIDERATIONS</h2>
+<h3 id="encryption">Encryption</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># config_encryption.py uses Fernet (symmetric)</span>
+<span class="c1"># Key derivation: PBKDF2-HMAC-SHA256, 100,000 iterations</span>
+<span class="c1"># Key storage: config.key (44 bytes)</span>
+
+<span class="c1"># NEVER commit config.key to git!</span>
+<span class="c1"># Add to .gitignore:</span>
+<span class="n">config</span><span class="o">.</span><span class="n">key</span>
+<span class="n">config</span><span class="o">.</span><span class="n">json</span>  <span class="c1"># Contains encrypted credentials</span>
+</code></pre></div>
+
+<h3 id="session-management">Session Management</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># app.py</span>
+<span class="n">app</span><span class="o">.</span><span class="n">secret_key</span> <span class="o">=</span> <span class="s2">&quot;ecohub-demo-secret&quot;</span>  <span class="c1"># Change in production!</span>
+
+<span class="c1"># Better:</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">secrets</span>
+<span class="n">app</span><span class="o">.</span><span class="n">secret_key</span> <span class="o">=</span> <span class="n">secrets</span><span class="o">.</span><span class="n">token_hex</span><span class="p">(</span><span class="mi">32</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="s3-permissions">S3 Permissions</h3>
+<p><strong>Minimum IAM Policy:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;Version&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2012-10-17&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;Statement&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;Effect&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Allow&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;Action&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;s3:PutObject&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;s3:GetObject&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;s3:DeleteObject&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;s3:ListBucket&quot;</span>
+<span class="w">      </span><span class="p">],</span>
+<span class="w">      </span><span class="nt">&quot;Resource&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::your-bucket/*&quot;</span><span class="p">,</span>
+<span class="w">        </span><span class="s2">&quot;arn:aws:s3:::your-bucket&quot;</span>
+<span class="w">      </span><span class="p">]</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h2 id="deployment">🚀 DEPLOYMENT</h2>
+<h3 id="production-checklist">Production Checklist</h3>
+<ul>
+<li>[ ] Change <code>app.secret_key</code></li>
+<li>[ ] Set <code>console=False</code> in <code>build.spec</code> (no console window)</li>
+<li>[ ] Add icon: <code>icon='icon.ico'</code> in <code>build.spec</code></li>
+<li>[ ] Test on clean Windows machine</li>
+<li>[ ] Test camera (USB + RTSP)</li>
+<li>[ ] Test S3 upload/download/delete</li>
+<li>[ ] Test full workflow (QR → Record → Upload)</li>
+<li>[ ] Test installer (install/uninstall)</li>
+</ul>
+<h3 id="build-for-production">Build for Production</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 1. Update version</span>
+<span class="c1"># build.spec: name=&#39;EcoHub_QR_Scanner_v1.0.1&#39;</span>
+<span class="c1"># setup.iss: #define MyAppVersion &quot;1.0.1&quot;</span>
+
+<span class="c1"># 2. Clean build</span>
+rmdir<span class="w"> </span>/s<span class="w"> </span>/q<span class="w"> </span>dist<span class="w"> </span>build
+
+<span class="c1"># 3. Build EXE</span>
+pyinstaller<span class="w"> </span>build.spec<span class="w"> </span>--clean
+
+<span class="c1"># 4. Test EXE</span>
+dist<span class="se">\E</span>coHub_QR_Scanner<span class="se">\E</span>coHub_QR_Scanner.exe
+
+<span class="c1"># 5. Build Installer</span>
+<span class="s2">&quot;C:\Program Files (x86)\Inno Setup 6\ISCC.exe&quot;</span><span class="w"> </span>setup.iss
+
+<span class="c1"># 6. Test Installer</span>
+installer_output<span class="se">\E</span>coHub_QR_Scanner_Setup_v1.0.1.exe
+</code></pre></div>
+
+<hr />
+<h2 id="performance-tuning">📊 PERFORMANCE TUNING</h2>
+<h3 id="1-optimize-ai-fps">1. Optimize AI FPS</h3>
+<p><strong>Current:</strong> 5 FPS (0.2s interval)</p>
+<p><strong>Higher FPS (faster detection):</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">TARGET_INTERVAL</span> <span class="o">=</span> <span class="mf">0.1</span>  <span class="c1"># 10 FPS</span>
+</code></pre></div>
+
+<p><strong>Lower FPS (less CPU):</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">TARGET_INTERVAL</span> <span class="o">=</span> <span class="mf">0.5</span>  <span class="c1"># 2 FPS</span>
+</code></pre></div>
+
+<hr />
+<h3 id="2-optimize-frame-resize">2. Optimize Frame Resize</h3>
+<p><strong>Current:</strong> 480px width</p>
+<p><strong>Smaller (faster but less accurate):</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">new_width</span> <span class="o">=</span> <span class="mi">320</span>  <span class="c1"># 320px</span>
+</code></pre></div>
+
+<p><strong>Larger (slower but more accurate):</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">new_width</span> <span class="o">=</span> <span class="mi">640</span>  <span class="c1"># 640px</span>
+</code></pre></div>
+
+<hr />
+<h3 id="3-optimize-recording-buffer">3. Optimize Recording Buffer</h3>
+<p><strong>Current:</strong> 90 frames (6 seconds @ 15 FPS)</p>
+<p><strong>Smaller (less memory):</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">_frame_queue</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">45</span><span class="p">)</span>  <span class="c1"># 3 seconds</span>
+</code></pre></div>
+
+<p><strong>Larger (smoother recording):</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">_frame_queue</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">150</span><span class="p">)</span>  <span class="c1"># 10 seconds</span>
+</code></pre></div>
+
+<hr />
+<h3 id="4-optimize-upload">4. Optimize Upload</h3>
+<p><strong>Parallel uploads:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Currently: 1 upload worker thread</span>
+
+<span class="c1"># Add more workers:</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">3</span><span class="p">):</span>  <span class="c1"># 3 workers</span>
+    <span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">upload_worker</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="integration-points">🔌 INTEGRATION POINTS</h2>
+<h3 id="1-order-api-integration">1. Order API Integration</h3>
+<p><strong>Current:</strong> Mock data in <code>services/order_service.py</code></p>
+<p><strong>Replace with real API:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">get_order_info</span><span class="p">(</span><span class="n">order_code</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">response</span> <span class="o">=</span> <span class="n">requests</span><span class="o">.</span><span class="n">get</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;https://api.ecohub.vn/orders/</span><span class="si">{</span><span class="n">order_code</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span>
+            <span class="n">headers</span><span class="o">=</span><span class="p">{</span><span class="s2">&quot;Authorization&quot;</span><span class="p">:</span> <span class="s2">&quot;Bearer &lt;token&gt;&quot;</span><span class="p">},</span>
+            <span class="n">timeout</span><span class="o">=</span><span class="mi">5</span>
+        <span class="p">)</span>
+        <span class="n">response</span><span class="o">.</span><span class="n">raise_for_status</span><span class="p">()</span>
+        <span class="k">return</span> <span class="n">response</span><span class="o">.</span><span class="n">json</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;[ORDER API] Error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span>
+</code></pre></div>
+
+<hr />
+<h3 id="2-webhook-on-upload-complete">2. Webhook on Upload Complete</h3>
+<p><strong>File:</strong> <code>app.py</code> → <code>upload_worker()</code></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># After successful upload</span>
+<span class="k">if</span> <span class="n">result</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;s3://&quot;</span><span class="p">):</span>
+    <span class="c1"># Send webhook</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>
+    <span class="n">requests</span><span class="o">.</span><span class="n">post</span><span class="p">(</span><span class="s2">&quot;https://api.ecohub.vn/webhooks/video-uploaded&quot;</span><span class="p">,</span> <span class="n">json</span><span class="o">=</span><span class="p">{</span>
+        <span class="s2">&quot;order_code&quot;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">order_code</span><span class="p">,</span>
+        <span class="s2">&quot;filename&quot;</span><span class="p">:</span> <span class="n">task</span><span class="o">.</span><span class="n">filename</span><span class="p">,</span>
+        <span class="s2">&quot;s3_url&quot;</span><span class="p">:</span> <span class="n">result</span><span class="p">,</span>
+        <span class="s2">&quot;timestamp&quot;</span><span class="p">:</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">(</span><span class="n">GMT7</span><span class="p">)</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+    <span class="p">})</span>
+</code></pre></div>
+
+<hr />
+<h3 id="3-database-integration">3. Database Integration</h3>
+<p><strong>Install SQLAlchemy:</strong></p>
+<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>sqlalchemy
+</code></pre></div>
+
+<p><strong>Create models:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># models.py</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sqlalchemy</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_engine</span><span class="p">,</span> <span class="n">Column</span><span class="p">,</span> <span class="n">String</span><span class="p">,</span> <span class="n">DateTime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sqlalchemy.ext.declarative</span><span class="w"> </span><span class="kn">import</span> <span class="n">declarative_base</span>
+
+<span class="n">Base</span> <span class="o">=</span> <span class="n">declarative_base</span><span class="p">()</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">VideoRecord</span><span class="p">(</span><span class="n">Base</span><span class="p">):</span>
+    <span class="n">__tablename__</span> <span class="o">=</span> <span class="s1">&#39;videos&#39;</span>
+
+    <span class="nb">id</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">,</span> <span class="n">primary_key</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">order_code</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">)</span>
+    <span class="n">filename</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">)</span>
+    <span class="n">s3_url</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">)</span>
+    <span class="n">created_at</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">DateTime</span><span class="p">)</span>
+    <span class="n">status</span> <span class="o">=</span> <span class="n">Column</span><span class="p">(</span><span class="n">String</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h3 id="4-custom-qr-actions">4. Custom QR Actions</h3>
+<p><strong>File:</strong> <code>app.py</code> → <code>on_code_detected()</code></p>
+<div class="codehilite"><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">on_code_detected</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">bbox</span><span class="p">):</span>
+    <span class="c1"># Current: Auto-record on QR</span>
+
+    <span class="c1"># Custom actions based on QR prefix:</span>
+    <span class="k">if</span> <span class="n">code</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;ORDER_&quot;</span><span class="p">):</span>
+        <span class="c1"># Regular order → Auto-record</span>
+        <span class="n">_trigger_auto_recording</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">code</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;RETURN_&quot;</span><span class="p">):</span>
+        <span class="c1"># Return order → Different workflow</span>
+        <span class="n">handle_return_order</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">code</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;CHECK_&quot;</span><span class="p">):</span>
+        <span class="c1"># Quality check → No recording</span>
+        <span class="n">show_quality_checklist</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="testing-guide">🧪 TESTING GUIDE</h2>
+<h3 id="manual-test-cases">Manual Test Cases</h3>
+<h4 id="test-1-basic-workflow"><strong>Test 1: Basic Workflow</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Start</span><span class="w"> </span><span class="n">app</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Login</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Settings</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Test</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">OK</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Settings</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Start</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Started</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Dashboard</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">feed</span><span class="w"> </span><span class="n">hiển</span><span class="w"> </span><span class="n">thị</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Detect</span>
+<span class="mf">7.</span><span class="w"> </span><span class="n">Auto</span><span class="w"> </span><span class="n">record</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Recording</span>
+<span class="mf">8.</span><span class="w"> </span><span class="n">Stop</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Video</span><span class="w"> </span><span class="n">saved</span>
+<span class="mf">9.</span><span class="w"> </span><span class="n">Storage</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Video</span><span class="w"> </span><span class="n">uploaded</span>
+</code></pre></div>
+
+<h4 id="test-2-error-handling"><strong>Test 2: Error Handling</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Start</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="p">(</span><span class="n">camera</span><span class="w"> </span><span class="n">unplugged</span><span class="p">)</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Settings</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Test</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">❌</span><span class="w"> </span><span class="n">Error</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Plug</span><span class="w"> </span><span class="n">in</span><span class="w"> </span><span class="n">camera</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Test</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">OK</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Start</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Started</span>
+</code></pre></div>
+
+<h4 id="test-3-s3-upload"><strong>Test 3: S3 Upload</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Settings</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">S3</span><span class="w"> </span><span class="n">Settings</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Nhập</span><span class="w"> </span><span class="n">thông</span><span class="w"> </span><span class="n">tin</span><span class="w"> </span><span class="n">S3</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Test</span><span class="w"> </span><span class="n">kết</span><span class="w"> </span><span class="n">nối</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">OK</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Lưu</span><span class="w"> </span><span class="n">config</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Record</span><span class="w"> </span><span class="n">video</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Storage</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Upload</span><span class="w"> </span><span class="n">history</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Success</span>
+<span class="mf">7.</span><span class="w"> </span><span class="n">Storage</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">S3</span><span class="w"> </span><span class="n">tab</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Video</span><span class="w"> </span><span class="n">visible</span>
+</code></pre></div>
+
+<h4 id="test-4-cooldown"><strong>Test 4: Cooldown</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="s">&quot;TEST123&quot;</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Auto</span><span class="w"> </span><span class="n">record</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="kr">Stop</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="n">lại</span><span class="w"> </span><span class="s">&quot;TEST123&quot;</span><span class="w"> </span><span class="n">ngay</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="err">❌</span><span class="w"> </span><span class="n">Console</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;scanned recently. 298s cooldown remaining&quot;</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Đợi</span><span class="w"> </span><span class="mf">5</span><span class="w"> </span><span class="n">phút</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="n">lại</span><span class="w"> </span><span class="s">&quot;TEST123&quot;</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Auto</span><span class="w"> </span><span class="n">record</span><span class="w"> </span><span class="n">lại</span>
+</code></pre></div>
+
+<hr />
+<h2 id="code-style">📝 CODE STYLE</h2>
+<h3 id="python-style">Python Style</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># PEP 8 compliant</span>
+<span class="c1"># Function names: snake_case</span>
+<span class="c1"># Class names: PascalCase</span>
+<span class="c1"># Constants: UPPER_CASE</span>
+
+<span class="c1"># Type hints</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">process_frame</span><span class="p">(</span><span class="n">frame</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+    <span class="k">pass</span>
+
+<span class="c1"># Docstrings</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">function_name</span><span class="p">():</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Brief description.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        param1: Description</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        Description</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">pass</span>
+</code></pre></div>
+
+<h3 id="threading-best-practices">Threading Best Practices</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Use locks for shared state</span>
+<span class="k">with</span> <span class="n">state_lock</span><span class="p">:</span>
+    <span class="n">app_state</span><span class="p">[</span><span class="s2">&quot;is_recording&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">True</span>
+
+<span class="c1"># Use queues for inter-thread communication</span>
+<span class="n">frame</span> <span class="o">=</span> <span class="n">_frame_queue</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">0.01</span><span class="p">)</span>
+
+<span class="c1"># Use daemon threads for background workers</span>
+<span class="n">thread</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Thread</span><span class="p">(</span><span class="n">target</span><span class="o">=</span><span class="n">worker</span><span class="p">,</span> <span class="n">daemon</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">thread</span><span class="o">.</span><span class="n">start</span><span class="p">()</span>
+
+<span class="c1"># Use events for graceful shutdown</span>
+<span class="n">_stop_event</span><span class="o">.</span><span class="n">set</span><span class="p">()</span>
+<span class="n">_thread</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">timeout</span><span class="o">=</span><span class="mf">2.0</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="git-workflow">🔄 GIT WORKFLOW</h2>
+<h3 id="branch-strategy">Branch Strategy</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">main</span><span class="w">         </span><span class="n">Production</span><span class="o">-</span><span class="n">ready</span><span class="w"> </span><span class="n">code</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">develop</span><span class="w">  </span><span class="n">Development</span><span class="w"> </span><span class="n">branch</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">feature</span><span class="o">/</span><span class="nb">camera</span><span class="o">-</span><span class="n">enhancement</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">feature</span><span class="o">/</span><span class="n">s3</span><span class="o">-</span><span class="n">retry</span>
+<span class="w">    </span><span class="err">└──</span><span class="w"> </span><span class="n">bugfix</span><span class="o">/</span><span class="n">memory</span><span class="o">-</span><span class="n">leak</span>
+</code></pre></div>
+
+<h3 id="commit-messages">Commit Messages</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">feat</span><span class="p">:</span><span class="w"> </span><span class="n">Add</span><span class="w"> </span><span class="n">multi</span><span class="o">-</span><span class="n">camera</span><span class="w"> </span><span class="n">support</span>
+<span class="n">fix</span><span class="p">:</span><span class="w"> </span><span class="n">Fix</span><span class="w"> </span><span class="n">RTSP</span><span class="w"> </span><span class="n">buffer</span><span class="w"> </span><span class="n">lag</span>
+<span class="n">perf</span><span class="p">:</span><span class="w"> </span><span class="n">Optimize</span><span class="w"> </span><span class="n">AI</span><span class="w"> </span><span class="n">scanner</span><span class="w"> </span><span class="n">FPS</span>
+<span class="n">docs</span><span class="p">:</span><span class="w"> </span><span class="n">Update</span><span class="w"> </span><span class="n">BUILD_GUIDE</span><span class="o">.</span><span class="n">md</span>
+<span class="n">refactor</span><span class="p">:</span><span class="w"> </span><span class="n">Extract</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">logic</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">service</span>
+</code></pre></div>
+
+<hr />
+<h2 id="dependencies">📦 DEPENDENCIES</h2>
+<h3 id="core-dependencies">Core Dependencies</h3>
+<div class="codehilite"><pre><span></span><code>flask&gt;=2.3.0              # Web framework
+opencv-python             # Camera &amp; video
+zxing-cpp&gt;=2.2.0          # QR/Barcode scanner
+numpy                     # Array operations
+boto3&gt;=1.28.0             # S3 SDK
+cryptography&gt;=41.0.0      # Encryption
+</code></pre></div>
+
+<h3 id="build-dependencies">Build Dependencies</h3>
+<div class="codehilite"><pre><span></span><code>pyinstaller&gt;=6.0.0        # EXE builder
+</code></pre></div>
+
+<h3 id="development-dependencies-optional">Development Dependencies (Optional)</h3>
+<div class="codehilite"><pre><span></span><code>pytest                    # Testing
+black                     # Code formatter
+flake8                    # Linter
+mypy                      # Type checker
+</code></pre></div>
+
+<hr />
+<h2 id="known-issues-workarounds">🐛 KNOWN ISSUES &amp; WORKAROUNDS</h2>
+<h3 id="issue-1-memory-leak-in-ai-scanner">Issue 1: Memory leak in AI scanner</h3>
+<p><strong>Symptom:</strong> App slows down over time</p>
+<p><strong>Cause:</strong> <code>_code_history</code> dict grows unbounded</p>
+<p><strong>Fix:</strong> Periodic cleanup (implemented)</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/ai_scanner.py (line ~115)</span>
+<span class="k">if</span> <span class="n">current_time</span> <span class="o">-</span> <span class="n">last_cleanup_time</span> <span class="o">&gt;</span> <span class="n">CLEANUP_INTERVAL</span><span class="p">:</span>
+    <span class="n">old_keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">_code_history</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> 
+                <span class="k">if</span> <span class="n">current_time</span> <span class="o">-</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="n">COOLDOWN_SECONDS</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">old_keys</span><span class="p">:</span>
+        <span class="k">del</span> <span class="n">_code_history</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+</code></pre></div>
+
+<hr />
+<h3 id="issue-2-rtsp-lag-5-seconds">Issue 2: RTSP lag 5 seconds</h3>
+<p><strong>Symptom:</strong> Video lags behind real-time</p>
+<p><strong>Cause:</strong> RTSP buffer accumulation</p>
+<p><strong>Fix:</strong> Set buffer size to 0 (implemented)</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/camera_manager.py (line ~85)</span>
+<span class="n">cap</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">cv2</span><span class="o">.</span><span class="n">CAP_PROP_BUFFERSIZE</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h3 id="issue-3-recording-blocks-camera">Issue 3: Recording blocks camera</h3>
+<p><strong>Symptom:</strong> Camera freezes during recording</p>
+<p><strong>Cause:</strong> Synchronous VideoWriter blocks thread</p>
+<p><strong>Fix:</strong> Async recorder with separate thread (implemented)</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/recorder.py</span>
+<span class="c1"># Separate _write_loop() thread</span>
+<span class="c1"># Non-blocking write_frame()</span>
+</code></pre></div>
+
+<hr />
+<h2 id="references">📚 REFERENCES</h2>
+<h3 id="flask">Flask</h3>
+<ul>
+<li>Docs: https://flask.palletsprojects.com/</li>
+<li>Routing, Templates, Sessions</li>
+</ul>
+<h3 id="opencv">OpenCV</h3>
+<ul>
+<li>Docs: https://docs.opencv.org/</li>
+<li>VideoCapture, VideoWriter, MJPEG</li>
+</ul>
+<h3 id="zxing-cpp">ZXing-CPP</h3>
+<ul>
+<li>GitHub: https://github.com/zxing-cpp/zxing-cpp</li>
+<li>Faster than pyzbar</li>
+</ul>
+<h3 id="boto3-aws-sdk">Boto3 (AWS SDK)</h3>
+<ul>
+<li>Docs: https://boto3.amazonaws.com/v1/documentation/api/latest/index.html</li>
+<li>S3 operations, Multipart upload</li>
+</ul>
+<h3 id="pyinstaller">PyInstaller</h3>
+<ul>
+<li>Docs: https://pyinstaller.org/</li>
+<li>.spec file, Hooks, Hidden imports</li>
+</ul>
+<h3 id="inno-setup">Inno Setup</h3>
+<ul>
+<li>Docs: https://jrsoftware.org/ishelp/</li>
+<li>.iss script syntax</li>
+</ul>
+<hr />
+<h2 id="future-enhancements">🔮 FUTURE ENHANCEMENTS</h2>
+<h3 id="v110-ideas">v1.1.0 Ideas</h3>
+<ul>
+<li>[ ] Video compression (FFmpeg integration)</li>
+<li>[ ] Multiple S3 buckets</li>
+<li>[ ] Database integration (PostgreSQL)</li>
+<li>[ ] Real order API integration</li>
+<li>[ ] Webhook notifications</li>
+<li>[ ] Export statistics (Excel/CSV)</li>
+<li>[ ] Dark mode UI</li>
+<li>[ ] Mobile responsive design</li>
+<li>[ ] Docker deployment</li>
+<li>[ ] Kubernetes support</li>
+</ul>
+<hr />
+<p><strong>Version:</strong> 1.0.0<br />
+<strong>Updated:</strong> 09/02/2026<br />
+<strong>Team:</strong> EcoHub Development</p>
+</body>
+</html>

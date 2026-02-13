@@ -1,0 +1,662 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>ARCHITECTURE</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 24pt;
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            font-size: 18pt;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            font-size: 14pt;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+            background-color: #f9f9f9;
+            padding: 10px 15px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 10pt;
+        }
+        
+        table th {
+            background-color: #3498db;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin: 5px 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<h1 id="kien-truc-he-thong-ecohub-qr-scanner">🏗️ KIẾN TRÚC HỆ THỐNG - ECOHUB QR SCANNER</h1>
+<hr />
+<h2 id="system-overview">📊 SYSTEM OVERVIEW</h2>
+<div class="codehilite"><pre><span></span><code><span class="err">┌─────────────────────────────────────────────────────────────────┐</span>
+<span class="err">│</span><span class="w">                         </span><span class="n">USER</span><span class="w"> </span><span class="n">BROWSER</span><span class="w">                            </span><span class="err">│</span>
+<span class="err">│</span><span class="w">                      </span><span class="p">(</span><span class="n">http</span><span class="p">:</span><span class="o">//</span><span class="n">localhost</span><span class="p">:</span><span class="mi">5000</span><span class="p">)</span><span class="w">                    </span><span class="err">│</span>
+<span class="err">└────────────────┬────────────────────────────────────────────────┘</span>
+<span class="w">                 </span><span class="err">│</span><span class="w"> </span><span class="n">HTTP</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">MJPEG</span><span class="w"> </span><span class="n">Stream</span>
+<span class="w">                 </span><span class="err">↓</span>
+<span class="err">┌─────────────────────────────────────────────────────────────────┐</span>
+<span class="err">│</span><span class="w">                         </span><span class="n">FLASK</span><span class="w"> </span><span class="n">SERVER</span><span class="w">                            </span><span class="err">│</span>
+<span class="err">│</span><span class="w">                    </span><span class="p">(</span><span class="n">Main</span><span class="w"> </span><span class="n">Thread</span><span class="p">:</span><span class="w"> </span><span class="n">port</span><span class="w"> </span><span class="mi">5000</span><span class="p">)</span><span class="w">                     </span><span class="err">│</span>
+<span class="err">│</span><span class="w">                                                                 </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="n">Routes</span><span class="p">:</span><span class="w">  </span><span class="o">/</span><span class="n">dashboard</span><span class="w">  </span><span class="o">/</span><span class="n">camera</span><span class="o">-</span><span class="n">settings</span><span class="w">  </span><span class="o">/</span><span class="n">storage</span><span class="w">  </span><span class="o">/</span><span class="n">video_feed</span><span class="w">  </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="n">API</span><span class="p">:</span><span class="w">     </span><span class="o">/</span><span class="n">status</span><span class="w">  </span><span class="o">/</span><span class="n">start_recording</span><span class="w">  </span><span class="o">/</span><span class="n">stop_recording</span><span class="w">           </span><span class="err">│</span>
+<span class="err">└─────────────┬───────────────────────────────────────────────────┘</span>
+<span class="w">              </span><span class="err">│</span>
+<span class="w">              </span><span class="err">├─────────────────────────────────────────────┐</span>
+<span class="w">              </span><span class="err">│</span><span class="w">                                             </span><span class="err">│</span>
+<span class="w">              </span><span class="err">↓</span><span class="w">                                             </span><span class="err">↓</span>
+<span class="err">┌──────────────────────────┐</span><span class="w">                  </span><span class="err">┌─────────────────────────┐</span>
+<span class="err">│</span><span class="w">   </span><span class="n">CAMERA</span><span class="w"> </span><span class="n">MANAGER</span><span class="w"> </span><span class="p">(</span><span class="n">x2</span><span class="p">)</span><span class="w">    </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">    </span><span class="n">S3</span><span class="w"> </span><span class="n">SERVICE</span><span class="w">           </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="p">(</span><span class="n">Thread</span><span class="w"> </span><span class="n">per</span><span class="w"> </span><span class="n">camera</span><span class="p">)</span><span class="w">    </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">    </span><span class="p">(</span><span class="n">Upload</span><span class="w"> </span><span class="n">Worker</span><span class="p">)</span><span class="w">      </span><span class="err">│</span>
+<span class="err">│</span><span class="w">                          </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">                         </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Read</span><span class="w"> </span><span class="n">frames</span><span class="w"> </span><span class="p">(</span><span class="mi">10</span><span class="n">ms</span><span class="p">)</span><span class="w">    </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Upload</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="p">(</span><span class="n">FIFO</span><span class="p">)</span><span class="w">  </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Push</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">AI</span><span class="w"> </span><span class="n">queue</span><span class="w">      </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Multipart</span><span class="w"> </span><span class="n">upload</span><span class="w">     </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Push</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">recorder</span><span class="w">      </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Retry</span><span class="w"> </span><span class="n">mechanism</span><span class="w">      </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">MJPEG</span><span class="w"> </span><span class="n">encoding</span><span class="w">        </span><span class="err">│</span><span class="w">                  </span><span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Presigned</span><span class="w"> </span><span class="n">URLs</span><span class="w">       </span><span class="err">│</span>
+<span class="err">└────────┬─────────────────┘</span><span class="w">                  </span><span class="err">└─────────────────────────┘</span>
+<span class="w">         </span><span class="err">│</span><span class="w">                                                 </span><span class="err">↑</span>
+<span class="w">         </span><span class="err">│</span><span class="w"> </span><span class="n">Frame</span><span class="w"> </span><span class="n">Queue</span><span class="w"> </span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span><span class="w">                        </span><span class="err">│</span>
+<span class="w">         </span><span class="err">↓</span><span class="w">                                                 </span><span class="err">│</span>
+<span class="err">┌──────────────────────────┐</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="n">AI</span><span class="w"> </span><span class="n">SCANNER</span><span class="w"> </span><span class="p">(</span><span class="n">x2</span><span class="p">)</span><span class="w">        </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="p">(</span><span class="n">Thread</span><span class="w"> </span><span class="n">per</span><span class="w"> </span><span class="n">camera</span><span class="p">)</span><span class="w">    </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">                          </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Get</span><span class="w"> </span><span class="n">frame</span><span class="w"> </span><span class="p">(</span><span class="mf">0.01</span><span class="n">s</span><span class="p">)</span><span class="w">     </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Resize</span><span class="w"> </span><span class="p">(</span><span class="mi">480</span><span class="n">px</span><span class="p">)</span><span class="w">        </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Grayscale</span><span class="w">             </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">ZXing</span><span class="w"> </span><span class="n">decode</span><span class="w">          </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Cooldown</span><span class="w"> </span><span class="n">check</span><span class="w"> </span><span class="p">(</span><span class="mi">5</span><span class="n">m</span><span class="p">)</span><span class="w">   </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Trigger</span><span class="w"> </span><span class="n">callback</span><span class="w">      </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">└────────┬─────────────────┘</span><span class="w">                              </span><span class="err">│</span>
+<span class="w">         </span><span class="err">│</span><span class="w">                                                 </span><span class="err">│</span>
+<span class="w">         </span><span class="err">│</span><span class="w"> </span><span class="n">on_code_detected</span><span class="p">()</span><span class="w">                             </span><span class="err">│</span>
+<span class="w">         </span><span class="err">↓</span><span class="w">                                                 </span><span class="err">│</span>
+<span class="err">┌──────────────────────────┐</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="n">VIDEO</span><span class="w"> </span><span class="n">RECORDER</span><span class="w">         </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">   </span><span class="p">(</span><span class="n">Async</span><span class="w"> </span><span class="n">Thread</span><span class="p">)</span><span class="w">         </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">                          </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Frame</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="p">(</span><span class="mi">90</span><span class="p">)</span><span class="w">      </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">VideoWriter</span><span class="w"> </span><span class="p">(</span><span class="mi">15</span><span class="w"> </span><span class="n">FPS</span><span class="p">)</span><span class="w">  </span><span class="err">│</span><span class="w">                              </span><span class="err">│</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Save</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">videos</span><span class="o">/</span><span class="w">       </span><span class="err">│</span><span class="w"> </span><span class="err">─────────────────────────────┘</span>
+<span class="err">│</span><span class="w">  </span><span class="o">-</span><span class="w"> </span><span class="n">Queue</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">upload</span><span class="w">       </span><span class="err">│</span><span class="w">   </span><span class="n">Upload</span><span class="w"> </span><span class="n">Task</span>
+<span class="err">└──────────────────────────┘</span>
+</code></pre></div>
+
+<hr />
+<h2 id="data-flow">🔄 DATA FLOW</h2>
+<h3 id="1-camera-frame-flow">1. Camera Frame Flow</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">[USB/RTSP Camera]</span>
+<span class="w">        </span><span class="na">↓ cv2.VideoCapture()</span>
+<span class="k">[Raw Frame (1280x720)]</span>
+<span class="w">        </span><span class="na">↓ camera_manager.py (_loop)</span>
+<span class="na">┌───────┴───────┐</span>
+<span class="na">│               │</span>
+<span class="na">↓               ↓</span>
+<span class="k">[AI Queue]    [Recorder Queue]    [MJPEG Encoder]</span>
+<span class="na">(maxsize</span><span class="o">=</span><span class="s">2)   (maxsize=90)              ↓</span>
+<span class="w">    </span><span class="na">↓             ↓              [Browser Stream]</span>
+<span class="k">[AI Thread]   [Writer Thread]</span>
+<span class="w">    </span><span class="na">↓             ↓</span>
+<span class="k">[ZXing]       [VideoWriter]</span>
+<span class="w">    </span><span class="na">↓             ↓</span>
+<span class="k">[QR Code]     [videos/*.mp4]</span>
+<span class="w">    </span><span class="na">↓             ↓</span>
+<span class="k">[Callback]    [Upload Queue]</span>
+<span class="w">                  </span><span class="na">↓</span>
+<span class="w">              </span><span class="k">[S3 Upload]</span>
+</code></pre></div>
+
+<h3 id="2-qr-detection-flow">2. QR Detection Flow</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">[Frame from Queue]</span>
+<span class="w">        </span><span class="na">↓ get_frame_from_queue(timeout</span><span class="o">=</span><span class="s">0.01)</span>
+<span class="na">[Timestamp Check] → (current_time - last_scan) &lt; 0.2s? → Skip</span>
+<span class="w">        </span><span class="na">↓ No</span>
+<span class="k">[Resize to 480px width]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Convert to Grayscale]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[ZXing Decode]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[QR Code Found?] → No → Loop back</span>
+<span class="w">        </span><span class="na">↓ Yes</span>
+<span class="na">[Cooldown Check] → (code in history &amp; &lt; 5m)? → Skip</span>
+<span class="w">        </span><span class="na">↓ No</span>
+<span class="k">[Add to history]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Trigger Callback]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Auto Start Recording]</span>
+</code></pre></div>
+
+<h3 id="3-recording-flow">3. Recording Flow</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">[Start Recording Request]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[Pause AI Scanner] ← Important!</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[Create VideoWriter] (15 FPS)</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Start Writer Thread]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">┌─────────────────────────────┐</span>
+<span class="na">│  Recording Loop             │</span>
+<span class="na">│  - Camera pushes frames     │</span>
+<span class="na">│  - Recorder queue (90)      │</span>
+<span class="na">│  - Writer thread writes     │</span>
+<span class="na">│  - Non-blocking             │</span>
+<span class="na">└─────────────────────────────┘</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Stop Recording Request]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Stop Writer Thread]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[Clear Frame Queue] ← Fresh frames!</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Resume AI Scanner]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Reset AI Scanner]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Queue Upload Task]</span>
+</code></pre></div>
+
+<h3 id="4-upload-flow">4. Upload Flow</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">[</span><span class="n">Video</span><span class="w"> </span><span class="n">Saved</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="n">videos</span><span class="cm">/*.mp4)</span>
+<span class="cm">        ↓</span>
+<span class="cm">[Create UploadTask]</span>
+<span class="cm">        ↓</span>
+<span class="cm">[Add to upload_queue] (FIFO)</span>
+<span class="cm">        ↓</span>
+<span class="cm">[Upload Worker Thread]</span>
+<span class="cm">        ↓</span>
+<span class="cm">[Get task from queue]</span>
+<span class="cm">        ↓</span>
+<span class="cm">[Update status: &quot;uploading&quot;]</span>
+<span class="cm">        ↓</span>
+<span class="cm">[File size &gt; 50MB?]</span>
+<span class="cm">        ↓ Yes              ↓ No</span>
+<span class="cm">[Multipart Upload]    [Simple Upload]</span>
+<span class="cm">(10MB chunks)</span>
+<span class="cm">        ↓                  ↓</span>
+<span class="cm">[S3 Upload Complete]</span>
+<span class="cm">        ↓</span>
+<span class="cm">[Update status: &quot;success&quot;]</span>
+<span class="cm">        ↓</span>
+<span class="cm">[Delete local file]</span>
+<span class="cm">        ↓</span>
+<span class="cm">[Keep in status_dict] ← Until 00:00 cleanup</span>
+</code></pre></div>
+
+<hr />
+<h2 id="threading-architecture">🧵 THREADING ARCHITECTURE</h2>
+<h3 id="thread-hierarchy">Thread Hierarchy</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Main</span><span class="w"> </span><span class="n">Process</span><span class="w"> </span><span class="p">(</span><span class="n">python</span><span class="o">.</span><span class="n">exe</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">EcoHub_QR_Scanner</span><span class="o">.</span><span class="n">exe</span><span class="p">)</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Main</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="p">(</span><span class="n">Flask</span><span class="p">)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">HTTP</span><span class="w"> </span><span class="n">Server</span><span class="w"> </span><span class="p">(</span><span class="n">werkzeug</span><span class="p">)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">Route</span><span class="w"> </span><span class="n">handlers</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">Template</span><span class="w"> </span><span class="n">rendering</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">(</span><span class="n">USB</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="mi">0</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">RTSP</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">cv2</span><span class="o">.</span><span class="n">VideoCapture</span><span class="p">()</span><span class="w"> </span><span class="n">read</span><span class="w"> </span><span class="n">loop</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">Push</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">_frame_queue</span><span class="w"> </span><span class="p">(</span><span class="n">AI</span><span class="p">)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">Push</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">_recorder_queue</span><span class="w"> </span><span class="p">(</span><span class="k">if</span><span class="w"> </span><span class="n">recording</span><span class="p">)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">MJPEG</span><span class="w"> </span><span class="n">encode</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="n">streaming</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="mi">2</span><span class="w"> </span><span class="p">(</span><span class="n">USB</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="n">RTSP</span><span class="w"> </span><span class="mi">2</span><span class="p">)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="p">(</span><span class="n">same</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">AI</span><span class="w"> </span><span class="n">Scanner</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="mi">1</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">Get</span><span class="w"> </span><span class="n">frames</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">queue</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">Timestamp</span><span class="o">-</span><span class="n">based</span><span class="w"> </span><span class="n">FPS</span><span class="w"> </span><span class="n">control</span><span class="w"> </span><span class="p">(</span><span class="mi">5</span><span class="w"> </span><span class="n">FPS</span><span class="p">)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">ZXing</span><span class="w"> </span><span class="n">decode</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">Cooldown</span><span class="w"> </span><span class="n">check</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">Trigger</span><span class="w"> </span><span class="n">callback</span><span class="w"> </span><span class="p">(</span><span class="n">main</span><span class="w"> </span><span class="n">thread</span><span class="p">)</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">AI</span><span class="w"> </span><span class="n">Scanner</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="mi">2</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="p">(</span><span class="n">same</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="n">AI</span><span class="w"> </span><span class="n">Scanner</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="mi">1</span><span class="p">)</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Recorder</span><span class="w"> </span><span class="n">Thread</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">Get</span><span class="w"> </span><span class="n">frames</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">_frame_queue</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">Write</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">cv2</span><span class="o">.</span><span class="n">VideoWriter</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">Non</span><span class="o">-</span><span class="n">blocking</span><span class="w"> </span><span class="p">(</span><span class="mi">90</span><span class="o">-</span><span class="n">frame</span><span class="w"> </span><span class="n">buffer</span><span class="p">)</span>
+<span class="err">│</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">Upload</span><span class="w"> </span><span class="n">Worker</span><span class="w"> </span><span class="n">Thread</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">Process</span><span class="w"> </span><span class="n">upload_queue</span><span class="w"> </span><span class="p">(</span><span class="n">FIFO</span><span class="p">)</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">Multipart</span><span class="w"> </span><span class="n">S3</span><span class="w"> </span><span class="n">upload</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">Update</span><span class="w"> </span><span class="n">upload_status_dict</span>
+<span class="w">    </span><span class="err">└──</span><span class="w"> </span><span class="n">Cleanup</span><span class="w"> </span><span class="p">(</span><span class="n">delete</span><span class="w"> </span><span class="n">local</span><span class="w"> </span><span class="n">files</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="thread-synchronization">Thread Synchronization</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Global Locks</span>
+<span class="n">state_lock</span>              <span class="c1"># app_state dict</span>
+<span class="n">upload_status_lock</span>      <span class="c1"># upload_status_dict</span>
+<span class="n">camera_status_lock</span>      <span class="c1"># camera_status dict</span>
+
+<span class="c1"># Queues (Thread-safe)</span>
+<span class="n">upload_queue</span>           <span class="c1"># Queue.Queue() - FIFO</span>
+<span class="n">_frame_queue</span>           <span class="c1"># Queue.Queue(maxsize=2) - Camera → AI</span>
+<span class="n">_recorder_queue</span>        <span class="c1"># Queue.Queue(maxsize=90) - Camera → Recorder</span>
+
+<span class="c1"># Thread Events</span>
+<span class="n">_stop_event</span>            <span class="c1"># threading.Event() - Stop signal</span>
+<span class="n">_running</span>               <span class="c1"># bool flag - Running state</span>
+</code></pre></div>
+
+<hr />
+<h2 id="data-storage">💾 DATA STORAGE</h2>
+<h3 id="configuration-storage">Configuration Storage</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Development</span><span class="o">:</span>
+<span class="w">    </span><span class="n">eco_hub_demo</span><span class="o">/</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="na">json</span><span class="w">         </span><span class="n">Main</span><span class="w"> </span><span class="n">config</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="na">key</span><span class="w">          </span><span class="n">Encryption</span><span class="w"> </span><span class="n">key</span><span class="w"> </span><span class="o">(</span><span class="n">Fernet</span><span class="o">)</span>
+<span class="w">    </span><span class="err">└──</span><span class="w"> </span><span class="n">videos</span><span class="o">/</span><span class="w">             </span><span class="n">Local</span><span class="w"> </span><span class="n">videos</span>
+
+<span class="n">Production</span><span class="w"> </span><span class="o">(</span><span class="n">PyInstaller</span><span class="o">):</span>
+<span class="w">    </span><span class="n">C</span><span class="o">:\</span><span class="n">Program</span><span class="w"> </span><span class="n">Files</span><span class="o">\</span><span class="n">EcoHub</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">Scanner</span><span class="o">\</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">EcoHub_QR_Scanner</span><span class="o">.</span><span class="na">exe</span>
+<span class="w">    </span><span class="err">└──</span><span class="w"> </span><span class="n">_internal</span><span class="o">\</span>
+<span class="w">        </span><span class="err">├──</span><span class="w"> </span><span class="kd">static</span><span class="o">\</span><span class="w">         </span><span class="o">(</span><span class="n">read</span><span class="o">-</span><span class="n">only</span><span class="o">)</span>
+<span class="w">        </span><span class="err">├──</span><span class="w"> </span><span class="n">templates</span><span class="o">\</span><span class="w">      </span><span class="o">(</span><span class="n">read</span><span class="o">-</span><span class="n">only</span><span class="o">)</span>
+<span class="w">        </span><span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="na">json</span><span class="w">     </span><span class="o">(</span><span class="k">default</span><span class="o">,</span><span class="w"> </span><span class="n">read</span><span class="o">-</span><span class="n">only</span><span class="o">)</span>
+<span class="w">        </span><span class="err">└──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="na">key</span><span class="w">      </span><span class="o">(</span><span class="k">default</span><span class="o">,</span><span class="w"> </span><span class="n">read</span><span class="o">-</span><span class="n">only</span><span class="o">)</span>
+
+<span class="w">    </span><span class="n">C</span><span class="o">:\</span><span class="n">Users</span><span class="o">\&lt;</span><span class="n">user</span><span class="o">&gt;\</span><span class="n">EcoHub_QR_Scanner</span><span class="o">\</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="na">json</span><span class="w">         </span><span class="o">(</span><span class="n">writable</span><span class="w"> </span><span class="n">copy</span><span class="o">)</span>
+<span class="w">    </span><span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="na">key</span><span class="w">          </span><span class="o">(</span><span class="n">writable</span><span class="w"> </span><span class="n">copy</span><span class="o">)</span>
+<span class="w">    </span><span class="err">└──</span><span class="w"> </span><span class="n">videos</span><span class="o">\</span><span class="w">             </span><span class="o">(</span><span class="n">writable</span><span class="o">)</span>
+</code></pre></div>
+
+<h3 id="memory-storage">Memory Storage</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># In-Memory State (app.py)</span>
+<span class="n">app_state</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;current_order_code&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;current_order_info&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;is_recording&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;recording_start&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;recording_order_code&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;auto_record_on_qr&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="n">upload_status_dict</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;filename1.mp4&quot;</span><span class="p">:</span> <span class="n">UploadTask</span><span class="p">(</span><span class="o">...</span><span class="p">),</span>
+    <span class="s2">&quot;filename2.mp4&quot;</span><span class="p">:</span> <span class="n">UploadTask</span><span class="p">(</span><span class="o">...</span><span class="p">),</span>
+<span class="p">}</span>
+
+<span class="n">camera_status</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;initialized&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;running&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;last_test&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">}</span>
+
+<span class="c1"># AI Scanner State (ai_scanner.py)</span>
+<span class="n">_code_history</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;QR123&quot;</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+    <span class="s2">&quot;QR456&quot;</span><span class="p">:</span> <span class="n">timestamp</span><span class="p">,</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="persistent-storage">Persistent Storage</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Local Files</span>
+<span class="n">videos</span><span class="o">/</span>
+<span class="err">├──</span> <span class="n">ORDER123_20260209_150000</span><span class="o">.</span><span class="n">mp4</span>
+<span class="err">├──</span> <span class="n">ORDER456_20260209_151000</span><span class="o">.</span><span class="n">mp4</span>
+<span class="err">└──</span> <span class="o">...</span>
+
+<span class="c1"># S3 Storage</span>
+<span class="n">s3</span><span class="p">:</span><span class="o">//&lt;</span><span class="n">bucket</span><span class="o">&gt;/</span>
+<span class="err">├──</span> <span class="n">ORDER123_20260209_150000</span><span class="o">.</span><span class="n">mp4</span>
+<span class="err">├──</span> <span class="n">ORDER456_20260209_151000</span><span class="o">.</span><span class="n">mp4</span>
+<span class="err">└──</span> <span class="o">...</span>
+</code></pre></div>
+
+<hr />
+<h2 id="security-architecture">🔐 SECURITY ARCHITECTURE</h2>
+<h3 id="encryption-layer">Encryption Layer</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">[</span><span class="n">User</span><span class="w"> </span><span class="n">Input</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="n">S3</span><span class="w"> </span><span class="n">Access</span><span class="w"> </span><span class="n">Key</span><span class="p">,</span><span class="w"> </span><span class="n">Secret</span><span class="w"> </span><span class="n">Key</span><span class="p">)</span>
+<span class="w">        </span><span class="err">↓</span>
+<span class="p">[</span><span class="n">ConfigEncryption</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="n">Fernet</span><span class="p">)</span>
+<span class="w">        </span><span class="err">↓</span><span class="w"> </span><span class="n">encrypt</span><span class="p">()</span>
+<span class="p">[</span><span class="n">Encrypted</span><span class="w"> </span><span class="n">String</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="n">base64</span><span class="p">)</span>
+<span class="w">        </span><span class="err">↓</span>
+<span class="p">[</span><span class="n">config</span><span class="p">.</span><span class="n">json</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="n">s3_config</span><span class="p">.</span><span class="n">access_key_encrypted</span><span class="p">)</span>
+<span class="w">        </span><span class="err">↓</span>
+<span class="p">[</span><span class="n">Load</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="n">runtime</span><span class="p">]</span>
+<span class="w">        </span><span class="err">↓</span>
+<span class="p">[</span><span class="n">ConfigEncryption</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="n">Fernet</span><span class="p">)</span>
+<span class="w">        </span><span class="err">↓</span><span class="w"> </span><span class="n">decrypt</span><span class="p">()</span>
+<span class="p">[</span><span class="n">Plain</span><span class="w"> </span><span class="n">Text</span><span class="p">]</span><span class="w"> </span><span class="p">(</span><span class="n">boto3</span><span class="w"> </span><span class="n">client</span><span class="p">)</span>
+<span class="w">        </span><span class="err">↓</span>
+<span class="p">[</span><span class="n">S3</span><span class="w"> </span><span class="n">API</span><span class="w"> </span><span class="n">Call</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="key-management">Key Management</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">[First Run]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Generate UUID password]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[Machine-specific salt] (platform.node() + machine() + system())</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[PBKDF2-HMAC-SHA256] (100,000 iterations)</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[32-byte key] → [Base64 encode] → [44 bytes]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[Save to config.key]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[Fernet(key)] → Encryption/Decryption</span>
+</code></pre></div>
+
+<hr />
+<h2 id="api-architecture">📡 API ARCHITECTURE</h2>
+<h3 id="rest-endpoints">REST Endpoints</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Public</span><span class="w"> </span><span class="n">Endpoints</span><span class="w"> </span><span class="p">(</span><span class="n">require</span><span class="w"> </span><span class="n">session</span><span class="p">):</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="w">                      </span><span class="n">Login</span><span class="w"> </span><span class="n">page</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="w">                      </span><span class="n">Login</span><span class="w"> </span><span class="n">submit</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">dashboard</span><span class="w">             </span><span class="n">Dashboard</span><span class="w"> </span><span class="p">(</span><span class="n">SSR</span><span class="p">)</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">camera</span><span class="o">-</span><span class="n">settings</span><span class="w">       </span><span class="n">Camera</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="p">(</span><span class="n">SSR</span><span class="p">)</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">storage</span><span class="o">-</span><span class="n">settings</span><span class="w">      </span><span class="n">S3</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="p">(</span><span class="n">SSR</span><span class="p">)</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">storage</span><span class="w">               </span><span class="n">Storage</span><span class="w"> </span><span class="n">page</span><span class="w"> </span><span class="p">(</span><span class="n">SSR</span><span class="p">)</span>
+
+<span class="n">API</span><span class="w"> </span><span class="n">Endpoints</span><span class="w"> </span><span class="p">(</span><span class="n">JSON</span><span class="p">):</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">test_camera</span><span class="w">           </span><span class="n">Test</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">availability</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">start_cameras</span><span class="w">         </span><span class="n">Start</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">threads</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">stop_cameras</span><span class="w">          </span><span class="n">Stop</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">threads</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">start_recording</span><span class="w">       </span><span class="n">Start</span><span class="w"> </span><span class="n">video</span><span class="w"> </span><span class="n">recording</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">stop_recording</span><span class="w">        </span><span class="n">Stop</span><span class="w"> </span><span class="n">video</span><span class="w"> </span><span class="n">recording</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">reset_order</span><span class="w">           </span><span class="n">Reset</span><span class="w"> </span><span class="n">current</span><span class="w"> </span><span class="n">order</span><span class="w"> </span><span class="n">code</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">status</span><span class="w">                </span><span class="n">Get</span><span class="w"> </span><span class="n">realtime</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="p">(</span><span class="n">polling</span><span class="p">)</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">upload</span><span class="o">-</span><span class="n">status</span><span class="w">         </span><span class="n">Get</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="p">(</span><span class="n">polling</span><span class="p">)</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">download</span><span class="o">/&lt;</span><span class="n">filename</span><span class="o">&gt;</span><span class="w">   </span><span class="n">Generate</span><span class="w"> </span><span class="n">presigned</span><span class="w"> </span><span class="n">URL</span>
+
+<span class="n">Streaming</span><span class="w"> </span><span class="n">Endpoints</span><span class="p">:</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">video_feed</span><span class="o">/&lt;</span><span class="n">index</span><span class="o">&gt;</span><span class="w">    </span><span class="n">MJPEG</span><span class="w"> </span><span class="n">stream</span>
+</code></pre></div>
+
+<h3 id="response-format">Response Format</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Success</span>
+<span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Operation successful&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;data&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Error</span>
+<span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;success&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Error message&quot;</span>
+<span class="p">}</span>
+
+<span class="c1">// Status (polling)</span>
+<span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;current_order_code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ORDER123&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;order_info&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="err">...</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">&quot;is_recording&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;recording_seconds&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">15</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h2 id="frontend-architecture">🎨 FRONTEND ARCHITECTURE</h2>
+<h3 id="template-inheritance">Template Inheritance</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">base</span><span class="o">.</span><span class="n">html</span><span class="w"> </span><span class="p">(</span><span class="n">Bootstrap</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Custom</span><span class="w"> </span><span class="n">CSS</span><span class="p">)</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">dashboard</span><span class="o">.</span><span class="n">html</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">camera_settings</span><span class="o">.</span><span class="n">html</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">storage_settings</span><span class="o">.</span><span class="n">html</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">storage</span><span class="o">.</span><span class="n">html</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">login</span><span class="o">.</span><span class="n">html</span>
+</code></pre></div>
+
+<h3 id="javascript-architecture">JavaScript Architecture</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1">// main.js</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">fetchStatus</span><span class="p">()</span><span class="w">          </span><span class="c1">// Poll /status every 1s</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">startRecording</span><span class="p">()</span><span class="w">       </span><span class="c1">// POST /start_recording</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">stopRecording</span><span class="p">()</span><span class="w">        </span><span class="c1">// POST /stop_recording</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">resetOrder</span><span class="p">()</span><span class="w">           </span><span class="c1">// POST /reset_order</span>
+<span class="err">└──</span><span class="w"> </span><span class="nx">formatSeconds</span><span class="p">()</span><span class="w">        </span><span class="c1">// Utility</span>
+
+<span class="c1">// storage.html (inline)</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">switchTab</span><span class="p">()</span><span class="w">            </span><span class="c1">// Tab switching</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">fetchUploadStatus</span><span class="p">()</span><span class="w">    </span><span class="c1">// Poll /upload-status every 2s</span>
+<span class="err">└──</span><span class="w"> </span><span class="nx">deleteVideo</span><span class="p">()</span><span class="w">          </span><span class="c1">// DELETE /s3/delete</span>
+
+<span class="c1">// camera_settings.html (inline)</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">testCamera</span><span class="p">()</span><span class="w">           </span><span class="c1">// POST /test_camera</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">startCameras</span><span class="p">()</span><span class="w">         </span><span class="c1">// POST /start_cameras</span>
+<span class="err">├──</span><span class="w"> </span><span class="nx">stopCameras</span><span class="p">()</span><span class="w">          </span><span class="c1">// POST /stop_cameras</span>
+<span class="err">└──</span><span class="w"> </span><span class="nx">toggleCamera</span><span class="p">()</span><span class="w">         </span><span class="c1">// Enable/disable camera config</span>
+</code></pre></div>
+
+<hr />
+<h2 id="deployment-architecture">📦 DEPLOYMENT ARCHITECTURE</h2>
+<h3 id="development-environment">Development Environment</h3>
+<div class="codehilite"><pre><span></span><code>Developer Machine
+├── Python 3.11
+├── pip install -r requirements.txt
+├── python app.py
+└── Access: http://127.0.0.1:5000
+</code></pre></div>
+
+<h3 id="production-build">Production Build</h3>
+<div class="codehilite"><pre><span></span><code>Build Machine
+├── Python 3.11
+├── PyInstaller 6.0.0+
+├── pyinstaller build.spec --clean
+└── Output: dist/EcoHub_QR_Scanner/
+
+Installer Machine
+├── Inno Setup 6.7.0
+├── ISCC.exe setup.iss
+└── Output: installer_output/EcoHub_QR_Scanner_Setup_v1.0.0.exe
+</code></pre></div>
+
+<h3 id="end-user-machine">End User Machine</h3>
+<div class="codehilite"><pre><span></span><code>Windows 10/11
+├── Run installer
+├── Install to: C:\Program Files\EcoHub QR Scanner\
+├── Data folder: C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\
+└── Access: Double-click desktop icon → http://127.0.0.1:5000
+</code></pre></div>
+
+<hr />
+<h2 id="state-machine">🔄 STATE MACHINE</h2>
+<h3 id="camera-state">Camera State</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">[Not Started] → Test → [Testing]</span>
+<span class="w">                  </span><span class="na">↓ OK</span>
+<span class="w">              </span><span class="k">[Tested]</span>
+<span class="w">                  </span><span class="na">↓ Start</span>
+<span class="w">              </span><span class="na">[Running] ←──┐</span>
+<span class="w">                  </span><span class="na">↓ Stop   │</span>
+<span class="w">              </span><span class="na">[Stopped] ───┘</span>
+<span class="w">                  </span><span class="na">↓ Restart</span>
+<span class="w">              </span><span class="k">[Running]</span>
+</code></pre></div>
+
+<h3 id="recording-state">Recording State</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">[Idle] → Start → [Recording]</span>
+<span class="w">                      </span><span class="na">↓</span>
+<span class="w">                 </span><span class="k">[Recording]</span>
+<span class="w">                      </span><span class="na">↓ Stop</span>
+<span class="w">                  </span><span class="k">[Saving]</span>
+<span class="w">                      </span><span class="na">↓</span>
+<span class="w">                  </span><span class="k">[Uploading]</span>
+<span class="w">                      </span><span class="na">↓</span>
+<span class="w">                  </span><span class="k">[Success]</span>
+<span class="w">                      </span><span class="na">↓</span>
+<span class="w">                  </span><span class="na">[Cooldown] (5m)</span>
+<span class="w">                      </span><span class="na">↓</span>
+<span class="w">                  </span><span class="k">[Idle]</span>
+</code></pre></div>
+
+<h3 id="upload-state">Upload State</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">[Local File] → Queue → [Pending]</span>
+<span class="w">                          </span><span class="na">↓</span>
+<span class="w">                      </span><span class="na">[Uploading] (progress %)</span>
+<span class="w">                          </span><span class="na">↓</span>
+<span class="w">                   </span><span class="k">[Success/Failed]</span>
+<span class="w">                          </span><span class="na">↓</span>
+<span class="w">                   </span><span class="k">[Cleanup at 00:00]</span>
+</code></pre></div>
+
+<hr />
+<h2 id="performance-metrics">📊 PERFORMANCE METRICS</h2>
+<h3 id="throughput">Throughput</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Camera</span><span class="w"> </span><span class="n">Read</span><span class="p">:</span><span class="w">     </span><span class="mi">25</span><span class="o">-</span><span class="mi">30</span><span class="w"> </span><span class="n">FPS</span><span class="w"> </span><span class="p">(</span><span class="n">USB</span><span class="p">),</span><span class="w"> </span><span class="mi">20</span><span class="o">-</span><span class="mi">25</span><span class="w"> </span><span class="n">FPS</span><span class="w"> </span><span class="p">(</span><span class="n">RTSP</span><span class="p">)</span>
+<span class="n">AI</span><span class="w"> </span><span class="n">Process</span><span class="p">:</span><span class="w">      </span><span class="mi">5</span><span class="w"> </span><span class="n">FPS</span><span class="w"> </span><span class="p">(</span><span class="n">timestamp</span><span class="o">-</span><span class="n">based</span><span class="p">)</span>
+<span class="n">Recording</span><span class="p">:</span><span class="w">       </span><span class="mi">15</span><span class="w"> </span><span class="n">FPS</span><span class="w"> </span><span class="p">(</span><span class="n">async</span><span class="w"> </span><span class="n">writer</span><span class="p">)</span>
+<span class="n">Upload</span><span class="p">:</span><span class="w">          </span><span class="mi">10</span><span class="w"> </span><span class="n">MB</span><span class="o">/</span><span class="n">s</span><span class="w"> </span><span class="n">chunks</span><span class="w"> </span><span class="p">(</span><span class="n">multipart</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="latency">Latency</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Camera</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">AI</span><span class="p">:</span><span class="w">    </span><span class="mi">20</span><span class="o">-</span><span class="mi">50</span><span class="w"> </span><span class="n">ms</span><span class="w"> </span><span class="p">(</span><span class="n">queue</span><span class="p">)</span>
+<span class="n">QR</span><span class="w"> </span><span class="n">Detection</span><span class="p">:</span><span class="w">    </span><span class="mi">100</span><span class="o">-</span><span class="mi">200</span><span class="w"> </span><span class="n">ms</span><span class="w"> </span><span class="p">(</span><span class="n">ZXing</span><span class="p">)</span>
+<span class="n">Start</span><span class="w"> </span><span class="n">Recording</span><span class="p">:</span><span class="w"> </span><span class="mi">200</span><span class="w"> </span><span class="n">ms</span><span class="w"> </span><span class="p">(</span><span class="n">pause</span><span class="w"> </span><span class="n">AI</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">init</span><span class="p">)</span>
+<span class="n">Stop</span><span class="w"> </span><span class="n">Recording</span><span class="p">:</span><span class="w">  </span><span class="mi">100</span><span class="w"> </span><span class="n">ms</span><span class="w"> </span><span class="p">(</span><span class="k">signal</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">cleanup</span><span class="p">)</span>
+<span class="n">Upload</span><span class="w"> </span><span class="n">Init</span><span class="p">:</span><span class="w">     </span><span class="o">&lt;</span><span class="w"> </span><span class="mi">100</span><span class="w"> </span><span class="n">ms</span><span class="w"> </span><span class="p">(</span><span class="n">queue</span><span class="p">)</span>
+</code></pre></div>
+
+<h3 id="resource-usage">Resource Usage</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">CPU</span><span class="p">:</span><span class="w">     </span><span class="mi">15</span><span class="o">-</span><span class="mi">30</span><span class="o">%</span><span class="w"> </span><span class="p">(</span><span class="mi">2</span><span class="o">-</span><span class="n">core</span><span class="p">,</span><span class="w"> </span><span class="n">recording</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">AI</span><span class="p">)</span>
+<span class="n">RAM</span><span class="p">:</span><span class="w">     </span><span class="mi">200</span><span class="o">-</span><span class="mi">400</span><span class="w"> </span><span class="n">MB</span><span class="w"> </span><span class="p">(</span><span class="n">base</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">buffers</span><span class="p">)</span>
+<span class="n">Disk</span><span class="p">:</span><span class="w">    </span><span class="o">~</span><span class="mi">50</span><span class="w"> </span><span class="n">MB</span><span class="o">/</span><span class="nb">min</span><span class="w"> </span><span class="p">(</span><span class="n">recording</span><span class="w"> </span><span class="n">at</span><span class="w"> </span><span class="mi">15</span><span class="w"> </span><span class="n">FPS</span><span class="p">)</span>
+<span class="n">Network</span><span class="p">:</span><span class="w"> </span><span class="n">Depends</span><span class="w"> </span><span class="n">on</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">speed</span>
+</code></pre></div>
+
+<hr />
+<h2 id="monitoring-logging">🔍 MONITORING &amp; LOGGING</h2>
+<h3 id="console-logs">Console Logs</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">[</span><span class="n">STARTUP</span><span class="p">]</span>      <span class="n">App</span> <span class="n">initialization</span> <span class="n">logs</span>
+<span class="p">[</span><span class="n">CAMERA</span> <span class="n">DEBUG</span><span class="p">]</span> <span class="n">FPS</span><span class="p">,</span> <span class="n">queue</span> <span class="n">size</span><span class="p">,</span> <span class="n">dropped</span> <span class="n">frames</span>
+<span class="p">[</span><span class="n">AI</span> <span class="n">DEBUG</span><span class="p">]</span>     <span class="n">FPS</span><span class="p">,</span> <span class="n">timing</span> <span class="n">breakdown</span><span class="p">,</span> <span class="nb">dict</span> <span class="n">size</span>
+<span class="p">[</span><span class="n">UPLOAD</span> <span class="n">WORKER</span><span class="p">]</span> <span class="n">Upload</span> <span class="n">status</span><span class="p">,</span> <span class="n">success</span><span class="o">/</span><span class="n">failed</span>
+<span class="p">[</span><span class="n">ERROR</span><span class="p">]</span>        <span class="n">Error</span> <span class="n">messages</span>
+<span class="p">[</span><span class="n">INFO</span><span class="p">]</span>         <span class="n">Info</span> <span class="n">messages</span>
+</code></pre></div>
+
+<h3 id="metrics-collection">Metrics Collection</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Camera Manager</span>
+<span class="o">-</span> <span class="n">Frames</span> <span class="n">read</span> <span class="n">per</span> <span class="n">second</span>
+<span class="o">-</span> <span class="n">Queue</span> <span class="n">full</span> <span class="n">count</span> <span class="p">(</span><span class="n">drops</span><span class="p">)</span>
+<span class="o">-</span> <span class="n">Current</span> <span class="n">queue</span> <span class="n">size</span>
+
+<span class="c1"># AI Scanner</span>
+<span class="o">-</span> <span class="n">Scans</span> <span class="n">per</span> <span class="n">second</span>
+<span class="o">-</span> <span class="n">Total</span> <span class="n">processing</span> <span class="n">time</span>
+<span class="o">-</span> <span class="n">History</span> <span class="nb">dict</span> <span class="n">size</span>
+
+<span class="c1"># Upload Worker</span>
+<span class="o">-</span> <span class="n">Upload</span> <span class="n">queue</span> <span class="n">size</span>
+<span class="o">-</span> <span class="n">Upload</span> <span class="n">success</span><span class="o">/</span><span class="n">failed</span> <span class="n">count</span>
+<span class="o">-</span> <span class="n">Upload</span> <span class="n">speed</span> <span class="p">(</span><span class="n">MB</span><span class="o">/</span><span class="n">s</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<p><strong>Version:</strong> 1.0.0<br />
+<strong>Updated:</strong> 09/02/2026<br />
+<strong>Team:</strong> EcoHub Development</p>
+</body>
+</html>

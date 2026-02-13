@@ -1,0 +1,905 @@
+{% extends "base.html" %}
+{% block title %}EcoHub - Kho lưu trữ{% endblock %}
+{% block content %}
+
+<style>
+/* ===== STORAGE PAGE STYLES ===== */
+.storage-header {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%);
+  color: white;
+  padding: 1.25rem 1.5rem;
+  border-radius: 10px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
+}
+
+.storage-header h4 {
+  margin: 0;
+  font-weight: 600;
+  font-size: 1.25rem;
+}
+
+.storage-header p {
+  margin: 0.25rem 0 0 0;
+  opacity: 0.9;
+  font-size: 0.875rem;
+}
+
+/* Custom Tabs */
+.custom-tabs {
+  background: white;
+  border-radius: 10px 10px 0 0;
+  border: 1px solid #e2e8f0;
+  border-bottom: none;
+  padding: 0;
+  display: flex;
+  gap: 0;
+  margin-bottom: 0;
+}
+
+.custom-tabs .tab-btn {
+  flex: 1;
+  padding: 1rem 1.5rem;
+  border: none;
+  background: white;
+  color: #64748b;
+  font-weight: 500;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+  position: relative;
+}
+
+.custom-tabs .tab-btn:first-child {
+  border-radius: 10px 0 0 0;
+}
+
+.custom-tabs .tab-btn:last-child {
+  border-radius: 0 10px 0 0;
+}
+
+.custom-tabs .tab-btn:hover {
+  background: #f8fafc;
+  color: #0d9488;
+}
+
+.custom-tabs .tab-btn.active {
+  color: #0d9488;
+  background: #f0fdfa;
+  border-bottom-color: #0d9488;
+  font-weight: 600;
+}
+
+.tab-content-wrapper {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0 0 10px 10px;
+  padding: 1.5rem;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+}
+
+.stats-card {
+  background: white;
+  border-radius: 10px;
+  padding: 1.25rem;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  border: 1px solid #e2e8f0;
+  height: 100%;
+}
+
+.stats-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+  margin-bottom: 0.75rem;
+  background: #0d9488;
+  color: white;
+}
+
+.stats-label {
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 0.5rem;
+}
+
+.stats-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 0.25rem;
+}
+
+.stats-subtitle {
+  color: #94a3b8;
+  font-size: 0.8rem;
+}
+
+.progress-thin {
+  height: 5px;
+  border-radius: 3px;
+  margin-top: 0.75rem;
+  background-color: #e2e8f0;
+}
+
+.progress-thin .progress-bar {
+  border-radius: 3px;
+}
+
+.filter-section {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.search-box {
+  position: relative;
+  margin-bottom: 1rem;
+}
+
+.search-box input {
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  padding: 0.6rem 1rem 0.6rem 2.5rem;
+  font-size: 0.875rem;
+  transition: border-color 0.2s;
+  width: 100%;
+}
+
+.search-box input:focus {
+  border-color: #0d9488;
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.1);
+  outline: none;
+}
+
+.search-box::before {
+  content: "🔍";
+  position: absolute;
+  left: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem;
+}
+
+.filter-badge {
+  position: absolute;
+  right: 0.875rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: #0d9488;
+  color: white;
+  padding: 0.25rem 0.6rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.filter-tabs .btn {
+  border-radius: 6px;
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  transition: all 0.2s;
+  border: 1px solid #e2e8f0;
+  background: white;
+  color: #64748b;
+}
+
+.filter-tabs .btn:hover {
+  border-color: #0d9488;
+  background: #0d9488;
+  color: white;
+}
+
+.date-inputs {
+  background: white;
+  border-radius: 6px;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+}
+
+.date-inputs label {
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.8rem;
+  margin-bottom: 0.4rem;
+}
+
+.date-inputs input {
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  font-size: 0.875rem;
+}
+
+.custom-table {
+  margin-bottom: 0;
+  font-size: 0.875rem;
+}
+
+.custom-table thead {
+  background: #f8fafc;
+}
+
+.custom-table thead th {
+  border: none;
+  padding: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.custom-table tbody tr {
+  border-bottom: 1px solid #e2e8f0;
+  transition: background 0.2s;
+}
+
+.custom-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.custom-table tbody td {
+  padding: 0.875rem 0.75rem;
+  vertical-align: middle;
+}
+
+.video-name {
+  color: #0d9488;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.video-name:hover {
+  color: #0f766e;
+  text-decoration: underline;
+}
+
+.badge-custom {
+  padding: 0.3rem 0.6rem;
+  border-radius: 4px;
+  font-weight: 500;
+  font-size: 0.75rem;
+}
+
+.badge-safe {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-warning {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.btn-delete {
+  border-radius: 6px;
+  padding: 0.3rem 0.75rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid #ef4444;
+  background: white;
+  color: #ef4444;
+  transition: all 0.2s;
+}
+
+.btn-delete:hover:not(:disabled) {
+  background: #ef4444;
+  color: white;
+}
+
+.btn-delete:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  border-color: #cbd5e1;
+  color: #94a3b8;
+  background: #f8fafc;
+}
+
+.custom-pagination {
+  margin-top: 1rem;
+  display: flex;
+  justify-content: center;
+  gap: 0.25rem;
+}
+
+.custom-pagination .page-item .page-link {
+  border-radius: 6px;
+  border: 1px solid #e2e8f0;
+  color: #0d9488;
+  padding: 0.4rem 0.65rem;
+  font-weight: 500;
+  font-size: 0.85rem;
+  transition: all 0.2s;
+}
+
+.custom-pagination .page-item .page-link:hover {
+  background: #0d9488;
+  color: white;
+  border-color: #0d9488;
+}
+
+.custom-pagination .page-item.active .page-link {
+  background: #0d9488;
+  border-color: #0d9488;
+  color: white;
+}
+
+.custom-pagination .page-item.disabled .page-link {
+  color: #cbd5e1;
+  cursor: not-allowed;
+}
+
+.page-info {
+  text-align: center;
+  color: #64748b;
+  font-size: 0.85rem;
+  margin-top: 0.75rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 2.5rem 1.5rem;
+  color: #64748b;
+}
+
+.empty-state-icon {
+  font-size: 3rem;
+  margin-bottom: 0.75rem;
+  opacity: 0.5;
+}
+
+.upload-info-box {
+  background: #eff6ff;
+  border-left: 4px solid #3b82f6;
+  padding: 1rem 1.25rem;
+  border-radius: 6px;
+  margin-bottom: 1.25rem;
+}
+
+.upload-info-box .info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.upload-info-box .info-row:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 768px) {
+  .storage-header {
+    padding: 1rem;
+  }
+  
+  .custom-tabs .tab-btn {
+    font-size: 0.85rem;
+    padding: 0.75rem 1rem;
+  }
+  
+  .stats-card {
+    margin-bottom: 0.75rem;
+  }
+  
+  .filter-tabs {
+    justify-content: center;
+  }
+}
+</style>
+
+<!-- Header -->
+<div class="storage-header">
+  <h4>📦 Kho lưu trữ</h4>
+  <p>☁️ Quản lý video trên S3 Cloud Storage và theo dõi tiến trình upload</p>
+</div>
+
+<!-- Stats Cards -->
+<div class="row mb-3">
+  <div class="col-md-4">
+    <div class="stats-card">
+      <div class="stats-icon">💾</div>
+      <div class="stats-label">Dung lượng</div>
+      <div class="stats-value">{{ (total_size / (1024*1024))|round(2) }} MB</div>
+      <div class="stats-subtitle">/ {{ (max_size / (1024*1024))|round(0) }} MB</div>
+      <div class="progress progress-thin">
+        {% set percent = ((total_size / max_size) * 100)|round(0) %}
+        <div class="progress-bar {% if percent > 80 %}bg-danger{% elif percent > 60 %}bg-warning{% else %}bg-success{% endif %}" 
+             style="width: {{ percent }}%"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4">
+    <div class="stats-card">
+      <div class="stats-icon">🎬</div>
+      <div class="stats-label">Số video</div>
+      <div class="stats-value">{{ videos|length }}</div>
+      <div class="stats-subtitle">video đã lưu</div>
+    </div>
+  </div>
+  
+  <div class="col-md-4">
+    <div class="stats-card">
+      <div class="stats-icon">📊</div>
+      <div class="stats-label">Trạng thái</div>
+      <div class="stats-value" style="font-size: 1.1rem;">{{ status }}</div>
+      <div class="stats-subtitle">Hệ thống ổn định</div>
+    </div>
+  </div>
+</div>
+
+<!-- Tabs Navigation -->
+<div class="custom-tabs">
+  <button class="tab-btn active" onclick="switchTab('s3-videos')">
+    ☁️ Video trên S3
+  </button>
+  <button class="tab-btn" onclick="switchTab('upload-history')">
+    📤 Lịch sử upload
+  </button>
+</div>
+
+<!-- Tab Content Wrapper -->
+<div class="tab-content-wrapper">
+  <!-- Tab 1: Video trên S3 -->
+  <div id="s3-videos" class="tab-pane active">
+    {% if videos %}
+    <!-- Filter Section -->
+    <div class="filter-section">
+      <div class="search-box">
+        <input 
+          type="text" 
+          id="searchInput" 
+          class="form-control" 
+          placeholder="Tìm kiếm video..."
+          autocomplete="off"
+        >
+        <span id="searchResultCount" class="filter-badge" style="display:none;"></span>
+      </div>
+
+      <div class="filter-tabs">
+        <button type="button" class="btn" onclick="filterToday()">Hôm nay</button>
+        <button type="button" class="btn" onclick="filterLast7Days()">7 ngày</button>
+        <button type="button" class="btn" onclick="filterThisMonth()">Tháng này</button>
+        <button type="button" class="btn" onclick="clearDateFilter()">Xóa lọc</button>
+      </div>
+
+      <div class="date-inputs">
+        <div class="row g-2">
+          <div class="col-md-4">
+            <label for="specificDate">Ngày cụ thể</label>
+            <input type="date" id="specificDate" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label for="fromDate">Từ ngày</label>
+            <input type="date" id="fromDate" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <label for="toDate">Đến ngày</label>
+            <input type="date" id="toDate" class="form-control">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Video Table -->
+    <div class="table-responsive">
+      <table class="table custom-table" id="videoTable">
+        <thead>
+          <tr>
+            <th>Tên video</th>
+            <th>Thời gian</th>
+            <th>Kích thước</th>
+            <th>Trạng thái</th>
+            <th style="width: 90px;">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for v in videos %}
+            <tr class="video-row" data-created="{{ v.created_at }}">
+              <td>
+                <a href="{{ url_for('serve_video', filename=v.name) }}" class="video-name" target="_blank">
+                  {{ v.name }}
+                </a>
+              </td>
+              <td>{{ v.created_at.strftime('%d/%m/%Y %H:%M') if v.created_at else '' }}</td>
+              <td>{{ (v.size_bytes / (1024*1024))|round(2) }} MB</td>
+              <td>
+                <span class="badge badge-custom badge-safe">
+                  {{ v.status }}
+                </span>
+              </td>
+              <td>
+                <form method="post" action="{{ url_for('delete_video', filename=v.name) }}" 
+                      onsubmit="return confirm('Xóa video này khỏi S3?\n\nHành động này không thể hoàn tác!');" class="d-inline">
+                  <button type="submit" class="btn btn-delete">Xóa</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav aria-label="Phân trang">
+      <ul class="pagination custom-pagination" id="paginationControls"></ul>
+    </nav>
+    
+    <div class="page-info" id="pageInfo"></div>
+
+    {% else %}
+    <div class="empty-state">
+      <div class="empty-state-icon">☁️</div>
+      <h5>Chưa có video trên S3</h5>
+      <p class="text-muted">Video sẽ tự động upload lên S3 sau khi quay xong</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Tab 2: Lịch sử upload -->
+  <div id="upload-history" class="tab-pane">
+    <div class="upload-info-box">
+      <div class="info-row">
+        <div style="font-size: 1.5rem;">⏳</div>
+        <div>
+          <strong>Hàng đợi upload:</strong> 
+          <span id="queueSize" style="color: #3b82f6; font-weight: 600;">0</span> video
+        </div>
+      </div>
+      <div style="font-size: 0.85rem; color: #64748b; margin-top: 0.5rem;">
+        Video sẽ tự động upload lên S3 sau khi quay xong. Refresh trang để cập nhật.
+      </div>
+    </div>
+    
+    <div id="uploadHistoryContent">
+      <!-- Nội dung sẽ được load bằng JavaScript -->
+      <div class="empty-state" id="emptyUploadState">
+        <div class="empty-state-icon">📤</div>
+        <h5>Không có video đang chờ upload</h5>
+        <p class="text-muted">Tất cả video đã được upload lên S3</p>
+      </div>
+      
+      <div id="uploadTableContainer" style="display: none;">
+        <div class="table-responsive">
+          <table class="table custom-table">
+            <thead>
+              <tr>
+                <th>Tên file</th>
+                <th style="width: 100px;">Kích thước</th>
+                <th style="width: 140px;">Thời gian</th>
+                <th style="width: 180px;">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody id="uploadTableBody">
+              <!-- Dữ liệu từ JavaScript -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================
+// TAB SWITCHING
+// =============================
+function switchTab(tabId) {
+  // Remove active class from all tabs
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.classList.remove('active');
+  });
+  document.querySelectorAll('.tab-pane').forEach(pane => {
+    pane.classList.remove('active');
+  });
+  
+  // Add active class to selected tab
+  event.target.classList.add('active');
+  document.getElementById(tabId).classList.add('active');
+}
+
+// =============================
+// S3 VIDEO LIST (TAB 1)
+// =============================
+(function() {
+  const searchInput = document.getElementById('searchInput');
+  const table = document.getElementById('videoTable');
+  if (!table) return;
+  
+  const countBadge = document.getElementById('searchResultCount');
+  const specificDateInput = document.getElementById('specificDate');
+  const fromDateInput = document.getElementById('fromDate');
+  const toDateInput = document.getElementById('toDate');
+  const pageInfo = document.getElementById('pageInfo');
+  const paginationControls = document.getElementById('paginationControls');
+  
+  const allRows = Array.from(table.querySelectorAll('tbody .video-row'));
+  const totalCount = allRows.length;
+  
+  let currentPage = 1;
+  let perPage = 20;
+  let filteredRows = [...allRows];
+
+  function parseDate(dateStr) {
+    try {
+      const parts = dateStr.split(' ')[0].split('-');
+      return new Date(parts[0], parts[1] - 1, parts[2]);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function applyFilters() {
+    const searchQuery = searchInput.value.toLowerCase().trim();
+    const specificDate = specificDateInput.value;
+    const fromDate = fromDateInput.value;
+    const toDate = toDateInput.value;
+
+    filteredRows = allRows.filter(row => {
+      const nameCell = row.querySelector('td:first-child');
+      const videoName = nameCell ? nameCell.textContent.toLowerCase() : '';
+      if (searchQuery && !videoName.includes(searchQuery)) {
+        return false;
+      }
+
+      const createdAtStr = row.getAttribute('data-created');
+      if (!createdAtStr) return true;
+
+      const rowDate = parseDate(createdAtStr);
+      if (!rowDate) return true;
+
+      if (specificDate) {
+        const targetDate = new Date(specificDate);
+        if (rowDate.toDateString() !== targetDate.toDateString()) {
+          return false;
+        }
+      }
+
+      if (fromDate) {
+        const from = new Date(fromDate);
+        if (rowDate < from) return false;
+      }
+      if (toDate) {
+        const to = new Date(toDate);
+        to.setHours(23, 59, 59, 999);
+        if (rowDate > to) return false;
+      }
+
+      return true;
+    });
+
+    currentPage = 1;
+    updateDisplay();
+  }
+
+  function updateDisplay() {
+    const start = (currentPage - 1) * perPage;
+    const end = start + perPage;
+    const totalPages = Math.ceil(filteredRows.length / perPage);
+
+    allRows.forEach(row => row.style.display = 'none');
+    filteredRows.slice(start, end).forEach(row => {
+      row.style.display = '';
+    });
+
+    if (filteredRows.length < totalCount) {
+      countBadge.textContent = `${filteredRows.length}`;
+      countBadge.style.display = 'inline-block';
+    } else {
+      countBadge.style.display = 'none';
+    }
+
+    if (filteredRows.length > 0) {
+      const showing = Math.min(end, filteredRows.length);
+      pageInfo.textContent = `${start + 1}-${showing} / ${filteredRows.length} video (Trang ${currentPage}/${totalPages})`;
+    } else {
+      pageInfo.textContent = 'Không tìm thấy';
+    }
+
+    renderPagination(totalPages);
+  }
+
+  function renderPagination(totalPages) {
+    paginationControls.innerHTML = '';
+
+    if (totalPages <= 1) return;
+
+    const prevLi = document.createElement('li');
+    prevLi.className = 'page-item' + (currentPage === 1 ? ' disabled' : '');
+    prevLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${currentPage - 1}); return false;">‹</a>`;
+    paginationControls.appendChild(prevLi);
+
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, currentPage + 2);
+
+    if (currentPage <= 3) {
+      endPage = Math.min(5, totalPages);
+    }
+    if (currentPage >= totalPages - 2) {
+      startPage = Math.max(1, totalPages - 4);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      const pageLi = document.createElement('li');
+      pageLi.className = 'page-item' + (i === currentPage ? ' active' : '');
+      pageLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${i}); return false;">${i}</a>`;
+      paginationControls.appendChild(pageLi);
+    }
+
+    const nextLi = document.createElement('li');
+    nextLi.className = 'page-item' + (currentPage === totalPages ? ' disabled' : '');
+    nextLi.innerHTML = `<a class="page-link" href="#" onclick="goToPage(${currentPage + 1}); return false;">›</a>`;
+    paginationControls.appendChild(nextLi);
+  }
+
+  window.goToPage = function(page) {
+    const totalPages = Math.ceil(filteredRows.length / perPage);
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    updateDisplay();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  window.filterToday = function() {
+    const today = new Date().toISOString().split('T')[0];
+    specificDateInput.value = today;
+    fromDateInput.value = '';
+    toDateInput.value = '';
+    applyFilters();
+  };
+
+  window.filterLast7Days = function() {
+    const today = new Date();
+    const last7Days = new Date(today);
+    last7Days.setDate(today.getDate() - 7);
+    
+    specificDateInput.value = '';
+    fromDateInput.value = last7Days.toISOString().split('T')[0];
+    toDateInput.value = today.toISOString().split('T')[0];
+    applyFilters();
+  };
+
+  window.filterThisMonth = function() {
+    const today = new Date();
+    const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
+    
+    specificDateInput.value = '';
+    fromDateInput.value = firstDay.toISOString().split('T')[0];
+    toDateInput.value = today.toISOString().split('T')[0];
+    applyFilters();
+  };
+
+  window.clearDateFilter = function() {
+    specificDateInput.value = '';
+    fromDateInput.value = '';
+    toDateInput.value = '';
+    searchInput.value = '';
+    applyFilters();
+  };
+
+  searchInput.addEventListener('input', applyFilters);
+  specificDateInput.addEventListener('change', function() {
+    fromDateInput.value = '';
+    toDateInput.value = '';
+    applyFilters();
+  });
+  fromDateInput.addEventListener('change', function() {
+    specificDateInput.value = '';
+    applyFilters();
+  });
+  toDateInput.addEventListener('change', function() {
+    specificDateInput.value = '';
+    applyFilters();
+  });
+
+  applyFilters();
+})();
+
+// =============================
+// UPLOAD HISTORY (TAB 2)
+// =============================
+(function() {
+  const queueSizeSpan = document.getElementById('queueSize');
+  const uploadTableBody = document.getElementById('uploadTableBody');
+  const uploadTableContainer = document.getElementById('uploadTableContainer');
+  const emptyUploadState = document.getElementById('emptyUploadState');
+  
+  function getStatusBadge(status, errorMsg) {
+    switch(status) {
+      case 'pending':
+        return '<span class="badge" style="background: #94a3b8; color: white;">⏳ Chờ upload</span>';
+      case 'uploading':
+        return '<span class="badge" style="background: #3b82f6; color: white;">📤 Đang upload...</span>';
+      case 'success':
+        return '<span class="badge" style="background: #10b981; color: white;">✅ Thành công</span>';
+      case 'failed':
+        return `<span class="badge" style="background: #dc2626; color: white;" title="${errorMsg || ''}">❌ Lỗi</span>`;
+      case 'not_queued':
+        return '<span class="badge" style="background: #f59e0b; color: white;">⚠️ Chưa đưa vào queue</span>';
+      default:
+        return '<span class="badge" style="background: #6b7280; color: white;">❓ Không rõ</span>';
+    }
+  }
+  
+  function updateUploadStatus() {
+    fetch('/upload-status')
+      .then(res => res.json())
+      .then(data => {
+        if (!data.success) {
+          console.error('Error fetching upload status:', data.error);
+          return;
+        }
+        
+        const queueSize = data.queue_size || 0;
+        const localVideos = data.local_videos || [];
+        
+        queueSizeSpan.textContent = queueSize;
+        
+        // Hiển thị/ẩn bảng
+        if (localVideos.length > 0) {
+          emptyUploadState.style.display = 'none';
+          uploadTableContainer.style.display = 'block';
+          
+          // Cập nhật bảng
+          uploadTableBody.innerHTML = '';
+          localVideos.forEach(video => {
+            const row = document.createElement('tr');
+            
+            // Highlight theo trạng thái
+            if (video.status === 'uploading') {
+              row.style.background = '#eff6ff';
+            } else if (video.status === 'failed') {
+              row.style.background = '#fef2f2';
+            } else if (video.status === 'success') {
+              row.style.background = '#f0fdf4';
+            }
+            
+            row.innerHTML = `
+              <td style="padding: 0.875rem 0.75rem; font-size: 0.875rem;">${video.filename}</td>
+              <td style="padding: 0.875rem 0.75rem; font-size: 0.875rem;">${video.size_mb} MB</td>
+              <td style="padding: 0.875rem 0.75rem; font-size: 0.875rem;">${video.created_at}</td>
+              <td style="padding: 0.875rem 0.75rem; font-size: 0.875rem;">
+                ${getStatusBadge(video.status, video.error_msg)}
+                ${video.error_msg ? `<div style="font-size: 0.75rem; color: #dc2626; margin-top: 0.25rem;">${video.error_msg}</div>` : ''}
+              </td>
+            `;
+            uploadTableBody.appendChild(row);
+          });
+        } else {
+          emptyUploadState.style.display = 'block';
+          uploadTableContainer.style.display = 'none';
+        }
+      })
+      .catch(err => {
+        console.error('Error updating upload status:', err);
+      });
+  }
+  
+  // Cập nhật mỗi 2 giây
+  updateUploadStatus();
+  setInterval(updateUploadStatus, 2000);
+})();
+</script>
+{% endblock %}

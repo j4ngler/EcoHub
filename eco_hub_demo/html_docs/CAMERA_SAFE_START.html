@@ -1,0 +1,393 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CAMERA_SAFE_START</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 24pt;
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            font-size: 18pt;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            font-size: 14pt;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+            background-color: #f9f9f9;
+            padding: 10px 15px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 10pt;
+        }
+        
+        table th {
+            background-color: #3498db;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin: 5px 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<h1 id="camera-safe-start-huong-dan">🎥 CAMERA SAFE START - HƯỚNG DẪN</h1>
+<h2 id="van-e-truoc-ay">⚠️ <strong>VẤN ĐỀ TRƯỚC ĐÂY:</strong></h2>
+<p><strong>Triệu chứng:</strong>
+- App khởi động → Tự động bật camera
+- Nếu camera KHÔNG kết nối → <strong>App bị treo/crash</strong>
+- User không thể sử dụng app</p>
+<p><strong>Nguyên nhân:</strong>
+- Code tự động gọi <code>build_managers_and_scanners()</code> khi app start
+- Camera initialization blocking → Nếu lỗi → App hang</p>
+<hr />
+<h2 id="giai-phap-moi">✅ <strong>GIẢI PHÁP MỚI:</strong></h2>
+<h3 id="1-app-khoi-ong-khong-tu-ong-bat-camera"><strong>1. App Khởi Động KHÔNG Tự Động Bật Camera</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># TRƯỚC ĐÂY (app.py line 467):</span>
+<span class="n">build_managers_and_scanners</span><span class="p">(</span><span class="n">camera_configs</span><span class="p">)</span>  <span class="c1"># ← Tự động bật camera</span>
+
+<span class="c1"># HIỆN TẠI:</span>
+<span class="c1"># KHÔNG TỰ ĐỘNG KHỞI ĐỘNG CAMERA KHI APP START</span>
+<span class="c1"># User sẽ test và start manual từ dashboard</span>
+</code></pre></div>
+
+<h3 id="2-dashboard-hien-thi-camera-status"><strong>2. Dashboard Hiển Thị Camera Status</strong></h3>
+<p><strong>Giao diện mới:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="err">┌─────────────────────────────────────┐</span>
+<span class="err">│</span><span class="w"> </span><span class="err">🎥</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">Status</span><span class="w">     </span><span class="p">[</span><span class="n">Not</span><span class="w"> </span><span class="n">Started</span><span class="p">]</span><span class="w">  </span><span class="err">│</span>
+<span class="err">├─────────────────────────────────────┤</span>
+<span class="err">│</span><span class="w"> </span><span class="err">⚠️</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">chưa</span><span class="w"> </span><span class="n">khởi</span><span class="w"> </span><span class="n">động</span><span class="w">            </span><span class="err">│</span>
+<span class="err">│</span><span class="w"> </span><span class="n">Vui</span><span class="w"> </span><span class="n">lòng</span><span class="w"> </span><span class="n">test</span><span class="w"> </span><span class="n">và</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="n">camera</span><span class="p">.</span><span class="w">     </span><span class="err">│</span>
+<span class="err">│</span><span class="w">                                      </span><span class="err">│</span>
+<span class="err">│</span><span class="w"> </span><span class="p">[</span><span class="n">Test</span><span class="w"> </span><span class="n">Camera</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">Start</span><span class="w"> </span><span class="n">Camera</span><span class="p">]</span><span class="w"> </span><span class="p">[</span><span class="n">Stop</span><span class="p">]</span><span class="w"> </span><span class="err">│</span>
+<span class="err">└─────────────────────────────────────┘</span>
+</code></pre></div>
+
+<h3 id="3-workflow-moi"><strong>3. Workflow Mới:</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="n">User</span><span class="w"> </span><span class="n">mở</span><span class="w"> </span><span class="n">app</span>
+<span class="w">   </span><span class="err">↓</span>
+<span class="n">Dashboard</span><span class="err">:</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">Status</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;Not Started&quot;</span>
+<span class="w">   </span><span class="err">↓</span>
+<span class="n">User</span><span class="w"> </span><span class="n">click</span><span class="w"> </span><span class="s2">&quot;Test Camera&quot;</span>
+<span class="w">   </span><span class="err">↓</span>
+<span class="n">Backend</span><span class="err">:</span><span class="w"> </span><span class="n">Thử</span><span class="w"> </span><span class="n">mở</span><span class="w"> </span><span class="nb">camera</span><span class="w"> </span><span class="p">(</span><span class="n">cv2</span><span class="o">.</span><span class="n">VideoCapture</span><span class="p">)</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">đọ</span><span class="n">c</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="n">frame</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">đó</span><span class="n">ng</span><span class="w"> </span><span class="n">lại</span>
+<span class="w">   </span><span class="err">↓</span>
+<span class="w">   </span><span class="err">├─</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">OK</span><span class="err">:</span><span class="w"> </span><span class="s2">&quot;Camera OK (usb/rtsp)&quot;</span>
+<span class="w">   </span><span class="err">└─</span><span class="w"> </span><span class="err">❌</span><span class="w"> </span><span class="n">Lỗi</span><span class="err">:</span><span class="w"> </span><span class="s2">&quot;Cannot open camera: ...&quot;</span>
+<span class="w">       </span><span class="err">↓</span>
+<span class="n">User</span><span class="w"> </span><span class="n">click</span><span class="w"> </span><span class="s2">&quot;Start Camera&quot;</span><span class="w"> </span><span class="p">(</span><span class="n">nếu</span><span class="w"> </span><span class="n">test</span><span class="w"> </span><span class="n">OK</span><span class="p">)</span>
+<span class="w">   </span><span class="err">↓</span>
+<span class="n">Backend</span><span class="err">:</span><span class="w"> </span><span class="n">Khởi</span><span class="w"> </span><span class="err">độ</span><span class="n">ng</span><span class="w"> </span><span class="nb">camera</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">AI</span><span class="w"> </span><span class="n">scanner</span>
+<span class="w">   </span><span class="err">↓</span>
+<span class="n">Dashboard</span><span class="err">:</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">feed</span><span class="w"> </span><span class="n">hiển</span><span class="w"> </span><span class="n">thị</span>
+</code></pre></div>
+
+<hr />
+<h2 id="cac-thay-oi-chi-tiet">📝 <strong>CÁC THAY ĐỔI CHI TIẾT:</strong></h2>
+<h3 id="a-apppy-backend"><strong>A. <code>app.py</code> - Backend</strong></h3>
+<h4 id="1-them-camera_status-tracking"><strong>1. Thêm camera_status tracking:</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Camera status tracking</span>
+<span class="n">camera_status</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;initialized&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;running&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="s2">&quot;last_test&quot;</span><span class="p">:</span> <span class="kc">None</span>
+<span class="p">}</span>
+<span class="n">camera_status_lock</span> <span class="o">=</span> <span class="n">threading</span><span class="o">.</span><span class="n">Lock</span><span class="p">()</span>
+</code></pre></div>
+
+<h4 id="2-endpoint-moi-test_camera-post"><strong>2. Endpoint mới: <code>/test_camera</code> (POST)</strong></h4>
+<ul>
+<li>Test camera KHÔNG khởi động</li>
+<li>Mở camera → đọc 1 frame → đóng ngay</li>
+<li>Trả về: <code>{"success": true/false, "error": "..."}</code></li>
+</ul>
+<h4 id="3-endpoint-moi-start_cameras-post"><strong>3. Endpoint mới: <code>/start_cameras</code> (POST)</strong></h4>
+<ul>
+<li>Gọi <code>build_managers_and_scanners()</code></li>
+<li>Khởi động tất cả camera + AI scanner</li>
+<li>Update <code>camera_status["running"] = True</code></li>
+</ul>
+<h4 id="4-endpoint-moi-stop_cameras-post"><strong>4. Endpoint mới: <code>/stop_cameras</code> (POST)</strong></h4>
+<ul>
+<li>Dừng tất cả camera + AI scanner</li>
+<li>Update <code>camera_status["running"] = False</code></li>
+</ul>
+<h4 id="5-endpoint-moi-camera_status-get"><strong>5. Endpoint mới: <code>/camera_status</code> (GET)</strong></h4>
+<ul>
+<li>Trả về <code>camera_status</code> hiện tại</li>
+</ul>
+<h4 id="6-sua-start_recording"><strong>6. Sửa <code>/start_recording</code>:</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Check if camera is running TRƯỚC KHI cho phép quay</span>
+<span class="k">with</span> <span class="n">camera_status_lock</span><span class="p">:</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">camera_status</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;running&quot;</span><span class="p">,</span> <span class="kc">False</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">jsonify</span><span class="p">({</span><span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="s2">&quot;Camera chưa khởi động!&quot;</span><span class="p">}),</span> <span class="mi">400</span>
+</code></pre></div>
+
+<h4 id="7-sua-if-__name__-__main__"><strong>7. Sửa <code>if __name__ == "__main__"</code>:</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># KHÔNG GỌI build_managers_and_scanners() nữa</span>
+<span class="c1"># Chỉ load config, KHÔNG khởi động camera</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[STARTUP] Config loaded. Camera: NOT STARTED YET&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s2">&quot;[STARTUP] User will test and start cameras manually from dashboard&quot;</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h3 id="b-dashboardhtml-frontend"><strong>B. <code>dashboard.html</code> - Frontend</strong></h3>
+<h4 id="1-them-camera-status-card"><strong>1. Thêm Camera Status Card:</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="p">&lt;</span><span class="nt">div</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;card&quot;</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">div</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;card-header&quot;</span><span class="p">&gt;</span>
+    🎥 Camera Status
+    <span class="p">&lt;</span><span class="nt">span</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;cameraStatusBadge&quot;</span><span class="p">&gt;</span>Not Started<span class="p">&lt;/</span><span class="nt">span</span><span class="p">&gt;</span>
+  <span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">div</span> <span class="na">class</span><span class="o">=</span><span class="s">&quot;card-body&quot;</span><span class="p">&gt;</span>
+    <span class="p">&lt;</span><span class="nt">button</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;testCameraBtn&quot;</span><span class="p">&gt;</span>Test Camera<span class="p">&lt;/</span><span class="nt">button</span><span class="p">&gt;</span>
+    <span class="p">&lt;</span><span class="nt">button</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;startCameraBtn&quot;</span><span class="p">&gt;</span>Start Camera<span class="p">&lt;/</span><span class="nt">button</span><span class="p">&gt;</span>
+    <span class="p">&lt;</span><span class="nt">button</span> <span class="na">id</span><span class="o">=</span><span class="s">&quot;stopCameraBtn&quot;</span><span class="p">&gt;</span>Stop Camera<span class="p">&lt;/</span><span class="nt">button</span><span class="p">&gt;</span>
+  <span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+<span class="p">&lt;/</span><span class="nt">div</span><span class="p">&gt;</span>
+</code></pre></div>
+
+<h4 id="2-them-javascript-xu-ly"><strong>2. Thêm JavaScript xử lý:</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="c1">// Test Camera</span>
+<span class="nx">testCameraBtn</span><span class="p">.</span><span class="nx">click</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="nx">fetch</span><span class="p">(</span><span class="s1">&#39;/test_camera&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">POST</span><span class="p">)</span>
+<span class="w">  </span><span class="err">→</span><span class="w"> </span><span class="nx">Hiển</span><span class="w"> </span><span class="nx">thị</span><span class="w"> </span><span class="nx">kết</span><span class="w"> </span><span class="nx">quả</span><span class="o">:</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="nx">OK</span><span class="w"> </span><span class="nx">hoặc</span><span class="w"> </span><span class="err">❌</span><span class="w"> </span><span class="ne">Error</span>
+
+<span class="c1">// Start Camera</span>
+<span class="nx">startCameraBtn</span><span class="p">.</span><span class="nx">click</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="nx">fetch</span><span class="p">(</span><span class="s1">&#39;/start_cameras&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">POST</span><span class="p">)</span>
+<span class="w">  </span><span class="err">→</span><span class="w"> </span><span class="nx">Reload</span><span class="w"> </span><span class="nx">page</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="nx">Camera</span><span class="w"> </span><span class="nx">feed</span><span class="w"> </span><span class="nx">hiển</span><span class="w"> </span><span class="nx">thị</span>
+
+<span class="c1">// Stop Camera</span>
+<span class="nx">stopCameraBtn</span><span class="p">.</span><span class="nx">click</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="nx">fetch</span><span class="p">(</span><span class="s1">&#39;/stop_cameras&#39;</span><span class="p">,</span><span class="w"> </span><span class="nx">POST</span><span class="p">)</span>
+<span class="w">  </span><span class="err">→</span><span class="w"> </span><span class="nx">Reload</span><span class="w"> </span><span class="nx">page</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="nx">Camera</span><span class="w"> </span><span class="nx">feed</span><span class="w"> </span><span class="nx">ẩn</span>
+</code></pre></div>
+
+<h4 id="3-camera-feed-conditional-rendering"><strong>3. Camera Feed: Conditional Rendering</strong></h4>
+<div class="codehilite"><pre><span></span><code>{% if camera_status.running %}
+  <span class="cm">&lt;!-- Hiển thị camera feed --&gt;</span>
+  <span class="p">&lt;</span><span class="nt">img</span> <span class="na">src</span><span class="o">=</span><span class="s">&quot;{{ url_for(&#39;video_feed&#39;) }}&quot;</span> <span class="p">/&gt;</span>
+{% else %}
+  <span class="cm">&lt;!-- Hiển thị placeholder --&gt;</span>
+  <span class="p">&lt;</span><span class="nt">p</span><span class="p">&gt;</span>Camera chưa khởi động<span class="p">&lt;/</span><span class="nt">p</span><span class="p">&gt;</span>
+  <span class="p">&lt;</span><span class="nt">p</span><span class="p">&gt;</span>Nhấn &quot;Test Camera&quot; sau đó &quot;Start Camera&quot;<span class="p">&lt;/</span><span class="nt">p</span><span class="p">&gt;</span>
+{% endif %}
+</code></pre></div>
+
+<hr />
+<h2 id="workflow-su-dung">🔄 <strong>WORKFLOW SỬ DỤNG:</strong></h2>
+<h3 id="lan-au-su-dung"><strong>Lần đầu sử dụng:</strong></h3>
+<ol>
+<li>Mở app: http://127.0.0.1:5000</li>
+<li>Login</li>
+<li>Dashboard: Thấy "⚠️ Camera chưa khởi động"</li>
+<li>Click <strong>"Test Camera"</strong></li>
+<li>✅ OK: Thấy "✅ Camera OK (usb)"</li>
+<li>❌ Lỗi: Thấy "❌ Camera Error: Cannot open camera"</li>
+<li>Nếu test OK → Click <strong>"Start Camera"</strong></li>
+<li>Page reload → Camera feed hiển thị</li>
+<li>Bắt đầu quét QR / quay video</li>
+</ol>
+<h3 id="neu-camera-bi-loi"><strong>Nếu camera bị lỗi:</strong></h3>
+<ol>
+<li>Test Camera → ❌ Error: "Cannot open camera"</li>
+<li>User khắc phục:</li>
+<li>USB camera: Cắm lại camera</li>
+<li>RTSP camera: Check IP, URL</li>
+<li>Test lại → ✅ OK</li>
+<li>Start Camera</li>
+</ol>
+<h3 id="stop-camera-neu-can"><strong>Stop Camera (nếu cần):</strong></h3>
+<ol>
+<li>Click <strong>"Stop Camera"</strong></li>
+<li>Camera dừng → App vẫn chạy bình thường</li>
+</ol>
+<hr />
+<h2 id="loi-ich">🎯 <strong>LỢI ÍCH:</strong></h2>
+<h3 id="truoc-ay"><strong>Trước đây:</strong></h3>
+<ul>
+<li>❌ App tự động bật camera → Lỗi → <strong>Treo app</strong></li>
+<li>❌ User không biết camera có lỗi không</li>
+<li>❌ Phải restart app nếu muốn thử lại</li>
+</ul>
+<h3 id="hien-tai"><strong>Hiện tại:</strong></h3>
+<ul>
+<li>✅ App khởi động <strong>KHÔNG bật camera</strong> → <strong>Không bao giờ treo</strong></li>
+<li>✅ User test trước → Biết camera OK hay lỗi</li>
+<li>✅ Chỉ bật camera khi <strong>chắc chắn OK</strong></li>
+<li>✅ Có thể stop/start camera bất kỳ lúc nào</li>
+<li>✅ App vẫn chạy ngay cả khi camera lỗi</li>
+</ul>
+<hr />
+<h2 id="testing">🧪 <strong>TESTING:</strong></h2>
+<h3 id="test-1-camera-usb-ok"><strong>Test 1: Camera USB OK</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Start</span><span class="w"> </span><span class="n">app</span><span class="p">:</span><span class="w"> </span><span class="n">python</span><span class="w"> </span><span class="n">app</span><span class="mf">.</span><span class="n">py</span>
+<span class="mf">2.</span><span class="w"> </span><span class="kr">Open</span><span class="w"> </span><span class="n">dashboard</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s">&quot;Test Camera&quot;</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="s">&quot;Camera OK (usb)&quot;</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s">&quot;Start Camera&quot;</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">feed</span><span class="w"> </span><span class="n">hiển</span><span class="w"> </span><span class="n">thị</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">Detect</span><span class="w"> </span><span class="n">được</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Quay</span><span class="w"> </span><span class="n">video</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">OK</span>
+</code></pre></div>
+
+<h3 id="test-2-camera-usb-bi-rut"><strong>Test 2: Camera USB bị rút</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Start</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="p">(</span><span class="n">camera</span><span class="w"> </span><span class="n">chưa</span><span class="w"> </span><span class="n">cắm</span><span class="p">)</span>
+<span class="mf">2.</span><span class="w"> </span><span class="kr">Open</span><span class="w"> </span><span class="n">dashboard</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s">&quot;Test Camera&quot;</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="err">❌</span><span class="w"> </span><span class="s">&quot;Cannot open camera: index 0&quot;</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Cắm</span><span class="w"> </span><span class="n">USB</span><span class="w"> </span><span class="n">camera</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s">&quot;Test Camera&quot;</span><span class="w"> </span><span class="n">lại</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="s">&quot;Camera OK (usb)&quot;</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s">&quot;Start Camera&quot;</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="n">OK</span>
+</code></pre></div>
+
+<h3 id="test-3-rtsp-camera-loi-ip"><strong>Test 3: RTSP Camera lỗi IP</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">config</span><span class="mf">.</span><span class="n">json</span><span class="p">:</span><span class="w"> </span><span class="n">rtsp_url</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s">&quot;rtsp://192.168.1.999/stream&quot;</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Start</span><span class="w"> </span><span class="n">app</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s">&quot;Test Camera&quot;</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="err">❌</span><span class="w"> </span><span class="s">&quot;Cannot open camera: ...&quot;</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Sửa</span><span class="w"> </span><span class="n">IP</span><span class="w"> </span><span class="n">đúng</span><span class="w"> </span><span class="n">trong</span><span class="w"> </span><span class="n">Settings</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Test</span><span class="w"> </span><span class="n">lại</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="err">✅</span><span class="w"> </span><span class="n">OK</span>
+</code></pre></div>
+
+<h3 id="test-4-recording-khi-camera-chua-start"><strong>Test 4: Recording khi camera chưa start</strong></h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Start</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="p">(</span><span class="n">camera</span><span class="w"> </span><span class="n">chưa</span><span class="w"> </span><span class="n">start</span><span class="p">)</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s">&quot;Bắt đầu quay&quot;</span>
+<span class="w">   </span><span class="err">→</span><span class="w"> </span><span class="err">❌</span><span class="w"> </span><span class="n">Alert</span><span class="p">:</span><span class="w"> </span><span class="s">&quot;Camera chưa khởi động! Vui lòng Start Camera trước.&quot;</span>
+</code></pre></div>
+
+<hr />
+<h2 id="checklist-a-sua">📋 <strong>CHECKLIST ĐÃ SỬA:</strong></h2>
+<ul>
+<li>[x] App khởi động KHÔNG tự động bật camera</li>
+<li>[x] Dashboard hiển thị camera status</li>
+<li>[x] Endpoint <code>/test_camera</code> để test trước</li>
+<li>[x] Endpoint <code>/start_cameras</code> để bật manual</li>
+<li>[x] Endpoint <code>/stop_cameras</code> để dừng</li>
+<li>[x] Recording check camera trước khi cho phép</li>
+<li>[x] UI hiển thị placeholder khi camera chưa bật</li>
+<li>[x] JavaScript xử lý test/start/stop</li>
+<li>[x] Camera feed conditional rendering</li>
+</ul>
+<hr />
+<h2 id="chay-thoi">🚀 <strong>CHẠY THÔI!</strong></h2>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>eco_hub_demo
+python<span class="w"> </span>app.py
+</code></pre></div>
+
+<p><strong>Output mới:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="n">Config</span><span class="w"> </span><span class="n">loaded</span><span class="p">.</span><span class="w"> </span><span class="nl">Camera</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">(</span><span class="ow">NOT</span><span class="w"> </span><span class="n">STARTED</span><span class="w"> </span><span class="n">YET</span><span class="p">)</span>
+<span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="k">User</span><span class="w"> </span><span class="n">will</span><span class="w"> </span><span class="n">test</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="k">start</span><span class="w"> </span><span class="n">cameras</span><span class="w"> </span><span class="n">manually</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">dashboard</span>
+
+<span class="o">============================================================</span>
+<span class="w">  </span><span class="n">ECOHUB</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">SCANNER</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">READY</span>
+<span class="o">============================================================</span>
+<span class="w">  </span><span class="nl">URL</span><span class="p">:</span><span class="w"> </span><span class="nl">http</span><span class="p">:</span><span class="o">//</span><span class="mf">127.0.0.1</span><span class="err">:</span><span class="mi">5000</span>
+<span class="w">  </span><span class="n">Camera</span><span class="w"> </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="ow">NOT</span><span class="w"> </span><span class="n">STARTED</span><span class="w"> </span><span class="p">(</span><span class="n">manual</span><span class="w"> </span><span class="k">start</span><span class="w"> </span><span class="n">required</span><span class="p">)</span>
+<span class="w">  </span><span class="n">S3</span><span class="w"> </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="n">CONFIGURED</span>
+<span class="o">============================================================</span>
+</code></pre></div>
+
+<p><strong>App KHÔNG BAO GIỜ treo do camera lỗi!</strong> ✅</p>
+</body>
+</html>

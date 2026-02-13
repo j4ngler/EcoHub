@@ -1,0 +1,293 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CHANGELOG</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 24pt;
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            font-size: 18pt;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            font-size: 14pt;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+            background-color: #f9f9f9;
+            padding: 10px 15px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 10pt;
+        }
+        
+        table th {
+            background-color: #3498db;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin: 5px 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<h1 id="changelog">📝 CHANGELOG</h1>
+<p>Tất cả thay đổi quan trọng của dự án được ghi lại trong file này.</p>
+<hr />
+<h2 id="100-2026-02-09">[1.0.0] - 2026-02-09</h2>
+<h3 id="initial-release">🎉 Initial Release</h3>
+<h4 id="tinh-nang-moi">✨ Tính năng mới</h4>
+<p><strong>Camera &amp; AI:</strong>
+- ✅ Hỗ trợ camera USB và RTSP
+- ✅ Tối đa 2 cameras đồng thời
+- ✅ AI QR/Barcode scanner với ZXing-CPP
+- ✅ FPS tối ưu: 5 FPS (AI), 15 FPS (recording)
+- ✅ Cooldown 5 phút để tránh quét lại
+- ✅ Frame resize tối ưu (480px width)</p>
+<p><strong>Recording:</strong>
+- ✅ Tự động quay video khi quét QR
+- ✅ Async recording với separate thread
+- ✅ 90-frame buffer để không bị lag
+- ✅ Pause AI scanner khi đang quay
+- ✅ Clear frame queue sau khi stop</p>
+<p><strong>S3 Upload:</strong>
+- ✅ S3-compatible storage support
+- ✅ Upload queue với FIFO
+- ✅ Multipart upload (50MB threshold)
+- ✅ Retry mechanism cho failed uploads
+- ✅ Presigned URL để download
+- ✅ Fernet encryption cho credentials</p>
+<p><strong>Upload History:</strong>
+- ✅ Hiển thị tất cả videos (pending/uploading/success/failed)
+- ✅ Cleanup tự động vào 00:00 GMT+7 hàng ngày
+- ✅ Status tracking với thread-safe locking</p>
+<p><strong>Camera Management:</strong>
+- ✅ Safe startup: Không tự động bật camera
+- ✅ Test camera trước khi start
+- ✅ Start/Stop manual từ Settings page
+- ✅ Camera status badge realtime</p>
+<p><strong>UI/UX:</strong>
+- ✅ Bootstrap 5 responsive design
+- ✅ Tabbed interface (S3 videos / Upload history)
+- ✅ MJPEG streaming
+- ✅ Realtime status updates (1s polling)</p>
+<p><strong>Build &amp; Deploy:</strong>
+- ✅ PyInstaller build support
+- ✅ Inno Setup installer
+- ✅ Path handling cho bundled app
+- ✅ Config copy to user directory</p>
+<h4 id="bug-fixes">🐛 Bug Fixes</h4>
+<p><strong>Camera:</strong>
+- ✅ Fix RTSP buffer lag (set buffer size to 0)
+- ✅ Fix camera thread interval (10ms)
+- ✅ Fix frame queue race condition</p>
+<p><strong>AI Scanner:</strong>
+- ✅ Fix continuous recording (add cooldown)
+- ✅ Fix memory leak (periodic cleanup)
+- ✅ Fix FPS drop (remove time.sleep)
+- ✅ Switch from pyzbar to zxing-cpp (faster)</p>
+<p><strong>Recording:</strong>
+- ✅ Fix recording lag (async recorder)
+- ✅ Fix frame drop (90-frame buffer)
+- ✅ Fix old frames after recording (clear queue)</p>
+<p><strong>S3:</strong>
+- ✅ Fix settings lost on refresh (preserve s3_config)
+- ✅ Fix Unicode errors (UTF-8 console)
+- ✅ Fix timezone (GMT+7)</p>
+<p><strong>PyInstaller:</strong>
+- ✅ Fix missing static/templates
+- ✅ Fix missing config.key
+- ✅ Fix Flask template path
+- ✅ Fix writable config location</p>
+<p><strong>UI:</strong>
+- ✅ Fix Vietnamese language in Inno Setup (remove)
+- ✅ Fix upload status not showing (auto-queue local videos)</p>
+<h4 id="improvements">🔧 Improvements</h4>
+<p><strong>Performance:</strong>
+- ✅ Timestamp-based FPS control (no blocking)
+- ✅ Frame resize optimization (480px)
+- ✅ Queue-based threading (camera → AI)
+- ✅ Async video writer (separate thread)
+- ✅ Memory leak prevention (periodic cleanup)</p>
+<p><strong>Code Quality:</strong>
+- ✅ UTF-8 encoding for Windows console
+- ✅ English messages (no Vietnamese in logs)
+- ✅ Debug timing logs
+- ✅ Thread safety with locks
+- ✅ Error handling improvements</p>
+<p><strong>Configuration:</strong>
+- ✅ Max 2 cameras (was 4)
+- ✅ Camera controls moved to Settings
+- ✅ Encrypted S3 credentials
+- ✅ Config file in user directory</p>
+<p><strong>Documentation:</strong>
+- ✅ DOCS.md - Full system documentation
+- ✅ BUILD_GUIDE.md - Build instructions
+- ✅ CAMERA_SAFE_START.md - Camera startup guide
+- ✅ PYINSTALLER_FIX.md - Build fixes
+- ✅ README.md - Quick start guide
+- ✅ CHANGELOG.md - This file</p>
+<hr />
+<h2 id="statistics">📊 Statistics</h2>
+<p><strong>Total Changes:</strong>
+- Files modified: 15+
+- Lines of code: ~5,000+
+- Dependencies: 6 core + build tools
+- Threads: 6-8 concurrent
+- Build size: 88.5 MB (installer)</p>
+<p><strong>Performance Metrics:</strong>
+- Camera read: 25-30 FPS
+- AI scan: 5 FPS
+- Recording: 15 FPS
+- Upload: 10 MB/s chunks
+- Memory: Stable (cleanup every 60s)</p>
+<hr />
+<h2 id="migration-notes">🔄 Migration Notes</h2>
+<h3 id="from-development-to-production">From Development to Production</h3>
+<ol>
+<li>
+<p><strong>Config location changed:</strong>
+   <code>Dev:  eco_hub_demo/config.json
+   Prod: C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\config.json</code></p>
+</li>
+<li>
+<p><strong>Videos location changed:</strong>
+   <code>Dev:  eco_hub_demo/videos/
+   Prod: C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\videos/</code></p>
+</li>
+<li>
+<p><strong>Camera startup changed:</strong>
+   <code>Before: Auto-start on app launch
+   Now:    Manual start from Settings</code></p>
+</li>
+<li>
+<p><strong>Upload history changed:</strong>
+   <code>Before: 24-hour rolling window
+   Now:    Daily cleanup at 00:00</code></p>
+</li>
+</ol>
+<hr />
+<h2 id="known-issues">🐛 Known Issues</h2>
+<p>Không có known issues trong v1.0.0.</p>
+<hr />
+<h2 id="planned-features">🔮 Planned Features</h2>
+<h3 id="v110-future">v1.1.0 (Future)</h3>
+<ul>
+<li>[ ] Multiple S3 bucket support</li>
+<li>[ ] Video compression before upload</li>
+<li>[ ] Custom cooldown per QR code</li>
+<li>[ ] Export upload statistics</li>
+<li>[ ] Email notification on failed upload</li>
+<li>[ ] Camera preview in Settings page</li>
+<li>[ ] Dark mode UI</li>
+</ul>
+<hr />
+<h2 id="reporting-issues">📞 Reporting Issues</h2>
+<p>Nếu phát hiện lỗi, vui lòng:
+1. Check console logs
+2. Check DOCS.md → Section 9: Xử lý sự cố
+3. Liên hệ EcoHub Development Team</p>
+<hr />
+<p><strong>Format:</strong> [MAJOR.MINOR.PATCH]<br />
+<strong>Convention:</strong> <a href="https://semver.org/">Semantic Versioning 2.0.0</a></p>
+</body>
+</html>

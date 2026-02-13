@@ -1,0 +1,11 @@
+flask>=2.3.0
+opencv-python
+zxing-cpp>=2.2.0
+numpy
+boto3>=1.28.0
+cryptography>=41.0.0
+
+# Build dependencies (chỉ cần khi build EXE)
+# pyinstaller>=6.0.0
+
+

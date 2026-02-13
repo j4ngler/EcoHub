@@ -1,0 +1,143 @@
+/* EcoHub Demo - Giao diện thống nhất */
+:root {
+  --primary: #0d9488;
+  --primary-dark: #0f766e;
+  --bg-page: #f1f5f9;
+  --card-bg: #ffffff;
+  --card-border: #e2e8f0;
+  --text-muted: #64748b;
+}
+
+body {
+  background: var(--bg-page);
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Navbar */
+.navbar-ecohub {
+  background: linear-gradient(135deg, #0f766e 0%, #0d9488 100%) !important;
+  box-shadow: 0 2px 8px rgba(13, 148, 136, 0.2);
+}
+.navbar-ecohub .navbar-brand {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.navbar-ecohub .nav-link {
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem !important;
+  transition: background 0.2s;
+}
+.navbar-ecohub .nav-link:hover {
+  background: rgba(255,255,255,0.15);
+}
+.navbar-ecohub .nav-link.active {
+  background: rgba(255,255,255,0.25);
+  font-weight: 500;
+}
+
+/* Cards */
+.card-ecohub {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.card-ecohub .card-header {
+  background: transparent;
+  border-bottom: 1px solid var(--card-border);
+  font-weight: 600;
+  color: #334155;
+  padding: 0.75rem 1rem;
+  border-radius: 12px 12px 0 0;
+}
+.card-ecohub .card-body {
+  padding: 1rem;
+}
+
+/* Camera preview area */
+.camera-wrap {
+  background: #0f172a;
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.camera-wrap img {
+  width: 100%;
+  height: auto;
+  min-height: 240px;
+  object-fit: contain;
+  display: block;
+  background: #0f172a;
+}
+.camera-wrap .camera-placeholder {
+  color: #64748b;
+  padding: 2rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* Buttons */
+.btn-ecohub {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+  border-radius: 8px;
+  font-weight: 500;
+}
+.btn-ecohub:hover {
+  background: var(--primary-dark);
+  border-color: var(--primary-dark);
+  color: #fff;
+}
+
+/* Login page */
+.login-card {
+  max-width: 400px;
+  margin: 0 auto;
+  border-radius: 16px;
+  border: 1px solid var(--card-border);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+}
+.login-card .card-body {
+  padding: 2rem;
+}
+.login-card h1 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #0f766e;
+  margin-bottom: 1.5rem;
+}
+
+/* Status badge */
+.badge-status {
+  padding: 0.35em 0.65em;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+/* Table */
+.table-ecohub {
+  margin-bottom: 0;
+}
+.table-ecohub thead th {
+  border-bottom: 1px solid var(--card-border);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.table-ecohub tbody tr:hover {
+  background: #f8fafc;
+}
+
+/* Flash messages */
+.alert-ecohub {
+  border-radius: 10px;
+  border: none;
+}

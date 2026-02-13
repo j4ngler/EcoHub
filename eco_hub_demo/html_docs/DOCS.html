@@ -1,0 +1,968 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>DOCS</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 24pt;
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            font-size: 18pt;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            font-size: 14pt;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+            background-color: #f9f9f9;
+            padding: 10px 15px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 10pt;
+        }
+        
+        table th {
+            background-color: #3498db;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin: 5px 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<h1 id="tai-lieu-he-thong-ecohub-qr-scanner">📘 TÀI LIỆU HỆ THỐNG ECOHUB QR SCANNER</h1>
+<h2 id="muc-luc">📋 MỤC LỤC</h2>
+<ol>
+<li><a href="#1-tổng-quan-hệ-thống">Tổng quan hệ thống</a></li>
+<li><a href="#2-kiến-trúc-hệ-thống">Kiến trúc hệ thống</a></li>
+<li><a href="#3-cài-đặt-môi-trường-phát-triển">Cài đặt môi trường phát triển</a></li>
+<li><a href="#4-chạy-ứng-dụng-development">Chạy ứng dụng Development</a></li>
+<li><a href="#5-build-thành-file-exe">Build thành file EXE</a></li>
+<li><a href="#6-tạo-installer">Tạo Installer</a></li>
+<li><a href="#7-hướng-dẫn-sử-dụng">Hướng dẫn sử dụng</a></li>
+<li><a href="#8-cấu-hình-nâng-cao">Cấu hình nâng cao</a></li>
+<li><a href="#9-xử-lý-sự-cố">Xử lý sự cố</a></li>
+</ol>
+<hr />
+<h2 id="1-tong-quan-he-thong">1. TỔNG QUAN HỆ THỐNG</h2>
+<h3 id="muc-ich">🎯 Mục đích</h3>
+<p><strong>EcoHub QR Scanner</strong> là ứng dụng quét mã QR/Barcode, tự động quay video đóng gói đơn hàng và upload lên S3 storage.</p>
+<h3 id="tinh-nang-chinh">✨ Tính năng chính</h3>
+<h4 id="1-quet-ma-qrbarcode"><strong>1. Quét mã QR/Barcode</strong></h4>
+<ul>
+<li>Hỗ trợ camera USB và RTSP</li>
+<li>Tối đa 2 camera đồng thời</li>
+<li>AI tự động detect mã với ZXing-CPP</li>
+<li>FPS tối ưu: 5 FPS cho AI, 15 FPS cho video</li>
+<li>Cooldown 5 phút để tránh quét lại</li>
+</ul>
+<h4 id="2-quay-video-tu-ong"><strong>2. Quay video tự động</strong></h4>
+<ul>
+<li>Tự động bắt đầu khi quét được QR</li>
+<li>Asynchronous recording (thread riêng)</li>
+<li>Buffer 90 frames để không bị lag</li>
+<li>Pause AI scanner khi đang quay</li>
+<li>Timestamp GMT+7</li>
+</ul>
+<h4 id="3-upload-len-s3"><strong>3. Upload lên S3</strong></h4>
+<ul>
+<li>Hỗ trợ S3-compatible storage (AWS S3, CMC Cloud, MinIO...)</li>
+<li>Upload queue với multipart upload</li>
+<li>Retry mechanism cho failed uploads</li>
+<li>Presigned URL để download</li>
+<li>Encrypted credentials</li>
+</ul>
+<h4 id="4-quan-ly-camera"><strong>4. Quản lý camera</strong></h4>
+<ul>
+<li>Safe startup: Không tự động bật camera</li>
+<li>Test camera trước khi start</li>
+<li>Start/Stop manual từ Settings page</li>
+<li>Cấu hình USB/RTSP linh hoạt</li>
+</ul>
+<h4 id="5-upload-history"><strong>5. Upload History</strong></h4>
+<ul>
+<li>Hiển thị tất cả videos (pending/uploading/success)</li>
+<li>Cleanup tự động vào 00:00 hàng ngày</li>
+<li>Status realtime với locking</li>
+</ul>
+<hr />
+<h2 id="2-kien-truc-he-thong">2. KIẾN TRÚC HỆ THỐNG</h2>
+<h3 id="tech-stack">🏗️ Tech Stack</h3>
+<div class="codehilite"><pre><span></span><code>Frontend:
+├── HTML5/CSS3/JavaScript
+├── Bootstrap 5
+└── MJPEG Streaming
+
+Backend:
+├── Flask 2.3.0
+├── Python 3.11
+├── OpenCV (opencv-python)
+├── ZXing-CPP 2.2.0
+├── Boto3 (S3 SDK)
+└── Cryptography (Fernet encryption)
+</code></pre></div>
+
+<h3 id="cau-truc-thu-muc">📁 Cấu trúc thư mục</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">eco_hub_demo</span><span class="o">/</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">app</span><span class="o">.</span><span class="n">py</span><span class="w">                      </span><span class="c1"># Main Flask application</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="n">json</span><span class="w">                 </span><span class="c1"># Cấu hình camera + S3</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="n">key</span><span class="w">                  </span><span class="c1"># Encryption key</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">requirements</span><span class="o">.</span><span class="n">txt</span><span class="w">            </span><span class="c1"># Python dependencies</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">camera</span><span class="o">/</span><span class="w">                     </span><span class="c1"># Camera &amp; AI modules</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">camera_manager</span><span class="o">.</span><span class="n">py</span><span class="w">       </span><span class="c1"># Camera stream management</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">camera_stream</span><span class="o">.</span><span class="n">py</span><span class="w">        </span><span class="c1"># MJPEG streaming</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">ai_scanner</span><span class="o">.</span><span class="n">py</span><span class="w">           </span><span class="c1"># AI QR/Barcode scanner</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">recorder</span><span class="o">.</span><span class="n">py</span><span class="w">             </span><span class="c1"># Async video recorder</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">services</span><span class="o">/</span><span class="w">                   </span><span class="c1"># Business logic</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">s3_service</span><span class="o">.</span><span class="n">py</span><span class="w">           </span><span class="c1"># S3 upload/download</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">storage_service</span><span class="o">.</span><span class="n">py</span><span class="w">      </span><span class="c1"># Local storage management</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">order_service</span><span class="o">.</span><span class="n">py</span><span class="w">        </span><span class="c1"># Order info (mock)</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">config_encryption</span><span class="o">.</span><span class="n">py</span><span class="w">    </span><span class="c1"># Credential encryption</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">templates</span><span class="o">/</span><span class="w">                  </span><span class="c1"># HTML templates</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">base</span><span class="o">.</span><span class="n">html</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">dashboard</span><span class="o">.</span><span class="n">html</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">camera_settings</span><span class="o">.</span><span class="n">html</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">storage_settings</span><span class="o">.</span><span class="n">html</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">storage</span><span class="o">.</span><span class="n">html</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="k">static</span><span class="o">/</span><span class="w">                     </span><span class="c1"># CSS/JS files</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">css</span><span class="o">/</span><span class="n">style</span><span class="o">.</span><span class="n">css</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">js</span><span class="o">/</span><span class="n">main</span><span class="o">.</span><span class="n">js</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">videos</span><span class="o">/</span><span class="w">                     </span><span class="c1"># Local video storage</span>
+<span class="err">│</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">build</span><span class="o">.</span><span class="n">spec</span><span class="w">                  </span><span class="c1"># PyInstaller config</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">build_exe</span><span class="o">.</span><span class="n">bat</span><span class="w">               </span><span class="c1"># Build EXE script</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">build_installer</span><span class="o">.</span><span class="n">bat</span><span class="w">         </span><span class="c1"># Build installer script</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">setup</span><span class="o">.</span><span class="n">iss</span><span class="w">                   </span><span class="c1"># Inno Setup config</span>
+</code></pre></div>
+
+<h3 id="luong-hoat-ong">🔄 Luồng hoạt động</h3>
+<div class="codehilite"><pre><span></span><code><span class="k">[Camera USB/RTSP]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[Camera Manager Thread]  ← Đọc frames liên tục (10ms interval)</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="w">    </span><span class="na">[Queue] ← Frame buffer (maxsize</span><span class="o">=</span><span class="s">2)</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="na">[AI Scanner Thread]  ← Process frames (5 FPS, timestamp-based)</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="w">    </span><span class="k">[ZXing Decode]</span>
+<span class="w">        </span><span class="na">↓</span>
+<span class="k">[QR Code Detected] → [Cooldown Check] → [Trigger Recording]</span>
+<span class="w">        </span><span class="na">↓                                         ↓</span>
+<span class="k">[5-minute cooldown]                      [Async Recorder Thread]</span>
+<span class="w">                                                 </span><span class="na">↓</span>
+<span class="w">                                         </span><span class="k">[Video Writer (90-frame buffer)]</span>
+<span class="w">                                                 </span><span class="na">↓</span>
+<span class="w">                                         </span><span class="k">[Save to videos/]</span>
+<span class="w">                                                 </span><span class="na">↓</span>
+<span class="w">                                         </span><span class="k">[Upload Queue] → [S3 Upload Worker]</span>
+<span class="w">                                                                 </span><span class="na">↓</span>
+<span class="w">                                                         </span><span class="k">[S3 Storage]</span>
+</code></pre></div>
+
+<h3 id="threading-model">🧵 Threading Model</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Main</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="p">(</span><span class="n">Flask</span><span class="p">):</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">HTTP</span><span class="w"> </span><span class="n">Server</span><span class="w"> </span><span class="p">(</span><span class="n">port</span><span class="w"> </span><span class="mi">5000</span><span class="p">)</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">Route</span><span class="w"> </span><span class="n">handlers</span>
+
+<span class="n">Camera</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="mi">1</span><span class="o">-</span><span class="mi">2</span><span class="p">:</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Read</span><span class="w"> </span><span class="n">frames</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">camera</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Push</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">frame</span><span class="w"> </span><span class="n">queue</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">Push</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">recorder</span><span class="w"> </span><span class="n">queue</span><span class="w"> </span><span class="p">(</span><span class="k">if</span><span class="w"> </span><span class="n">recording</span><span class="p">)</span>
+
+<span class="n">AI</span><span class="w"> </span><span class="n">Scanner</span><span class="w"> </span><span class="n">Thread</span><span class="w"> </span><span class="mi">1</span><span class="o">-</span><span class="mi">2</span><span class="p">:</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Get</span><span class="w"> </span><span class="n">frames</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">queue</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Decode</span><span class="w"> </span><span class="n">QR</span><span class="o">/</span><span class="n">Barcode</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">Trigger</span><span class="w"> </span><span class="n">callbacks</span>
+
+<span class="n">Recorder</span><span class="w"> </span><span class="n">Thread</span><span class="p">:</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Get</span><span class="w"> </span><span class="n">frames</span><span class="w"> </span><span class="n">from</span><span class="w"> </span><span class="n">queue</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">Write</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">VideoWriter</span>
+
+<span class="n">Upload</span><span class="w"> </span><span class="n">Worker</span><span class="w"> </span><span class="n">Thread</span><span class="p">:</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Process</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">queue</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">Multipart</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">S3</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">Update</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="n">dict</span>
+</code></pre></div>
+
+<hr />
+<h2 id="3-cai-at-moi-truong-phat-trien">3. CÀI ĐẶT MÔI TRƯỜNG PHÁT TRIỂN</h2>
+<h3 id="yeu-cau-he-thong">📌 Yêu cầu hệ thống</h3>
+<ul>
+<li><strong>OS</strong>: Windows 10/11</li>
+<li><strong>Python</strong>: 3.11.x</li>
+<li><strong>RAM</strong>: Tối thiểu 4GB</li>
+<li><strong>Camera</strong>: USB hoặc RTSP stream</li>
+<li><strong>S3 Account</strong>: Access Key + Secret Key + Bucket</li>
+</ul>
+<h3 id="cai-at-python">🔧 Cài đặt Python</h3>
+<ol>
+<li>
+<p><strong>Download Python 3.11</strong>:
+   <code>https://www.python.org/downloads/</code></p>
+</li>
+<li>
+<p><strong>Cài đặt</strong> (check "Add Python to PATH"):
+   <code>bash
+   # Verify installation
+   python --version  # Python 3.11.x
+   pip --version</code></p>
+</li>
+</ol>
+<h3 id="cai-at-dependencies">📦 Cài đặt dependencies</h3>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>eco_hub_demo
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+</code></pre></div>
+
+<p><strong>Requirements:</strong></p>
+<div class="codehilite"><pre><span></span><code>flask&gt;=2.3.0
+opencv-python
+zxing-cpp&gt;=2.2.0
+numpy
+boto3&gt;=1.28.0
+cryptography&gt;=41.0.0
+</code></pre></div>
+
+<h3 id="cai-at-camera">🎥 Cài đặt camera</h3>
+<h4 id="usb-camera"><strong>USB Camera:</strong></h4>
+<ul>
+<li>Cắm camera USB vào máy</li>
+<li>Windows sẽ tự động nhận diện</li>
+</ul>
+<h4 id="rtsp-camera"><strong>RTSP Camera:</strong></h4>
+<ul>
+<li>Kiểm tra IP camera: <code>rtsp://&lt;ip&gt;:&lt;port&gt;/stream</code></li>
+<li>Test với VLC: Media → Open Network Stream</li>
+</ul>
+<hr />
+<h2 id="4-chay-ung-dung-development">4. CHẠY ỨNG DỤNG DEVELOPMENT</h2>
+<h3 id="khoi-ong-server">🚀 Khởi động server</h3>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>eco_hub_demo
+python<span class="w"> </span>app.py
+</code></pre></div>
+
+<p><strong>Console output:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="n">Scanning</span><span class="w"> </span><span class="k">for</span><span class="w"> </span><span class="k">local</span><span class="w"> </span><span class="n">videos</span><span class="w"> </span><span class="k">to</span><span class="w"> </span><span class="n">upload</span><span class="p">...</span>
+<span class="o">[</span><span class="n">S3</span><span class="o">]</span><span class="w"> </span><span class="n">Loaded</span><span class="w"> </span><span class="n">S3</span><span class="w"> </span><span class="nl">config</span><span class="p">:</span><span class="w"> </span><span class="o">&lt;</span><span class="n">bucket</span><span class="o">-</span><span class="n">name</span><span class="o">&gt;</span>
+<span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="n">Config</span><span class="w"> </span><span class="n">loaded</span><span class="p">.</span><span class="w"> </span><span class="nl">Camera</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="w"> </span><span class="p">(</span><span class="ow">NOT</span><span class="w"> </span><span class="n">STARTED</span><span class="w"> </span><span class="n">YET</span><span class="p">)</span>
+<span class="o">[</span><span class="n">STARTUP</span><span class="o">]</span><span class="w"> </span><span class="k">User</span><span class="w"> </span><span class="n">will</span><span class="w"> </span><span class="n">test</span><span class="w"> </span><span class="ow">and</span><span class="w"> </span><span class="k">start</span><span class="w"> </span><span class="n">cameras</span><span class="w"> </span><span class="n">manually</span><span class="w"> </span><span class="k">from</span><span class="w"> </span><span class="n">dashboard</span>
+
+<span class="o">============================================================</span>
+<span class="w">  </span><span class="n">ECOHUB</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">SCANNER</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">READY</span>
+<span class="o">============================================================</span>
+<span class="w">  </span><span class="nl">URL</span><span class="p">:</span><span class="w"> </span><span class="nl">http</span><span class="p">:</span><span class="o">//</span><span class="mf">127.0.0.1</span><span class="err">:</span><span class="mi">5000</span>
+<span class="w">  </span><span class="n">Camera</span><span class="w"> </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="ow">NOT</span><span class="w"> </span><span class="n">STARTED</span><span class="w"> </span><span class="p">(</span><span class="n">manual</span><span class="w"> </span><span class="k">start</span><span class="w"> </span><span class="n">required</span><span class="p">)</span>
+<span class="w">  </span><span class="n">S3</span><span class="w"> </span><span class="nl">Status</span><span class="p">:</span><span class="w"> </span><span class="n">CONFIGURED</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="ow">NOT</span><span class="w"> </span><span class="n">CONFIGURED</span>
+<span class="o">============================================================</span>
+
+<span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">Running</span><span class="w"> </span><span class="k">on</span><span class="w"> </span><span class="nl">http</span><span class="p">:</span><span class="o">//</span><span class="mf">127.0.0.1</span><span class="err">:</span><span class="mi">5000</span>
+</code></pre></div>
+
+<h3 id="truy-cap-ung-dung">🌐 Truy cập ứng dụng</h3>
+<div class="codehilite"><pre><span></span><code>http://127.0.0.1:5000
+</code></pre></div>
+
+<h3 id="login-mock">🔐 Login (Mock)</h3>
+<ul>
+<li>Username: bất kỳ</li>
+<li>Không cần password</li>
+</ul>
+<hr />
+<h2 id="5-build-thanh-file-exe">5. BUILD THÀNH FILE EXE</h2>
+<h3 id="yeu-cau">📋 Yêu cầu</h3>
+<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>pyinstaller&gt;<span class="o">=</span><span class="m">6</span>.0.0
+</code></pre></div>
+
+<h3 id="build-voi-script-tu-ong">🔨 Build với script tự động</h3>
+<div class="codehilite"><pre><span></span><code>build_exe.bat
+</code></pre></div>
+
+<p><strong>Script sẽ:</strong>
+1. Check PyInstaller
+2. Install dependencies
+3. Clean old build
+4. Build EXE với PyInstaller</p>
+<p><strong>Output:</strong></p>
+<div class="codehilite"><pre><span></span><code>dist/EcoHub_QR_Scanner/
+├── EcoHub_QR_Scanner.exe       (19 MB)
+└── _internal/                  (200+ MB)
+    ├── static/
+    ├── templates/
+    ├── config.json
+    ├── config.key
+    └── ... (Python runtime + libraries)
+</code></pre></div>
+
+<h3 id="build-manual">🔧 Build manual</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Clean</span>
+rmdir<span class="w"> </span>/s<span class="w"> </span>/q<span class="w"> </span>dist<span class="w"> </span>build
+
+<span class="c1"># Build</span>
+pyinstaller<span class="w"> </span>build.spec<span class="w"> </span>--clean
+</code></pre></div>
+
+<h3 id="cau-hinh-build-buildspec">⚙️ Cấu hình build (<code>build.spec</code>)</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Thêm/bớt files vào build</span>
+<span class="n">datas</span><span class="o">=</span><span class="p">[</span>
+    <span class="p">(</span><span class="s1">&#39;templates&#39;</span><span class="p">,</span> <span class="s1">&#39;templates&#39;</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;static&#39;</span><span class="p">,</span> <span class="s1">&#39;static&#39;</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;config.json&#39;</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;config.key&#39;</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">),</span>
+    <span class="p">(</span><span class="s1">&#39;README.md&#39;</span><span class="p">,</span> <span class="s1">&#39;.&#39;</span><span class="p">),</span>
+<span class="p">],</span>
+
+<span class="c1"># Thêm hidden imports nếu thiếu modules</span>
+<span class="n">hiddenimports</span><span class="o">=</span><span class="p">[</span>
+    <span class="s1">&#39;flask&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;cv2&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;numpy&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;boto3&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;botocore&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;cryptography&#39;</span><span class="p">,</span>
+    <span class="s1">&#39;zxingcpp&#39;</span><span class="p">,</span>
+<span class="p">],</span>
+
+<span class="c1"># Console mode (hiện console để debug)</span>
+<span class="n">console</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>  <span class="c1"># False để ẩn console</span>
+</code></pre></div>
+
+<h3 id="test-exe">🧪 Test EXE</h3>
+<div class="codehilite"><pre><span></span><code><span class="nb">cd</span><span class="w"> </span>dist<span class="se">\E</span>coHub_QR_Scanner
+EcoHub_QR_Scanner.exe
+</code></pre></div>
+
+<p><strong>Check:</strong>
+- ✅ App mở được
+- ✅ Console hiện logs
+- ✅ Browser tự động mở http://127.0.0.1:5000
+- ✅ Templates/Static load được
+- ✅ Config files copy vào <code>C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\</code></p>
+<hr />
+<h2 id="6-tao-installer">6. TẠO INSTALLER</h2>
+<h3 id="yeu-cau_1">📋 Yêu cầu</h3>
+<p><strong>Download Inno Setup:</strong></p>
+<div class="codehilite"><pre><span></span><code>https://jrsoftware.org/isdl.php
+</code></pre></div>
+
+<p><strong>Cài vào:</strong></p>
+<div class="codehilite"><pre><span></span><code>C:\Program Files (x86)\Inno Setup 6\
+</code></pre></div>
+
+<h3 id="build-installer">🔨 Build installer</h3>
+<div class="codehilite"><pre><span></span><code>build_installer.bat
+</code></pre></div>
+
+<p><strong>Script sẽ:</strong>
+1. Check Inno Setup installation
+2. Check EXE exists
+3. Build installer với Inno Setup</p>
+<p><strong>Output:</strong></p>
+<div class="codehilite"><pre><span></span><code>installer_output/
+└── EcoHub_QR_Scanner_Setup_v1.0.0.exe  (88 MB)
+</code></pre></div>
+
+<h3 id="build-manual_1">🔧 Build manual</h3>
+<div class="codehilite"><pre><span></span><code><span class="s2">&quot;C:\Program Files (x86)\Inno Setup 6\ISCC.exe&quot;</span><span class="w"> </span>setup.iss
+</code></pre></div>
+
+<h3 id="cau-hinh-installer-setupiss">⚙️ Cấu hình installer (<code>setup.iss</code>)</h3>
+<div class="codehilite"><pre><span></span><code><span class="o">;</span><span class="w"> </span><span class="nt">Version</span>
+<span class="p">#</span><span class="nn">define</span><span class="w"> </span><span class="nt">MyAppVersion</span><span class="w"> </span><span class="s2">&quot;1.0.0&quot;</span>
+
+<span class="o">;</span><span class="w"> </span><span class="nt">Cài</span><span class="w"> </span><span class="nt">vào</span>
+<span class="nt">DefaultDirName</span><span class="o">=</span><span class="p">{</span><span class="err">autopf</span><span class="p">}</span><span class="err">\</span><span class="p">{</span><span class="err">#MyAppName</span><span class="p">}</span>
+
+<span class="o">;</span><span class="w"> </span><span class="nt">Output</span>
+<span class="nt">OutputDir</span><span class="o">=</span><span class="nt">installer_output</span>
+<span class="nt">OutputBaseFilename</span><span class="o">=</span><span class="nt">EcoHub_QR_Scanner_Setup_v</span><span class="p">{</span><span class="err">#MyAppVersion</span><span class="p">}</span>
+
+<span class="o">;</span><span class="w"> </span><span class="nt">Files</span>
+<span class="nt">Source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;dist\EcoHub_QR_Scanner\*&quot;</span><span class="o">;</span>
+<span class="nt">Source</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;config.json&quot;</span><span class="o">;</span><span class="w"> </span><span class="nt">Flags</span><span class="o">:</span><span class="w"> </span><span class="nt">onlyifdoesntexist</span>
+</code></pre></div>
+
+<h3 id="installer-features">📦 Installer features</h3>
+<ul>
+<li>✅ Cài đặt tự động</li>
+<li>✅ Desktop shortcut</li>
+<li>✅ Start Menu shortcut</li>
+<li>✅ Uninstaller</li>
+<li>✅ Tự động tạo <code>videos</code> folder</li>
+<li>✅ Giữ <code>config.json</code> khi update</li>
+</ul>
+<hr />
+<h2 id="7-huong-dan-su-dung">7. HƯỚNG DẪN SỬ DỤNG</h2>
+<h3 id="lan-au-su-dung">🚀 Lần đầu sử dụng</h3>
+<h4 id="buoc-1-cai-at"><strong>Bước 1: Cài đặt</strong></h4>
+<ol>
+<li>Double-click <code>EcoHub_QR_Scanner_Setup_v1.0.0.exe</code></li>
+<li>Next → Next → Install</li>
+<li>Finish</li>
+</ol>
+<h4 id="buoc-2-khoi-ong"><strong>Bước 2: Khởi động</strong></h4>
+<ul>
+<li>Desktop: Double-click icon "EcoHub QR Scanner"</li>
+<li>Start Menu: Tìm "EcoHub QR Scanner"</li>
+</ul>
+<h4 id="buoc-3-login"><strong>Bước 3: Login</strong></h4>
+<ul>
+<li>Username: admin (hoặc bất kỳ)</li>
+<li>Click "Đăng nhập"</li>
+</ul>
+<h4 id="buoc-4-cai-at-camera"><strong>Bước 4: Cài đặt Camera</strong></h4>
+<ol>
+<li>
+<p><strong>Vào menu: ⚙️ Cài đặt camera</strong></p>
+</li>
+<li>
+<p><strong>Test camera:</strong></p>
+</li>
+<li>Click <strong>"Test Camera"</strong></li>
+<li>✅ OK: "Camera OK (usb)"</li>
+<li>
+<p>❌ Lỗi: Kiểm tra camera</p>
+</li>
+<li>
+<p><strong>Start camera:</strong></p>
+</li>
+<li>Click <strong>"Start Camera"</strong></li>
+<li>Confirm</li>
+<li>
+<p>Page reload → Camera feed hiển thị</p>
+</li>
+<li>
+<p><strong>Cấu hình camera (tùy chọn):</strong></p>
+</li>
+<li>Camera 1: USB hoặc RTSP</li>
+<li>Camera 2: Bật/Tắt</li>
+<li>Độ nhạy AI: Thấp/Trung bình/Cao</li>
+<li>Tự động quay khi quét QR: ☑ / ☐</li>
+<li>Click <strong>"Áp dụng"</strong></li>
+</ol>
+<h4 id="buoc-5-cai-at-s3"><strong>Bước 5: Cài đặt S3</strong></h4>
+<ol>
+<li>
+<p><strong>Vào menu: ☁️ Cài đặt S3</strong></p>
+</li>
+<li>
+<p><strong>Nhập thông tin:</strong>
+   <code>Endpoint: https://s3.amazonaws.com (hoặc CMC Cloud...)
+   Region: ap-southeast-1
+   Bucket: your-bucket-name
+   Access Key: AKIA...
+   Secret Key: ******</code></p>
+</li>
+<li>
+<p><strong>Click "Test kết nối"</strong></p>
+</li>
+<li>✅ OK: "Kết nối S3 thành công"</li>
+<li>
+<p>❌ Lỗi: Kiểm tra credentials</p>
+</li>
+<li>
+<p><strong>Click "Lưu cấu hình"</strong></p>
+</li>
+</ol>
+<h3 id="su-dung-hang-ngay">📹 Sử dụng hàng ngày</h3>
+<h4 id="dashboard"><strong>Dashboard:</strong></h4>
+<ol>
+<li><strong>Camera live feed</strong></li>
+<li>Hiển thị camera realtime</li>
+<li>AI tự động detect QR/Barcode</li>
+<li>
+<p>Badge status: Đang chạy / Chưa khởi động</p>
+</li>
+<li>
+<p><strong>Mã đơn hiện tại</strong></p>
+</li>
+<li>Hiển thị mã vừa quét</li>
+<li>
+<p>Button "Reset mã" để quét lại</p>
+</li>
+<li>
+<p><strong>Thông tin đơn hàng</strong></p>
+</li>
+<li>Order ID</li>
+<li>Platform</li>
+<li>
+<p>Items list</p>
+</li>
+<li>
+<p><strong>Quay video</strong></p>
+</li>
+<li>Trạng thái: Idle / Recording</li>
+<li>Thời gian: 00:00</li>
+<li><strong>Bắt đầu quay</strong> (manual)</li>
+<li><strong>Kết thúc</strong> (stop recording)</li>
+</ol>
+<h4 id="kho-luu-tru"><strong>Kho lưu trữ:</strong></h4>
+<ol>
+<li><strong>Tab "Video trên S3"</strong></li>
+<li>Danh sách videos đã upload</li>
+<li>Filename, Size, Last Modified</li>
+<li>
+<p>Actions: Download, Delete</p>
+</li>
+<li>
+<p><strong>Tab "Lịch sử upload"</strong></p>
+</li>
+<li>Pending: Chưa upload</li>
+<li>Uploading: Đang upload (progress %)</li>
+<li>Success: Upload thành công</li>
+<li>Failed: Upload lỗi</li>
+<li>Tự động xóa vào 00:00 hàng ngày</li>
+</ol>
+<h3 id="workflow-tu-ong">🔄 Workflow tự động</h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Nhân</span><span class="w"> </span><span class="n">viên</span><span class="w"> </span><span class="err">đó</span><span class="n">ng</span><span class="w"> </span><span class="n">gói</span><span class="w"> </span><span class="err">đơ</span><span class="n">n</span><span class="w"> </span><span class="n">hàng</span>
+<span class="w">         </span><span class="err">↓</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="err">đơ</span><span class="n">n</span><span class="w"> </span><span class="n">hàng</span><span class="w"> </span><span class="n">bằng</span><span class="w"> </span><span class="n">camera</span>
+<span class="w">         </span><span class="err">↓</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">App</span><span class="w"> </span><span class="n">detect</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Tự</span><span class="w"> </span><span class="err">độ</span><span class="n">ng</span><span class="w"> </span><span class="n">bắt</span><span class="w"> </span><span class="err">đầ</span><span class="n">u</span><span class="w"> </span><span class="n">quay</span><span class="w"> </span><span class="n">video</span>
+<span class="w">         </span><span class="err">↓</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Nhân</span><span class="w"> </span><span class="n">viên</span><span class="w"> </span><span class="err">đó</span><span class="n">ng</span><span class="w"> </span><span class="n">gói</span><span class="w"> </span><span class="p">(</span><span class="mi">15</span><span class="o">-</span><span class="mi">30</span><span class="n">s</span><span class="p">)</span>
+<span class="w">         </span><span class="err">↓</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Nhân</span><span class="w"> </span><span class="n">viên</span><span class="w"> </span><span class="n">click</span><span class="w"> </span><span class="s2">&quot;Kết thúc&quot;</span><span class="w"> </span><span class="n">hoặc</span><span class="w"> </span><span class="n">tự</span><span class="w"> </span><span class="err">độ</span><span class="n">ng</span><span class="w"> </span><span class="n">stop</span>
+<span class="w">         </span><span class="err">↓</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Video</span><span class="w"> </span><span class="n">lưu</span><span class="w"> </span><span class="n">vào</span><span class="w"> </span><span class="n">local</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">tự</span><span class="w"> </span><span class="err">độ</span><span class="n">ng</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">S3</span>
+<span class="w">         </span><span class="err">↓</span>
+<span class="mf">7.</span><span class="w"> </span><span class="n">Upload</span><span class="w"> </span><span class="n">thành</span><span class="w"> </span><span class="n">công</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Xóa</span><span class="w"> </span><span class="n">file</span><span class="w"> </span><span class="n">local</span>
+<span class="w">         </span><span class="err">↓</span>
+<span class="mf">8.</span><span class="w"> </span><span class="n">Cooldown</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="n">phút</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Sẵn</span><span class="w"> </span><span class="n">sàng</span><span class="w"> </span><span class="n">quét</span><span class="w"> </span><span class="n">mã</span><span class="w"> </span><span class="n">tiếp</span><span class="w"> </span><span class="n">theo</span>
+</code></pre></div>
+
+<hr />
+<h2 id="8-cau-hinh-nang-cao">8. CẤU HÌNH NÂNG CAO</h2>
+<h3 id="file-configjson">📝 File <code>config.json</code></h3>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;cameras&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">&quot;source_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;usb&quot;</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;camera_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1280</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;height&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">720</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;fps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">&quot;rtsp_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">],</span>
+<span class="w">  </span><span class="nt">&quot;scan_sensitivity&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;normal&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;scan_interval_sec&quot;</span><span class="p">:</span><span class="w"> </span><span class="mf">0.05</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;auto_record_on_qr&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;storage_mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;s3&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;s3_config&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">&quot;endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;region&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ap-southeast-1&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;bucket&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;bucket-name&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;access_key_encrypted&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">&quot;secret_key_encrypted&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="encryption">🔐 Encryption</h3>
+<p><strong>File <code>config.key</code>:</strong>
+- Fernet symmetric encryption
+- 44 bytes, base64-encoded
+- Tự động tạo khi first run
+- Lưu ở <code>C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\config.key</code></p>
+<p><strong>Encrypted fields:</strong>
+- S3 Access Key
+- S3 Secret Key</p>
+<h3 id="camera-parameters">🎥 Camera parameters</h3>
+<p><strong>USB Camera:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;source_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;usb&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;camera_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="w">  </span><span class="c1">// 0, 1, 2...</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>RTSP Camera:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;source_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rtsp&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;rtsp_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;rtsp://admin:password@192.168.1.100:554/stream&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<p><strong>Resolution &amp; FPS:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1280</span><span class="p">,</span><span class="w">    </span><span class="c1">// 640, 1280, 1920</span>
+<span class="w">  </span><span class="nt">&quot;height&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">720</span><span class="p">,</span><span class="w">    </span><span class="c1">// 480, 720, 1080</span>
+<span class="w">  </span><span class="nt">&quot;fps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span><span class="w">         </span><span class="c1">// 15, 20, 25, 30</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="ai-scanner-parameters">🤖 AI Scanner parameters</h3>
+<p><strong>Sensitivity:</strong>
+- <code>"low"</code>: 0.1s interval (10 FPS)
+- <code>"normal"</code>: 0.05s interval (20 FPS)
+- <code>"high"</code>: 0.03s interval (33 FPS)</p>
+<p><strong>Cooldown:</strong>
+- Default: 300s (5 phút)
+- Sửa trong <code>camera/ai_scanner.py</code>:
+  <code>python
+  COOLDOWN_SECONDS = 5 * 60  # 5 minutes</code></p>
+<h3 id="recording-parameters">📹 Recording parameters</h3>
+<p><strong>FPS:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/recorder.py</span>
+<span class="n">recorder</span><span class="o">.</span><span class="n">start</span><span class="p">(</span><span class="n">video_path</span><span class="p">,</span> <span class="n">frame_size</span><span class="o">=</span><span class="p">(</span><span class="mi">1280</span><span class="p">,</span> <span class="mi">720</span><span class="p">),</span> <span class="n">fps</span><span class="o">=</span><span class="mf">15.0</span><span class="p">)</span>
+</code></pre></div>
+
+<p><strong>Buffer size:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/recorder.py</span>
+<span class="n">_frame_queue</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">Queue</span><span class="p">(</span><span class="n">maxsize</span><span class="o">=</span><span class="mi">90</span><span class="p">)</span>  <span class="c1"># 90 frames = 6s @ 15 FPS</span>
+</code></pre></div>
+
+<h3 id="s3-parameters">☁️ S3 parameters</h3>
+<p><strong>Multipart upload:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># services/s3_service.py</span>
+<span class="n">MULTIPART_THRESHOLD</span> <span class="o">=</span> <span class="mi">50</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>  <span class="c1"># 50 MB</span>
+<span class="n">MULTIPART_CHUNKSIZE</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span>  <span class="c1"># 10 MB chunks</span>
+</code></pre></div>
+
+<p><strong>Presigned URL expiration:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># app.py</span>
+<span class="n">url</span> <span class="o">=</span> <span class="n">s3_service</span><span class="o">.</span><span class="n">generate_presigned_url</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="n">expiration</span><span class="o">=</span><span class="mi">3600</span><span class="p">)</span>  <span class="c1"># 1 hour</span>
+</code></pre></div>
+
+<hr />
+<h2 id="9-xu-ly-su-co">9. XỬ LÝ SỰ CỐ</h2>
+<h3 id="loi-thuong-gap">❌ Lỗi thường gặp</h3>
+<h4 id="1-camera-khong-khoi-ong"><strong>1. Camera không khởi động</strong></h4>
+<p><strong>Triệu chứng:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="o">[</span><span class="n">ERROR</span><span class="o">]</span><span class="w"> </span><span class="n">Cannot</span><span class="w"> </span><span class="k">open</span><span class="w"> </span><span class="nl">camera</span><span class="p">:</span><span class="w"> </span><span class="k">index</span><span class="w"> </span><span class="mi">0</span>
+</code></pre></div>
+
+<p><strong>Nguyên nhân:</strong>
+- Camera chưa cắm
+- Driver chưa cài
+- Camera đang được dùng bởi app khác</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Check camera</span>
+<span class="m">1</span>.<span class="w"> </span>Cắm<span class="w"> </span>lại<span class="w"> </span>camera<span class="w"> </span>USB
+<span class="m">2</span>.<span class="w"> </span>Device<span class="w"> </span>Manager<span class="w"> </span>→<span class="w"> </span>Cameras<span class="w"> </span>→<span class="w"> </span>Check<span class="w"> </span>driver
+<span class="m">3</span>.<span class="w"> </span>Đóng<span class="w"> </span>Skype,<span class="w"> </span>Teams,<span class="w"> </span>Zoom...
+<span class="m">4</span>.<span class="w"> </span>Restart<span class="w"> </span>app
+</code></pre></div>
+
+<h4 id="2-rtsp-timeout"><strong>2. RTSP timeout</strong></h4>
+<p><strong>Triệu chứng:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="o">[</span><span class="n">ERROR</span><span class="o">]</span><span class="w"> </span><span class="n">RTSP</span><span class="w"> </span><span class="k">connection</span><span class="w"> </span><span class="n">timeout</span>
+</code></pre></div>
+
+<p><strong>Nguyên nhân:</strong>
+- IP camera không khả dụng
+- URL sai
+- Firewall block</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Test với VLC</span>
+<span class="m">1</span>.<span class="w"> </span>VLC<span class="w"> </span>→<span class="w"> </span>Media<span class="w"> </span>→<span class="w"> </span>Open<span class="w"> </span>Network<span class="w"> </span>Stream
+<span class="m">2</span>.<span class="w"> </span>Nhập<span class="w"> </span>RTSP<span class="w"> </span>URL
+<span class="m">3</span>.<span class="w"> </span>Nếu<span class="w"> </span>VLC<span class="w"> </span>OK<span class="w"> </span>→<span class="w"> </span>Check<span class="w"> </span>firewall
+<span class="m">4</span>.<span class="w"> </span>Nếu<span class="w"> </span>VLC<span class="w"> </span>lỗi<span class="w"> </span>→<span class="w"> </span>Check<span class="w"> </span>IP,<span class="w"> </span>username,<span class="w"> </span>password
+</code></pre></div>
+
+<h4 id="3-s3-upload-failed"><strong>3. S3 upload failed</strong></h4>
+<p><strong>Triệu chứng:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="p">[</span><span class="n">UPLOAD</span><span class="w"> </span><span class="n">WORKER</span><span class="p">]</span><span class="w"> </span><span class="n">Failed</span><span class="o">:</span><span class="w"> </span><span class="n">Access</span><span class="w"> </span><span class="n">Denied</span>
+</code></pre></div>
+
+<p><strong>Nguyên nhân:</strong>
+- Credentials sai
+- Bucket không tồn tại
+- Permission không đủ</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="m">1</span>.<span class="w"> </span>Vào<span class="w"> </span><span class="s2">&quot;Cài đặt S3&quot;</span>
+<span class="m">2</span>.<span class="w"> </span>Click<span class="w"> </span><span class="s2">&quot;Test kết nối&quot;</span>
+<span class="m">3</span>.<span class="w"> </span>Check<span class="w"> </span>logs<span class="w"> </span>để<span class="w"> </span>xem<span class="w"> </span>lỗi<span class="w"> </span>chi<span class="w"> </span>tiết
+<span class="m">4</span>.<span class="w"> </span>Verify:
+<span class="w">   </span>-<span class="w"> </span>Access<span class="w"> </span>Key<span class="w"> </span>đúng
+<span class="w">   </span>-<span class="w"> </span>Secret<span class="w"> </span>Key<span class="w"> </span>đúng
+<span class="w">   </span>-<span class="w"> </span>Bucket<span class="w"> </span>name<span class="w"> </span>đúng
+<span class="w">   </span>-<span class="w"> </span>IAM<span class="w"> </span>permissions:<span class="w"> </span>s3:PutObject,<span class="w"> </span>s3:GetObject,<span class="w"> </span>s3:DeleteObject
+</code></pre></div>
+
+<h4 id="4-templates-not-found-pyinstaller"><strong>4. Templates not found (PyInstaller)</strong></h4>
+<p><strong>Triệu chứng:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">TemplateNotFound</span><span class="o">:</span><span class="w"> </span><span class="n">dashboard</span><span class="o">.</span><span class="na">html</span>
+</code></pre></div>
+
+<p><strong>Nguyên nhân:</strong>
+- Build thiếu templates folder</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Check build.spec</span>
+<span class="n">datas</span><span class="o">=</span><span class="p">[</span>
+    <span class="p">(</span><span class="s1">&#39;templates&#39;</span><span class="p">,</span> <span class="s1">&#39;templates&#39;</span><span class="p">),</span>  <span class="c1"># ← Phải có dòng này</span>
+    <span class="p">(</span><span class="s1">&#39;static&#39;</span><span class="p">,</span> <span class="s1">&#39;static&#39;</span><span class="p">),</span>
+<span class="p">]</span>
+
+<span class="c1"># Rebuild</span>
+<span class="n">pyinstaller</span> <span class="n">build</span><span class="o">.</span><span class="n">spec</span> <span class="o">--</span><span class="n">clean</span>
+</code></pre></div>
+
+<h4 id="5-unicodeencodeerror-windows-console"><strong>5. UnicodeEncodeError (Windows console)</strong></h4>
+<p><strong>Triệu chứng:</strong></p>
+<div class="codehilite"><pre><span></span><code>UnicodeEncodeError: &#39;charmap&#39; codec can&#39;t encode character &#39;\u1eae&#39;
+</code></pre></div>
+
+<p><strong>Nguyên nhân:</strong>
+- Windows console không hỗ trợ UTF-8</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># app.py (đã có)</span>
+<span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s1">&#39;win32&#39;</span><span class="p">:</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stdout</span><span class="o">.</span><span class="n">reconfigure</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+    <span class="n">sys</span><span class="o">.</span><span class="n">stderr</span><span class="o">.</span><span class="n">reconfigure</span><span class="p">(</span><span class="n">encoding</span><span class="o">=</span><span class="s1">&#39;utf-8&#39;</span><span class="p">)</span>
+</code></pre></div>
+
+<h4 id="6-video-lag-5-giay"><strong>6. Video lag 5 giây</strong></h4>
+<p><strong>Triệu chứng:</strong>
+- Video chậm hơn real-time 5 giây</p>
+<p><strong>Nguyên nhân:</strong>
+- RTSP buffer
+- Frame queue full</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/camera_manager.py (đã fix)</span>
+<span class="n">cap</span><span class="o">.</span><span class="n">set</span><span class="p">(</span><span class="n">cv2</span><span class="o">.</span><span class="n">CAP_PROP_BUFFERSIZE</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>  <span class="c1"># No buffer for RTSP</span>
+</code></pre></div>
+
+<h4 id="7-memory-leak-app-cham-dan"><strong>7. Memory leak (app chậm dần)</strong></h4>
+<p><strong>Triệu chứng:</strong>
+- App càng chạy càng chậm
+- RAM tăng liên tục</p>
+<p><strong>Nguyên nhân:</strong>
+- <code>_code_history</code> dict không giới hạn</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/ai_scanner.py (đã fix)</span>
+<span class="c1"># Cleanup old history mỗi 60s</span>
+<span class="k">if</span> <span class="n">current_time</span> <span class="o">-</span> <span class="n">last_cleanup_time</span> <span class="o">&gt;</span> <span class="n">CLEANUP_INTERVAL</span><span class="p">:</span>
+    <span class="n">old_keys</span> <span class="o">=</span> <span class="p">[</span><span class="n">k</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">_code_history</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> 
+                <span class="k">if</span> <span class="n">current_time</span> <span class="o">-</span> <span class="n">v</span> <span class="o">&gt;</span> <span class="n">COOLDOWN_SECONDS</span><span class="p">]</span>
+    <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">old_keys</span><span class="p">:</span>
+        <span class="k">del</span> <span class="n">_code_history</span><span class="p">[</span><span class="n">k</span><span class="p">]</span>
+</code></pre></div>
+
+<h3 id="debug-tips">🐛 Debug tips</h3>
+<h4 id="1-check-logs"><strong>1. Check logs:</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Development</span>
+python<span class="w"> </span>app.py<span class="w">  </span><span class="c1"># Console output</span>
+
+<span class="c1"># Production (EXE)</span>
+EcoHub_QR_Scanner.exe<span class="w">  </span><span class="c1"># Console hiển thị logs</span>
+</code></pre></div>
+
+<h4 id="2-enable-debug-timing"><strong>2. Enable debug timing:</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/ai_scanner.py</span>
+<span class="p">[</span><span class="n">AI</span> <span class="n">DEBUG</span><span class="p">]</span> <span class="n">fps</span><span class="o">=</span><span class="mf">5.2</span><span class="p">,</span> <span class="n">queue</span><span class="o">=</span><span class="mi">1</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">drop</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">t_total</span><span class="o">=</span><span class="mf">0.189</span><span class="n">s</span><span class="p">,</span> <span class="o">...</span>
+</code></pre></div>
+
+<h4 id="3-check-camera-status"><strong>3. Check camera status:</strong></h4>
+<div class="codehilite"><pre><span></span><code>Dashboard → Camera status badge
+Settings → Camera Control Panel
+</code></pre></div>
+
+<h4 id="4-check-upload-status"><strong>4. Check upload status:</strong></h4>
+<div class="codehilite"><pre><span></span><code><span class="n">Kho</span><span class="w"> </span><span class="n">lưu</span><span class="w"> </span><span class="n">trữ</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Tab</span><span class="w"> </span><span class="s2">&quot;Lịch sử upload&quot;</span>
+</code></pre></div>
+
+<h4 id="5-check-s3-connection"><strong>5. Check S3 connection:</strong></h4>
+<div class="codehilite"><pre><span></span><code>Cài đặt S3 → Test kết nối
+</code></pre></div>
+
+<h3 id="support">📞 Support</h3>
+<p><strong>Issues:</strong>
+- Check console logs
+- Check <code>warn-build.txt</code> (nếu build lỗi)
+- Check camera permissions
+- Check S3 credentials</p>
+<p><strong>Performance:</strong>
+- Camera FPS: 15-30 FPS
+- AI FPS: 5 FPS
+- Recording FPS: 15 FPS
+- Upload speed: Phụ thuộc bandwidth</p>
+<hr />
+<h2 id="phu-luc">📚 PHỤ LỤC</h2>
+<h3 id="a-keyboard-shortcuts">A. Keyboard Shortcuts</h3>
+<p>Không có (sử dụng GUI)</p>
+<h3 id="b-api-endpoints">B. API Endpoints</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="w">                      </span><span class="n">Login</span><span class="w"> </span><span class="n">page</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="w">                      </span><span class="n">Login</span><span class="w"> </span><span class="n">submit</span>
+<span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">dashboard</span><span class="w">             </span><span class="n">Dashboard</span>
+<span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">camera</span><span class="o">-</span><span class="n">settings</span><span class="w">       </span><span class="n">Camera</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="n">page</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">camera</span><span class="o">-</span><span class="n">settings</span><span class="w">       </span><span class="n">Save</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">settings</span>
+<span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">storage</span><span class="o">-</span><span class="n">settings</span><span class="w">      </span><span class="n">S3</span><span class="w"> </span><span class="n">settings</span><span class="w"> </span><span class="n">page</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">storage</span><span class="o">-</span><span class="n">settings</span><span class="w">      </span><span class="n">Save</span><span class="w"> </span><span class="n">S3</span><span class="w"> </span><span class="n">settings</span>
+<span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">storage</span><span class="w">               </span><span class="n">Storage</span><span class="w"> </span><span class="n">page</span><span class="w"> </span><span class="p">(</span><span class="n">videos</span><span class="p">)</span>
+<span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">upload</span><span class="o">-</span><span class="n">status</span><span class="w">         </span><span class="n">Upload</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="n">API</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">test_camera</span><span class="w">           </span><span class="n">Test</span><span class="w"> </span><span class="n">camera</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">start_cameras</span><span class="w">         </span><span class="n">Start</span><span class="w"> </span><span class="n">cameras</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">stop_cameras</span><span class="w">          </span><span class="n">Stop</span><span class="w"> </span><span class="n">cameras</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">start_recording</span><span class="w">       </span><span class="n">Start</span><span class="w"> </span><span class="n">recording</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">stop_recording</span><span class="w">        </span><span class="n">Stop</span><span class="w"> </span><span class="n">recording</span>
+<span class="n">POST</span><span class="w"> </span><span class="o">/</span><span class="n">reset_order</span><span class="w">           </span><span class="n">Reset</span><span class="w"> </span><span class="n">order</span><span class="w"> </span><span class="n">code</span>
+<span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">video_feed</span><span class="w">            </span><span class="n">MJPEG</span><span class="w"> </span><span class="n">stream</span>
+<span class="n">GET</span><span class="w">  </span><span class="o">/</span><span class="n">status</span><span class="w">                </span><span class="n">Realtime</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="n">API</span>
+</code></pre></div>
+
+<h3 id="c-files-location">C. Files Location</h3>
+<p><strong>Development:</strong></p>
+<div class="codehilite"><pre><span></span><code>eco_hub_demo/
+├── config.json
+├── config.key
+└── videos/
+</code></pre></div>
+
+<p><strong>Production (PyInstaller):</strong></p>
+<div class="codehilite"><pre><span></span><code>C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\
+├── config.json
+├── config.key
+└── videos\
+</code></pre></div>
+
+<p><strong>Installed:</strong></p>
+<div class="codehilite"><pre><span></span><code>C:\Program Files\EcoHub QR Scanner\
+├── EcoHub_QR_Scanner.exe
+└── _internal\
+    ├── static\
+    ├── templates\
+    ├── config.json (default)
+    └── config.key (default)
+</code></pre></div>
+
+<h3 id="d-dependencies-version">D. Dependencies Version</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">Python</span><span class="o">:</span><span class="w"> </span><span class="mf">3.11</span><span class="o">.</span><span class="na">x</span>
+<span class="n">Flask</span><span class="o">:</span><span class="w"> </span><span class="mf">2.3</span><span class="o">.</span><span class="mi">0</span><span class="o">+</span>
+<span class="n">OpenCV</span><span class="o">:</span><span class="w"> </span><span class="n">Latest</span>
+<span class="n">ZXing</span><span class="o">-</span><span class="n">CPP</span><span class="o">:</span><span class="w"> </span><span class="mf">2.2</span><span class="o">.</span><span class="mi">0</span><span class="o">+</span>
+<span class="n">Boto3</span><span class="o">:</span><span class="w"> </span><span class="mf">1.28</span><span class="o">.</span><span class="mi">0</span><span class="o">+</span>
+<span class="n">Cryptography</span><span class="o">:</span><span class="w"> </span><span class="mf">41.0</span><span class="o">.</span><span class="mi">0</span><span class="o">+</span>
+<span class="n">NumPy</span><span class="o">:</span><span class="w"> </span><span class="n">Latest</span>
+<span class="n">PyInstaller</span><span class="o">:</span><span class="w"> </span><span class="mf">6.0</span><span class="o">.</span><span class="mi">0</span><span class="o">+</span><span class="w"> </span><span class="o">(</span><span class="n">build</span><span class="w"> </span><span class="n">only</span><span class="o">)</span>
+<span class="n">Inno</span><span class="w"> </span><span class="n">Setup</span><span class="o">:</span><span class="w"> </span><span class="mf">6.7</span><span class="o">.</span><span class="mi">0</span><span class="w"> </span><span class="o">(</span><span class="n">installer</span><span class="w"> </span><span class="n">only</span><span class="o">)</span>
+</code></pre></div>
+
+<h3 id="e-browser-support">E. Browser Support</h3>
+<ul>
+<li>Chrome/Edge: ✅ Recommended</li>
+<li>Firefox: ✅ OK</li>
+<li>Safari: ⚠️ Limited MJPEG support</li>
+</ul>
+<h3 id="f-camera-support">F. Camera Support</h3>
+<p><strong>Tested:</strong>
+- Logitech C920
+- Generic USB webcam
+- RTSP IP cameras (Hikvision, Dahua)</p>
+<p><strong>Requirements:</strong>
+- Resolution: 640x480 minimum, 1920x1080 maximum
+- FPS: 15+ FPS
+- Format: MJPEG, H.264</p>
+<hr />
+<h2 id="license">📄 LICENSE</h2>
+<p>Copyright © 2026 EcoHub Team. All rights reserved.</p>
+<hr />
+<p><strong>Phiên bản:</strong> 1.0.0<br />
+<strong>Cập nhật:</strong> 09/02/2026<br />
+<strong>Tác giả:</strong> EcoHub Development Team</p>
+</body>
+</html>

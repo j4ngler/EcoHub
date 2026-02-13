@@ -1,0 +1,636 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>USER_MANUAL</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 24pt;
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            font-size: 18pt;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            font-size: 14pt;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+            background-color: #f9f9f9;
+            padding: 10px 15px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 10pt;
+        }
+        
+        table th {
+            background-color: #3498db;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin: 5px 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<h1 id="huong-dan-su-dung-ecohub-qr-scanner">👤 HƯỚNG DẪN SỬ DỤNG - ECOHUB QR SCANNER</h1>
+<p><strong>Dành cho người dùng cuối (End User)</strong></p>
+<hr />
+<h2 id="cai-at">📦 CÀI ĐẶT</h2>
+<h3 id="buoc-1-chay-installer">Bước 1: Chạy Installer</h3>
+<ol>
+<li>Double-click file <code>EcoHub_QR_Scanner_Setup_v1.0.0.exe</code></li>
+<li>Chọn <strong>Next</strong></li>
+<li>Chọn thư mục cài đặt (mặc định: <code>C:\Program Files\EcoHub QR Scanner\</code>)</li>
+<li>Chọn <strong>Install</strong></li>
+<li>Đợi cài đặt hoàn tất (~1-2 phút)</li>
+<li>Chọn <strong>Finish</strong></li>
+</ol>
+<h3 id="buoc-2-khoi-ong-app">Bước 2: Khởi động App</h3>
+<p><strong>Cách 1:</strong> Double-click icon "EcoHub QR Scanner" trên <strong>Desktop</strong></p>
+<p><strong>Cách 2:</strong> Start Menu → Tìm "EcoHub QR Scanner" → Click</p>
+<p><strong>App sẽ:</strong>
+- Mở console window (hiển thị logs)
+- Tự động mở browser: http://127.0.0.1:5000
+- Hiển thị trang login</p>
+<hr />
+<h2 id="ang-nhap">🔐 ĐĂNG NHẬP</h2>
+<ol>
+<li>Nhập <strong>Username</strong> (bất kỳ, ví dụ: <code>admin</code>)</li>
+<li>Click <strong>"Đăng nhập"</strong></li>
+<li>Vào trang <strong>Dashboard</strong></li>
+</ol>
+<hr />
+<h2 id="cau-hinh-lan-au">⚙️ CẤU HÌNH LẦN ĐẦU</h2>
+<h3 id="1-cai-at-camera">1️⃣ Cài đặt Camera</h3>
+<h4 id="buoc-1-vao-menu"><strong>Bước 1: Vào menu</strong></h4>
+<ul>
+<li>Click <strong>"⚙️ Cài đặt camera"</strong> trên thanh menu</li>
+</ul>
+<h4 id="buoc-2-test-camera"><strong>Bước 2: Test Camera</strong></h4>
+<ul>
+<li>Click nút <strong>"Test Camera"</strong></li>
+<li>Chờ 1-2 giây</li>
+<li>Kết quả:</li>
+<li>✅ <strong>"Camera OK (usb)"</strong> → Camera hoạt động bình thường</li>
+<li>❌ <strong>"Lỗi camera: ..."</strong> → Camera có vấn đề</li>
+</ul>
+<p><strong>Nếu lỗi camera:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Kiểm</span><span class="w"> </span><span class="n">tra</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">USB</span><span class="w"> </span><span class="n">đã</span><span class="w"> </span><span class="n">cắm</span><span class="w"> </span><span class="n">chưa</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Kiểm</span><span class="w"> </span><span class="n">tra</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">có</span><span class="w"> </span><span class="n">đang</span><span class="w"> </span><span class="n">được</span><span class="w"> </span><span class="n">dùng</span><span class="w"> </span><span class="n">bởi</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="n">khác</span><span class="w"> </span><span class="n">không</span><span class="w"> </span><span class="p">(</span><span class="n">Skype</span><span class="p">,</span><span class="w"> </span><span class="n">Zoom</span><span class="p">,</span><span class="w"> </span><span class="n">Teams</span><span class="mf">...</span><span class="p">)</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Thử</span><span class="w"> </span><span class="n">lại</span><span class="w"> </span><span class="s">&quot;Test Camera&quot;</span>
+</code></pre></div>
+
+<h4 id="buoc-3-start-camera"><strong>Bước 3: Start Camera</strong></h4>
+<ul>
+<li>Click nút <strong>"Start Camera"</strong></li>
+<li>Confirm "Bắt đầu camera?"</li>
+<li>Đợi 2-3 giây</li>
+<li>Page tự động reload</li>
+<li><strong>Xem trước</strong> ở dưới cùng sẽ hiển thị hình ảnh camera</li>
+</ul>
+<h4 id="buoc-4-cau-hinh-camera-tuy-chon"><strong>Bước 4: Cấu hình Camera (tùy chọn)</strong></h4>
+<p><strong>Camera 1:</strong>
+- ☑ <strong>Bật</strong> (đã bật mặc định)
+- Chọn nguồn: <strong>[USB]</strong> hoặc <strong>[RTSP]</strong>
+- USB: Chọn Camera 0, 1, 2...
+- RTSP: Nhập URL <code>rtsp://...</code></p>
+<p><strong>Camera 2:</strong>
+- ☐ <strong>Bật</strong> để thêm camera thứ 2
+- Tương tự Camera 1</p>
+<p><strong>Độ nhạy AI:</strong>
+- <strong>Thấp</strong> - Chậm nhưng chính xác
+- <strong>Trung bình</strong> - Cân bằng (khuyến nghị)
+- <strong>Cao</strong> - Nhanh nhưng tốn CPU</p>
+<p><strong>Tự động quay:</strong>
+- ☑ <strong>Bật</strong> - Tự động quay khi quét được QR (khuyến nghị)
+- ☐ <strong>Tắt</strong> - Phải click "Bắt đầu quay" manual</p>
+<p><strong>Click "Áp dụng"</strong> để lưu cấu hình.</p>
+<hr />
+<h3 id="2-cai-at-s3-luu-tru-am-may">2️⃣ Cài đặt S3 (Lưu trữ đám mây)</h3>
+<h4 id="buoc-1-vao-menu_1"><strong>Bước 1: Vào menu</strong></h4>
+<ul>
+<li>Click <strong>"☁️ Cài đặt S3"</strong> trên thanh menu</li>
+</ul>
+<h4 id="buoc-2-nhap-thong-tin-s3"><strong>Bước 2: Nhập thông tin S3</strong></h4>
+<p><strong>Ví dụ với AWS S3:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">Endpoint</span><span class="o">:</span><span class="w">    </span><span class="n">https</span><span class="o">://</span><span class="n">s3</span><span class="o">.</span><span class="na">amazonaws</span><span class="o">.</span><span class="na">com</span>
+<span class="n">Region</span><span class="o">:</span><span class="w">      </span><span class="n">ap</span><span class="o">-</span><span class="n">southeast</span><span class="o">-</span><span class="mi">1</span>
+<span class="n">Bucket</span><span class="o">:</span><span class="w">      </span><span class="n">my</span><span class="o">-</span><span class="n">video</span><span class="o">-</span><span class="n">bucket</span>
+<span class="n">Access</span><span class="w"> </span><span class="n">Key</span><span class="o">:</span><span class="w">  </span><span class="n">AKIA</span><span class="o">...</span>
+<span class="n">Secret</span><span class="w"> </span><span class="n">Key</span><span class="o">:</span><span class="w">  </span><span class="n">wJalrXUtn</span><span class="o">...</span>
+</code></pre></div>
+
+<p><strong>Ví dụ với CMC Cloud S3:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="n">Endpoint</span><span class="o">:</span><span class="w">    </span><span class="n">https</span><span class="o">://</span><span class="n">s3</span><span class="o">.</span><span class="na">hcm</span><span class="o">-</span><span class="n">r2</span><span class="o">.</span><span class="na">cloud</span><span class="o">.</span><span class="na">cmctelecom</span><span class="o">.</span><span class="na">vn</span>
+<span class="n">Region</span><span class="o">:</span><span class="w">      </span><span class="n">hcm</span><span class="o">-</span><span class="n">r2</span>
+<span class="n">Bucket</span><span class="o">:</span><span class="w">      </span><span class="n">komex</span><span class="o">-</span><span class="n">demo</span><span class="o">-</span><span class="n">before</span><span class="o">-</span><span class="n">tet</span>
+<span class="n">Access</span><span class="w"> </span><span class="n">Key</span><span class="o">:</span><span class="w">  </span><span class="o">&lt;</span><span class="n">ask</span><span class="w"> </span><span class="n">IT</span><span class="w"> </span><span class="n">team</span><span class="o">&gt;</span>
+<span class="n">Secret</span><span class="w"> </span><span class="n">Key</span><span class="o">:</span><span class="w">  </span><span class="o">&lt;</span><span class="n">ask</span><span class="w"> </span><span class="n">IT</span><span class="w"> </span><span class="n">team</span><span class="o">&gt;</span>
+</code></pre></div>
+
+<h4 id="buoc-3-test-ket-noi"><strong>Bước 3: Test kết nối</strong></h4>
+<ul>
+<li>Click <strong>"Test kết nối"</strong></li>
+<li>Đợi 2-3 giây</li>
+<li>Kết quả:</li>
+<li>✅ <strong>"Kết nối S3 thành công"</strong> → OK</li>
+<li>❌ <strong>"Lỗi: ..."</strong> → Check lại thông tin</li>
+</ul>
+<h4 id="buoc-4-luu-cau-hinh"><strong>Bước 4: Lưu cấu hình</strong></h4>
+<ul>
+<li>Click <strong>"Lưu cấu hình"</strong></li>
+<li>Thông tin được mã hóa và lưu vào <code>config.json</code></li>
+</ul>
+<hr />
+<h2 id="su-dung-hang-ngay">📹 SỬ DỤNG HÀNG NGÀY</h2>
+<h3 id="dashboard">Dashboard</h3>
+<h4 id="1-camera-live-feed"><strong>1. Camera Live Feed</strong></h4>
+<ul>
+<li>Hiển thị hình ảnh camera realtime</li>
+<li>AI tự động quét mã QR/Barcode</li>
+<li>Badge status:</li>
+<li>🟢 <strong>"Đang chạy"</strong> - Camera hoạt động</li>
+<li>⚪ <strong>"Chưa khởi động"</strong> - Camera chưa bật</li>
+</ul>
+<h4 id="2-ma-on-hien-tai"><strong>2. Mã đơn hiện tại</strong></h4>
+<ul>
+<li>Hiển thị mã QR vừa quét</li>
+<li>Click <strong>"Reset mã"</strong> để xóa và quét lại</li>
+</ul>
+<h4 id="3-thong-tin-on-hang"><strong>3. Thông tin đơn hàng</strong></h4>
+<ul>
+<li>Order ID</li>
+<li>Platform (Shopee, Lazada, TikTok...)</li>
+<li>Danh sách sản phẩm</li>
+</ul>
+<h4 id="4-quay-video"><strong>4. Quay video</strong></h4>
+<ul>
+<li><strong>Trạng thái:</strong></li>
+<li>⚪ <strong>Idle</strong> - Không quay</li>
+<li>🔴 <strong>Recording</strong> - Đang quay</li>
+<li><strong>Thời gian:</strong> 00:00 (đếm lên)</li>
+<li><strong>Nút:</strong></li>
+<li><strong>"Bắt đầu quay"</strong> - Manual start (nếu tắt auto-record)</li>
+<li><strong>"Kết thúc"</strong> - Stop recording</li>
+</ul>
+<hr />
+<h3 id="quy-trinh-quay-video-tu-ong">Quy trình quay video tự động</h3>
+<h4 id="buoc-1-quet-qr-code"><strong>Bước 1: Quét QR code</strong></h4>
+<ol>
+<li>Nhân viên cầm QR code đơn hàng</li>
+<li>Đưa QR code vào trước camera</li>
+<li>AI tự động detect QR</li>
+<li><strong>Mã đơn hiện tại</strong> hiển thị mã vừa quét</li>
+</ol>
+<h4 id="buoc-2-tu-ong-quay-video"><strong>Bước 2: Tự động quay video</strong></h4>
+<ul>
+<li>App <strong>TỰ ĐỘNG</strong> bắt đầu quay video</li>
+<li>Trạng thái chuyển sang 🔴 <strong>Recording</strong></li>
+<li>Timer bắt đầu đếm: 00:01, 00:02, ...</li>
+</ul>
+<h4 id="buoc-3-nhan-vien-ong-goi"><strong>Bước 3: Nhân viên đóng gói</strong></h4>
+<ul>
+<li>Nhân viên đóng gói đơn hàng vào túi/hộp</li>
+<li>Camera quay toàn bộ quá trình</li>
+<li>Thời gian: 15-30 giây</li>
+</ul>
+<h4 id="buoc-4-ket-thuc-quay"><strong>Bước 4: Kết thúc quay</strong></h4>
+<ul>
+<li>Click nút <strong>"Kết thúc"</strong></li>
+<li>Confirm "Bạn có chắc muốn kết thúc quay?"</li>
+<li>Click <strong>OK</strong></li>
+</ul>
+<h4 id="buoc-5-luu-upload-tu-ong"><strong>Bước 5: Lưu &amp; Upload tự động</strong></h4>
+<ul>
+<li>Video lưu vào folder <code>videos/</code></li>
+<li><strong>TỰ ĐỘNG upload lên S3</strong></li>
+<li>Thông báo: <strong>"✅ In xong! Thời lượng: 25 giây"</strong></li>
+<li><strong>Mã đơn reset</strong> → Sẵn sàng quét mã mới</li>
+</ul>
+<h4 id="buoc-6-cooldown"><strong>Bước 6: Cooldown</strong></h4>
+<ul>
+<li>Hệ thống cooldown <strong>5 phút</strong></li>
+<li>Nếu quét lại cùng mã trong 5 phút → <strong>Không quay lại</strong></li>
+<li>Sau 5 phút → Có thể quét lại cùng mã</li>
+</ul>
+<hr />
+<h2 id="kho-luu-tru">📦 KHO LƯU TRỮ</h2>
+<h3 id="tab-video-tren-s3">Tab "Video trên S3"</h3>
+<p><strong>Hiển thị:</strong>
+- Danh sách videos đã upload lên S3
+- Filename, Size, Last Modified
+- Actions:
+  - <strong>Download</strong> - Tải video về máy
+  - <strong>Delete</strong> - Xóa video khỏi S3</p>
+<p><strong>Cách dùng:</strong>
+1. Click tab <strong>"Video trên S3"</strong>
+2. Xem danh sách videos
+3. Click <strong>"Download"</strong> để tải video
+4. Click <strong>"Delete"</strong> → Confirm → Xóa video</p>
+<h3 id="tab-lich-su-upload">Tab "Lịch sử upload"</h3>
+<p><strong>Hiển thị:</strong>
+- Tất cả videos trong ngày (00:00 - 23:59)
+- Status:
+  - ⏳ <strong>Pending</strong> - Chưa upload
+  - ⬆️ <strong>Uploading</strong> - Đang upload (progress %)
+  - ✅ <strong>Success</strong> - Upload thành công
+  - ❌ <strong>Failed</strong> - Upload lỗi</p>
+<p><strong>Cleanup tự động:</strong>
+- Vào <strong>00:00 hàng ngày</strong>
+- Xóa tất cả lịch sử ngày hôm trước
+- Bắt đầu ngày mới với lịch sử trống</p>
+<p><strong>Cách dùng:</strong>
+1. Click tab <strong>"Lịch sử upload"</strong>
+2. Xem status upload realtime
+3. Nếu <strong>Failed</strong> → Check S3 credentials</p>
+<hr />
+<h2 id="cai-at-nang-cao">⚙️ CÀI ĐẶT NÂNG CAO</h2>
+<h3 id="camera-settings">Camera Settings</h3>
+<h4 id="test-camera"><strong>Test Camera</strong></h4>
+<ul>
+<li>Kiểm tra camera có hoạt động không</li>
+<li>KHÔNG khởi động camera</li>
+<li>Nhanh (1-2 giây)</li>
+</ul>
+<h4 id="start-camera"><strong>Start Camera</strong></h4>
+<ul>
+<li>Khởi động camera + AI scanner</li>
+<li>Bắt đầu quét QR tự động</li>
+<li>Chỉ click khi Test OK</li>
+</ul>
+<h4 id="stop-camera"><strong>Stop Camera</strong></h4>
+<ul>
+<li>Dừng camera + AI scanner</li>
+<li>App vẫn chạy bình thường</li>
+<li>Cần stop nếu muốn đổi config</li>
+</ul>
+<h4 id="cau-hinh-camera"><strong>Cấu hình Camera</strong></h4>
+<p><strong>USB Camera:</strong>
+- Nguồn: [USB]
+- Camera: Chọn Camera 0, 1, 2...</p>
+<p><strong>RTSP Camera:</strong>
+- Nguồn: [RTSP]
+- URL: <code>rtsp://admin:password@192.168.1.100:554/stream</code></p>
+<p><strong>Tips:</strong>
+- USB: Đơn giản, cắm và dùng
+- RTSP: Cho camera IP, cần URL đúng</p>
+<hr />
+<h3 id="s3-settings">S3 Settings</h3>
+<h4 id="lay-thong-tin-s3"><strong>Lấy thông tin S3:</strong></h4>
+<ul>
+<li>Liên hệ IT team để lấy:</li>
+<li>Endpoint URL</li>
+<li>Region</li>
+<li>Bucket name</li>
+<li>Access Key</li>
+<li>Secret Key</li>
+</ul>
+<h4 id="test-ket-noi"><strong>Test kết nối:</strong></h4>
+<ul>
+<li>Nhập đầy đủ thông tin</li>
+<li>Click <strong>"Test kết nối"</strong></li>
+<li>Phải thấy <strong>"✅ Kết nối S3 thành công"</strong></li>
+</ul>
+<h4 id="luu-cau-hinh"><strong>Lưu cấu hình:</strong></h4>
+<ul>
+<li>Click <strong>"Lưu cấu hình"</strong></li>
+<li>Credentials được <strong>mã hóa</strong> và lưu</li>
+<li>Không cần nhập lại khi restart app</li>
+</ul>
+<hr />
+<h2 id="xu-ly-su-co">🐛 XỬ LÝ SỰ CỐ</h2>
+<h3 id="camera-khong-hoat-ong">❌ Camera không hoạt động</h3>
+<p><strong>Triệu chứng:</strong>
+- Test Camera → ❌ "Cannot open camera"
+- Dashboard → "Camera chưa khởi động"</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Kiểm</span><span class="w"> </span><span class="n">tra</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">USB</span><span class="w"> </span><span class="n">đã</span><span class="w"> </span><span class="n">cắm</span><span class="w"> </span><span class="n">chưa</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Device</span><span class="w"> </span><span class="n">Manager</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Cameras</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">driver</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Đóng</span><span class="w"> </span><span class="n">các</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="n">đang</span><span class="w"> </span><span class="n">dùng</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="p">(</span><span class="n">Skype</span><span class="p">,</span><span class="w"> </span><span class="n">Zoom</span><span class="p">,</span><span class="w"> </span><span class="n">Teams</span><span class="p">,</span><span class="w"> </span><span class="n">Discord</span><span class="mf">...</span><span class="p">)</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Rút</span><span class="w"> </span><span class="n">USB</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Cắm</span><span class="w"> </span><span class="n">lại</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Restart</span><span class="w"> </span><span class="n">app</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Test</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">lại</span>
+</code></pre></div>
+
+<hr />
+<h3 id="s3-upload-failed">❌ S3 upload failed</h3>
+<p><strong>Triệu chứng:</strong>
+- Lịch sử upload → ❌ Failed
+- Console: "Access Denied" hoặc "NoSuchBucket"</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Vào</span><span class="w"> </span><span class="s">&quot;☁️ Cài đặt S3&quot;</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s">&quot;Test kết nối&quot;</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Nếu</span><span class="w"> </span><span class="n">lỗi</span><span class="p">:</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">Access</span><span class="w"> </span><span class="n">Key</span><span class="w"> </span><span class="n">đúng</span><span class="w"> </span><span class="n">chưa</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">Secret</span><span class="w"> </span><span class="n">Key</span><span class="w"> </span><span class="n">đúng</span><span class="w"> </span><span class="n">chưa</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">Bucket</span><span class="w"> </span><span class="n">name</span><span class="w"> </span><span class="n">đúng</span><span class="w"> </span><span class="n">chưa</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Liên</span><span class="w"> </span><span class="n">hệ</span><span class="w"> </span><span class="n">IT</span><span class="w"> </span><span class="n">để</span><span class="w"> </span><span class="kr">verify</span><span class="w"> </span><span class="n">credentials</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Nhập</span><span class="w"> </span><span class="n">lại</span><span class="w"> </span><span class="n">thông</span><span class="w"> </span><span class="n">tin</span><span class="w"> </span><span class="n">đúng</span>
+<span class="mf">5.</span><span class="w"> </span><span class="s">&quot;Lưu cấu hình&quot;</span>
+</code></pre></div>
+
+<hr />
+<h3 id="video-bi-lag-cham">❌ Video bị lag / chậm</h3>
+<p><strong>Triệu chứng:</strong>
+- Video chậm hơn real-time 3-5 giây</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code>✅ Đã fix trong phiên bản này
+   - RTSP buffer = 0
+   - Async recorder
+   - Clear queue after recording
+
+Nếu vẫn lag:
+   - Check network (nếu RTSP)
+   - Giảm resolution trong Settings
+</code></pre></div>
+
+<hr />
+<h3 id="quet-qr-khong-uoc">❌ Quét QR không được</h3>
+<p><strong>Triệu chứng:</strong>
+- Quét QR nhưng không detect</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">feed</span><span class="w"> </span><span class="n">rõ</span><span class="w"> </span><span class="n">nét</span><span class="w"> </span><span class="n">không</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Đưa</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="n">GẦN</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">hơn</span><span class="w"> </span><span class="p">(</span><span class="mf">10</span><span class="o">-</span><span class="mf">30</span><span class="w"> </span><span class="n">cm</span><span class="p">)</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Đảm</span><span class="w"> </span><span class="n">bảo</span><span class="w"> </span><span class="n">ánh</span><span class="w"> </span><span class="n">sáng</span><span class="w"> </span><span class="n">đủ</span><span class="w"> </span><span class="p">(</span><span class="n">không</span><span class="w"> </span><span class="n">quá</span><span class="w"> </span><span class="n">tối</span><span class="o">/</span><span class="n">sáng</span><span class="p">)</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Thử</span><span class="w"> </span><span class="n">tăng</span><span class="w"> </span><span class="s">&quot;Độ nhạy AI&quot;</span><span class="w"> </span><span class="n">lên</span><span class="w"> </span><span class="s">&quot;Cao&quot;</span><span class="w"> </span><span class="n">trong</span><span class="w"> </span><span class="n">Settings</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Nếu</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="n">vừa</span><span class="w"> </span><span class="n">quét</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="mf">5</span><span class="w"> </span><span class="n">phút</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Cooldown</span><span class="p">,</span><span class="w"> </span><span class="n">đợi</span><span class="w"> </span><span class="mf">5</span><span class="w"> </span><span class="n">phút</span>
+</code></pre></div>
+
+<hr />
+<h3 id="app-bi-treo-crash">❌ App bị treo / crash</h3>
+<p><strong>Triệu chứng:</strong>
+- App không phản hồi
+- Console window đóng đột ngột</p>
+<p><strong>Giải pháp:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">console</span><span class="w"> </span><span class="nb">log</span><span class="n">s</span><span class="w"> </span><span class="p">(</span><span class="n">nếu</span><span class="w"> </span><span class="n">còn</span><span class="p">)</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Restart</span><span class="w"> </span><span class="n">app</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Nếu</span><span class="w"> </span><span class="n">vẫn</span><span class="w"> </span><span class="n">treo</span><span class="p">:</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">connection</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">S3</span><span class="w"> </span><span class="n">credentials</span>
+<span class="w">   </span><span class="o">-</span><span class="w"> </span><span class="n">Liên</span><span class="w"> </span><span class="n">hệ</span><span class="w"> </span><span class="n">IT</span><span class="w"> </span><span class="n">support</span>
+</code></pre></div>
+
+<hr />
+<h2 id="tips-tricks">💡 TIPS &amp; TRICKS</h2>
+<h3 id="toi-uu-hieu-suat">✅ Tối ưu hiệu suất</h3>
+<ol>
+<li><strong>Dùng 1 camera</strong> thay vì 2 (nếu không cần thiết)</li>
+<li><strong>Resolution 1280x720</strong> (khuyến nghị) thay vì 1920x1080</li>
+<li><strong>Độ nhạy "Trung bình"</strong> (khuyến nghị) thay vì "Cao"</li>
+<li><strong>Đóng các app không cần thiết</strong> khi chạy</li>
+</ol>
+<h3 id="quet-qr-nhanh-hon">✅ Quét QR nhanh hơn</h3>
+<ol>
+<li><strong>Đưa QR code thẳng trước camera</strong> (không nghiêng)</li>
+<li><strong>Khoảng cách 15-25 cm</strong> (không quá gần/xa)</li>
+<li><strong>Ánh sáng đủ</strong> (không backlight)</li>
+<li><strong>QR code rõ nét</strong> (không nhăn, rách)</li>
+</ol>
+<h3 id="upload-nhanh-hon">✅ Upload nhanh hơn</h3>
+<ol>
+<li><strong>Check internet speed</strong> (upload speed)</li>
+<li><strong>Nếu lỗi upload</strong> → App sẽ tự động retry</li>
+<li><strong>Videos upload tuần tự</strong> → Đợi video hiện tại xong mới upload tiếp</li>
+</ol>
+<hr />
+<h2 id="hieu-status">📊 HIỂU STATUS</h2>
+<h3 id="camera-status-badge">Camera Status Badge</h3>
+<div class="codehilite"><pre><span></span><code>🟢 Đang chạy     - Camera đang hoạt động, có thể quét QR
+⚪ Chưa khởi động - Camera chưa bật, vào Settings để start
+</code></pre></div>
+
+<h3 id="recording-status">Recording Status</h3>
+<div class="codehilite"><pre><span></span><code>⚪ Idle          - Không đang quay, sẵn sàng bắt đầu
+🔴 Recording     - Đang quay video
+</code></pre></div>
+
+<h3 id="upload-status">Upload Status</h3>
+<div class="codehilite"><pre><span></span><code><span class="err">⏳</span><span class="w"> </span><span class="n">Pending</span><span class="w">       </span><span class="o">-</span><span class="w"> </span><span class="n">Video</span><span class="w"> </span><span class="err">đ</span><span class="n">ang</span><span class="w"> </span><span class="n">chờ</span><span class="w"> </span><span class="n">upload</span>
+<span class="err">⬆️</span><span class="w"> </span><span class="n">Uploading</span><span class="w"> </span><span class="mi">45</span><span class="o">%</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="err">Đ</span><span class="n">ang</span><span class="w"> </span><span class="n">upload</span><span class="p">,</span><span class="w"> </span><span class="n">progress</span><span class="w"> </span><span class="mi">45</span><span class="o">%</span>
+<span class="err">✅</span><span class="w"> </span><span class="n">Success</span><span class="w">       </span><span class="o">-</span><span class="w"> </span><span class="n">Upload</span><span class="w"> </span><span class="n">thành</span><span class="w"> </span><span class="n">công</span>
+<span class="err">❌</span><span class="w"> </span><span class="n">Failed</span><span class="w">        </span><span class="o">-</span><span class="w"> </span><span class="n">Upload</span><span class="w"> </span><span class="n">lỗi</span><span class="p">,</span><span class="w"> </span><span class="n">sẽ</span><span class="w"> </span><span class="n">retry</span>
+</code></pre></div>
+
+<hr />
+<h2 id="quy-trinh-hang-ngay">🔄 QUY TRÌNH HÀNG NGÀY</h2>
+<h3 id="buoi-sang-khoi-ong">Buổi sáng (Khởi động)</h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Mở</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="p">(</span><span class="n">double</span><span class="o">-</span><span class="n">click</span><span class="w"> </span><span class="n">desktop</span><span class="w"> </span><span class="n">icon</span><span class="p">)</span>
+<span class="mf">2.</span><span class="w"> </span><span class="nb">Log</span><span class="n">in</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">camera</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Đang</span><span class="w"> </span><span class="n">chạy</span><span class="w"> </span><span class="p">(</span><span class="n">nếu</span><span class="w"> </span><span class="n">chưa</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">vào</span><span class="w"> </span><span class="n">Settings</span><span class="w"> </span><span class="n">start</span><span class="p">)</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">S3</span><span class="w"> </span><span class="n">status</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Configured</span><span class="w"> </span><span class="p">(</span><span class="n">nếu</span><span class="w"> </span><span class="n">chưa</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">vào</span><span class="w"> </span><span class="n">Settings</span><span class="w"> </span><span class="n">config</span><span class="p">)</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Sẵn</span><span class="w"> </span><span class="n">sàng</span><span class="w"> </span><span class="n">làm</span><span class="w"> </span><span class="n">việc</span><span class="err">!</span>
+</code></pre></div>
+
+<h3 id="trong-ngay-ong-goi-on-hang">Trong ngày (Đóng gói đơn hàng)</h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Chuẩn</span><span class="w"> </span><span class="n">bị</span><span class="w"> </span><span class="err">đơ</span><span class="n">n</span><span class="w"> </span><span class="n">hàng</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="err">đơ</span><span class="n">n</span><span class="w"> </span><span class="n">hàng</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">App</span><span class="w"> </span><span class="n">tự</span><span class="w"> </span><span class="err">độ</span><span class="n">ng</span><span class="w"> </span><span class="n">bắt</span><span class="w"> </span><span class="err">đầ</span><span class="n">u</span><span class="w"> </span><span class="n">quay</span>
+<span class="mf">3.</span><span class="w"> </span><span class="err">Đó</span><span class="n">ng</span><span class="w"> </span><span class="n">gói</span><span class="w"> </span><span class="err">đơ</span><span class="n">n</span><span class="w"> </span><span class="n">hàng</span><span class="w"> </span><span class="n">vào</span><span class="w"> </span><span class="n">túi</span><span class="o">/</span><span class="n">hộp</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s2">&quot;Kết thúc&quot;</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Video</span><span class="w"> </span><span class="n">lưu</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">upload</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Cooldown</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="n">phút</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="err">đơ</span><span class="n">n</span><span class="w"> </span><span class="n">tiếp</span><span class="w"> </span><span class="n">theo</span>
+</code></pre></div>
+
+<h3 id="cuoi-ngay-kiem-tra">Cuối ngày (Kiểm tra)</h3>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Vào</span><span class="w"> </span><span class="s2">&quot;📦 Kho lưu trữ&quot;</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Tab</span><span class="w"> </span><span class="s2">&quot;Lịch sử upload&quot;</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">có</span><span class="w"> </span><span class="n">Failed</span><span class="w"> </span><span class="n">không</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Nếu</span><span class="w"> </span><span class="n">có</span><span class="w"> </span><span class="n">Failed</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Check</span><span class="w"> </span><span class="n">S3</span><span class="p">,</span><span class="w"> </span><span class="n">retry</span><span class="w"> </span><span class="n">nếu</span><span class="w"> </span><span class="n">cần</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Tab</span><span class="w"> </span><span class="s2">&quot;Video trên S3&quot;</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Verify</span><span class="w"> </span><span class="n">videos</span><span class="w"> </span><span class="err">đã</span><span class="w"> </span><span class="n">upload</span>
+<span class="mf">5.</span><span class="w"> </span><span class="err">Đó</span><span class="n">ng</span><span class="w"> </span><span class="n">app</span><span class="w"> </span><span class="n">hoặc</span><span class="w"> </span><span class="err">để</span><span class="w"> </span><span class="n">chạy</span><span class="w"> </span><span class="n">qua</span><span class="w"> </span><span class="err">đê</span><span class="n">m</span>
+</code></pre></div>
+
+<h3 id="nua-em-0000">Nửa đêm (00:00)</h3>
+<div class="codehilite"><pre><span></span><code><span class="n">App</span><span class="w"> </span><span class="n">tự</span><span class="w"> </span><span class="err">độ</span><span class="n">ng</span><span class="p">:</span>
+<span class="mf">1.</span><span class="w"> </span><span class="n">Cleanup</span><span class="w"> </span><span class="n">lịch</span><span class="w"> </span><span class="n">sử</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">ngày</span><span class="w"> </span><span class="n">hôm</span><span class="w"> </span><span class="n">trước</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Bắt</span><span class="w"> </span><span class="err">đầ</span><span class="n">u</span><span class="w"> </span><span class="n">lịch</span><span class="w"> </span><span class="n">sử</span><span class="w"> </span><span class="n">mới</span><span class="w"> </span><span class="n">cho</span><span class="w"> </span><span class="n">ngày</span><span class="w"> </span><span class="n">mới</span>
+</code></pre></div>
+
+<hr />
+<h2 id="faq-cau-hoi-thuong-gap">❓ FAQ (Câu hỏi thường gặp)</h2>
+<h3 id="q1-toi-co-the-dung-camera-ien-thoai-khong">Q1: Tôi có thể dùng camera điện thoại không?</h3>
+<p><strong>A:</strong> Có, nếu điện thoại hỗ trợ RTSP streaming. Cài app như "IP Webcam" trên Android, lấy RTSP URL và cấu hình trong Settings.</p>
+<hr />
+<h3 id="q2-video-luu-o-au">Q2: Video lưu ở đâu?</h3>
+<p><strong>A:</strong> 
+- <strong>Local:</strong> <code>C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\videos\</code>
+- <strong>S3:</strong> Upload tự động, xem trong tab "Video trên S3"</p>
+<hr />
+<h3 id="q3-toi-co-the-xoa-videos-local-khong">Q3: Tôi có thể xóa videos local không?</h3>
+<p><strong>A:</strong> Có, nhưng <strong>không nên</strong> xóa manual. App tự động xóa sau khi upload thành công lên S3.</p>
+<hr />
+<h3 id="q4-lam-sao-biet-video-a-upload-chua">Q4: Làm sao biết video đã upload chưa?</h3>
+<p><strong>A:</strong> Vào <strong>"Kho lưu trữ"</strong> → Tab <strong>"Lịch sử upload"</strong> → Check status:
+- ✅ Success - Đã upload
+- ⬆️ Uploading - Đang upload
+- ⏳ Pending - Chưa upload</p>
+<hr />
+<h3 id="q5-tai-sao-khong-quet-lai-cung-qr-trong-5-phut">Q5: Tại sao không quét lại cùng QR trong 5 phút?</h3>
+<p><strong>A:</strong> <strong>Cooldown mechanism</strong> để tránh quay lại cùng đơn hàng nhiều lần. Nếu cần quét lại:
+- Đợi 5 phút, hoặc
+- Click "Reset mã" trước khi quét</p>
+<hr />
+<h3 id="q6-co-the-oi-thoi-gian-cooldown-khong">Q6: Có thể đổi thời gian Cooldown không?</h3>
+<p><strong>A:</strong> Có, nhưng cần sửa code:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># camera/ai_scanner.py</span>
+<span class="n">COOLDOWN_SECONDS</span> <span class="o">=</span> <span class="mi">5</span> <span class="o">*</span> <span class="mi">60</span>  <span class="c1"># 5 phút → Đổi thành 2 * 60 (2 phút)</span>
+</code></pre></div>
+
+<p>Rebuild app sau khi sửa.</p>
+<hr />
+<h3 id="q7-toi-co-the-them-camera-thu-3-khong">Q7: Tôi có thể thêm camera thứ 3 không?</h3>
+<p><strong>A:</strong> Không, app giới hạn <strong>tối đa 2 cameras</strong>. Nếu cần thêm:</p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># app.py</span>
+<span class="n">MAX_CAMERAS</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># Đổi thành 3</span>
+</code></pre></div>
+
+<p>Rebuild app sau khi sửa.</p>
+<hr />
+<h3 id="q8-camera-bi-disconnect-giua-chung">Q8: Camera bị disconnect giữa chừng?</h3>
+<p><strong>A:</strong> 
+1. Check USB connection
+2. Check camera power
+3. Vào Settings → Stop Camera → Start Camera lại</p>
+<hr />
+<h3 id="q9-upload-bi-loi-lam-sao-retry">Q9: Upload bị lỗi, làm sao retry?</h3>
+<p><strong>A:</strong> App <strong>TỰ ĐỘNG retry</strong> 3 lần. Nếu vẫn lỗi:
+1. Check internet connection
+2. Check S3 credentials (Settings)
+3. Video vẫn lưu local, sẽ retry khi app restart</p>
+<hr />
+<h3 id="q10-lam-sao-go-cai-at">Q10: Làm sao gỡ cài đặt?</h3>
+<p><strong>A:</strong> 
+1. Start Menu → Tìm "EcoHub QR Scanner"
+2. Right-click → Uninstall
+3. Hoặc: Control Panel → Programs → Uninstall</p>
+<hr />
+<h2 id="ho-tro">📞 HỖ TRỢ</h2>
+<h3 id="console-logs">Console Logs</h3>
+<ul>
+<li>App hiển thị console window</li>
+<li>Logs realtime (màu xanh/đỏ)</li>
+<li>Copy logs để gửi IT nếu lỗi</li>
+</ul>
+<h3 id="lien-he">Liên hệ</h3>
+<ul>
+<li>Email: support@ecohub.vn</li>
+<li>Phone: 1900-xxxx</li>
+<li>Team: EcoHub IT Support</li>
+</ul>
+<hr />
+<h2 id="checklist-hang-ngay">📋 CHECKLIST HÀNG NGÀY</h2>
+<p><strong>Buổi sáng:</strong>
+- [ ] Mở app
+- [ ] Login
+- [ ] Check camera: ✅ Đang chạy
+- [ ] Check S3: ✅ Configured</p>
+<p><strong>Trong ngày:</strong>
+- [ ] Quét QR → Auto record
+- [ ] Click "Kết thúc" sau khi đóng gói
+- [ ] Verify upload: ✅ Success</p>
+<p><strong>Cuối ngày:</strong>
+- [ ] Check "Lịch sử upload" → Không có Failed
+- [ ] Check "Video trên S3" → Tất cả videos có
+- [ ] Đóng app hoặc để chạy qua đêm</p>
+<hr />
+<p><strong>Phiên bản:</strong> 1.0.0<br />
+<strong>Cập nhật:</strong> 09/02/2026<br />
+<strong>Team:</strong> EcoHub Support</p>
+</body>
+</html>

@@ -1,0 +1,370 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>README</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 2cm;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            font-size: 11pt;
+            line-height: 1.6;
+            color: #333;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            border-bottom: 3px solid #3498db;
+            padding-bottom: 10px;
+            margin-top: 30px;
+            font-size: 24pt;
+            page-break-before: auto;
+        }
+        
+        h2 {
+            color: #34495e;
+            border-bottom: 2px solid #95a5a6;
+            padding-bottom: 8px;
+            margin-top: 25px;
+            font-size: 18pt;
+        }
+        
+        h3 {
+            color: #555;
+            margin-top: 20px;
+            font-size: 14pt;
+        }
+        
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 9pt;
+            color: #c7254e;
+        }
+        
+        pre {
+            background-color: #f8f8f8;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 12px;
+            overflow-x: auto;
+            font-size: 8pt;
+            line-height: 1.4;
+        }
+        
+        pre code {
+            background-color: transparent;
+            padding: 0;
+            color: #333;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3498db;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #555;
+            font-style: italic;
+            background-color: #f9f9f9;
+            padding: 10px 15px;
+        }
+        
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 10pt;
+        }
+        
+        table th {
+            background-color: #3498db;
+            color: white;
+            padding: 8px;
+            text-align: left;
+        }
+        
+        table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+        
+        table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        
+        a {
+            color: #3498db;
+            text-decoration: none;
+        }
+        
+        ul, ol {
+            margin-left: 20px;
+        }
+        
+        li {
+            margin: 5px 0;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #ddd;
+            margin: 30px 0;
+        }
+        
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<h1 id="ecohub-qr-scanner">🎥 EcoHub QR Scanner</h1>
+<p>Ứng dụng quét mã QR/Barcode, tự động quay video đóng gói và upload lên S3 storage.</p>
+<hr />
+<h2 id="quick-start">⚡ Quick Start</h2>
+<h3 id="development">🔧 Development</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 1. Install dependencies</span>
+pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>requirements.txt
+
+<span class="c1"># 2. Run app</span>
+python<span class="w"> </span>app.py
+
+<span class="c1"># 3. Open browser</span>
+http://127.0.0.1:5000
+</code></pre></div>
+
+<h3 id="build-deploy">📦 Build &amp; Deploy</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 1. Build EXE</span>
+build_exe.bat
+
+<span class="c1"># 2. Test EXE</span>
+dist<span class="se">\E</span>coHub_QR_Scanner<span class="se">\E</span>coHub_QR_Scanner.exe
+
+<span class="c1"># 3. Build Installer</span>
+build_installer.bat
+
+<span class="c1"># 4. Result</span>
+installer_output<span class="se">\E</span>coHub_QR_Scanner_Setup_v1.0.0.exe
+</code></pre></div>
+
+<hr />
+<h2 id="features">✨ Features</h2>
+<ul>
+<li>🎥 <strong>Camera USB/RTSP</strong> - Tối đa 2 cameras</li>
+<li>🤖 <strong>AI QR Scanner</strong> - ZXing-CPP, 5 FPS</li>
+<li>📹 <strong>Auto Recording</strong> - 15 FPS, async thread</li>
+<li>☁️ <strong>S3 Upload</strong> - Multipart, retry mechanism</li>
+<li>🔐 <strong>Encrypted Config</strong> - Fernet encryption</li>
+<li>🕐 <strong>GMT+7 Timezone</strong> - Timestamp chính xác</li>
+<li>🔄 <strong>Upload History</strong> - Daily cleanup at 00:00</li>
+<li>⚙️ <strong>Safe Startup</strong> - Manual camera start</li>
+</ul>
+<hr />
+<h2 id="documentation">📚 Documentation</h2>
+<ul>
+<li><strong><a href="DOCS.md">📘 DOCS.md</a></strong> - Tài liệu đầy đủ hệ thống</li>
+<li><strong><a href="BUILD_GUIDE.md">🔨 BUILD_GUIDE.md</a></strong> - Hướng dẫn build EXE/Installer</li>
+<li><strong><a href="CAMERA_SAFE_START.md">🎥 CAMERA_SAFE_START.md</a></strong> - Camera safe startup</li>
+<li><strong><a href="PYINSTALLER_FIX.md">🔧 PYINSTALLER_FIX.md</a></strong> - PyInstaller paths fix</li>
+<li><strong><a href="../TAI_LIEU_S3_BACKEND.md">📝 TAI_LIEU_S3_BACKEND.md</a></strong> - S3 backend docs</li>
+</ul>
+<hr />
+<h2 id="tech-stack">🏗️ Tech Stack</h2>
+<div class="codehilite"><pre><span></span><code><span class="n">Frontend</span><span class="o">:</span><span class="w"> </span><span class="n">HTML5</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Bootstrap</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">JavaScript</span>
+<span class="n">Backend</span><span class="o">:</span><span class="w">  </span><span class="n">Flask</span><span class="w"> </span><span class="mf">2.3</span><span class="o">.</span><span class="mi">0</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">Python</span><span class="w"> </span><span class="mf">3.11</span>
+<span class="n">Camera</span><span class="o">:</span><span class="w">   </span><span class="n">OpenCV</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">ZXing</span><span class="o">-</span><span class="n">CPP</span><span class="w"> </span><span class="mf">2.2</span><span class="o">.</span><span class="mi">0</span>
+<span class="n">Storage</span><span class="o">:</span><span class="w">  </span><span class="n">Boto3</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="n">S3</span><span class="o">-</span><span class="n">compatible</span>
+<span class="n">Security</span><span class="o">:</span><span class="w"> </span><span class="n">Cryptography</span><span class="w"> </span><span class="o">(</span><span class="n">Fernet</span><span class="o">)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="project-structure">📁 Project Structure</h2>
+<div class="codehilite"><pre><span></span><code><span class="n">eco_hub_demo</span><span class="o">/</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">app</span><span class="o">.</span><span class="n">py</span><span class="w">                  </span><span class="err">#</span><span class="w"> </span><span class="n">Main</span><span class="w"> </span><span class="n">Flask</span><span class="w"> </span><span class="n">app</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">config</span><span class="o">.</span><span class="n">json</span><span class="w">             </span><span class="err">#</span><span class="w"> </span><span class="n">Configuration</span>
+<span class="err">├──</span><span class="w"> </span><span class="nb">camera</span><span class="o">/</span><span class="w">                 </span><span class="err">#</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">modules</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">camera_manager</span><span class="o">.</span><span class="n">py</span><span class="w">   </span><span class="err">#</span><span class="w"> </span><span class="n">Camera</span><span class="w"> </span><span class="n">stream</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">ai_scanner</span><span class="o">.</span><span class="n">py</span><span class="w">       </span><span class="err">#</span><span class="w"> </span><span class="n">AI</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">scanner</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">recorder</span><span class="o">.</span><span class="n">py</span><span class="w">         </span><span class="err">#</span><span class="w"> </span><span class="n">Video</span><span class="w"> </span><span class="n">recorder</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">services</span><span class="o">/</span><span class="w">               </span><span class="err">#</span><span class="w"> </span><span class="n">Business</span><span class="w"> </span><span class="n">logic</span>
+<span class="err">│</span><span class="w">   </span><span class="err">├──</span><span class="w"> </span><span class="n">s3_service</span><span class="o">.</span><span class="n">py</span><span class="w">       </span><span class="err">#</span><span class="w"> </span><span class="n">S3</span><span class="w"> </span><span class="n">operations</span>
+<span class="err">│</span><span class="w">   </span><span class="err">└──</span><span class="w"> </span><span class="n">config_encryption</span><span class="o">.</span><span class="n">py</span><span class="err">#</span><span class="w"> </span><span class="n">Encryption</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">templates</span><span class="o">/</span><span class="w">              </span><span class="err">#</span><span class="w"> </span><span class="n">HTML</span><span class="w"> </span><span class="n">templates</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">static</span><span class="o">/</span><span class="w">                 </span><span class="err">#</span><span class="w"> </span><span class="n">CSS</span><span class="o">/</span><span class="n">JS</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">build</span><span class="o">.</span><span class="n">spec</span><span class="w">              </span><span class="err">#</span><span class="w"> </span><span class="n">PyInstaller</span><span class="w"> </span><span class="n">config</span>
+<span class="err">├──</span><span class="w"> </span><span class="n">setup</span><span class="o">.</span><span class="n">iss</span><span class="w">               </span><span class="err">#</span><span class="w"> </span><span class="n">Inno</span><span class="w"> </span><span class="n">Setup</span><span class="w"> </span><span class="n">config</span>
+<span class="err">└──</span><span class="w"> </span><span class="n">videos</span><span class="o">/</span><span class="w">                 </span><span class="err">#</span><span class="w"> </span><span class="n">Local</span><span class="w"> </span><span class="n">storage</span>
+</code></pre></div>
+
+<hr />
+<h2 id="workflow">🎯 Workflow</h2>
+<div class="codehilite"><pre><span></span><code><span class="mf">1.</span><span class="w"> </span><span class="n">Quét</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">code</span><span class="w"> </span><span class="err">đơ</span><span class="n">n</span><span class="w"> </span><span class="n">hàng</span>
+<span class="w">      </span><span class="err">↓</span>
+<span class="mf">2.</span><span class="w"> </span><span class="n">Auto</span><span class="w"> </span><span class="n">detect</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Auto</span><span class="w"> </span><span class="n">start</span><span class="w"> </span><span class="n">recording</span>
+<span class="w">      </span><span class="err">↓</span>
+<span class="mf">3.</span><span class="w"> </span><span class="n">Nhân</span><span class="w"> </span><span class="n">viên</span><span class="w"> </span><span class="err">đó</span><span class="n">ng</span><span class="w"> </span><span class="n">gói</span><span class="w"> </span><span class="p">(</span><span class="mi">15</span><span class="o">-</span><span class="mi">30</span><span class="n">s</span><span class="p">)</span>
+<span class="w">      </span><span class="err">↓</span>
+<span class="mf">4.</span><span class="w"> </span><span class="n">Click</span><span class="w"> </span><span class="s2">&quot;Kết thúc&quot;</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Stop</span><span class="w"> </span><span class="n">recording</span>
+<span class="w">      </span><span class="err">↓</span>
+<span class="mf">5.</span><span class="w"> </span><span class="n">Auto</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">to</span><span class="w"> </span><span class="n">S3</span>
+<span class="w">      </span><span class="err">↓</span>
+<span class="mf">6.</span><span class="w"> </span><span class="n">Cooldown</span><span class="w"> </span><span class="mi">5</span><span class="w"> </span><span class="n">phút</span><span class="w"> </span><span class="err">→</span><span class="w"> </span><span class="n">Ready</span><span class="w"> </span><span class="n">cho</span><span class="w"> </span><span class="err">đơ</span><span class="n">n</span><span class="w"> </span><span class="n">tiếp</span><span class="w"> </span><span class="n">theo</span>
+</code></pre></div>
+
+<hr />
+<h2 id="configuration">⚙️ Configuration</h2>
+<h3 id="camera-settings">Camera Settings</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;source_type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;usb&quot;</span><span class="p">,</span><span class="w">      </span><span class="c1">// &quot;usb&quot; hoặc &quot;rtsp&quot;</span>
+<span class="w">  </span><span class="nt">&quot;camera_index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w">         </span><span class="c1">// USB: 0, 1, 2...</span>
+<span class="w">  </span><span class="nt">&quot;rtsp_url&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;&quot;</span><span class="p">,</span><span class="w">            </span><span class="c1">// RTSP: rtsp://...</span>
+<span class="w">  </span><span class="nt">&quot;width&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1280</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;height&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">720</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;fps&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">30</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<h3 id="s3-settings">S3 Settings</h3>
+<div class="codehilite"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;endpoint&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;https://s3.amazonaws.com&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;region&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;ap-southeast-1&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;bucket&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;your-bucket&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;access_key_encrypted&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;secret_key_encrypted&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;...&quot;</span>
+<span class="p">}</span>
+</code></pre></div>
+
+<hr />
+<h2 id="usage">🚀 Usage</h2>
+<h3 id="first-time-setup">First Time Setup</h3>
+<ol>
+<li><strong>Khởi động app</strong></li>
+<li><strong>Login</strong> (username bất kỳ)</li>
+<li><strong>Vào ⚙️ Cài đặt camera:</strong></li>
+<li>Click "Test Camera"</li>
+<li>Click "Start Camera"</li>
+<li>Cấu hình USB/RTSP</li>
+<li><strong>Vào ☁️ Cài đặt S3:</strong></li>
+<li>Nhập credentials</li>
+<li>Click "Test kết nối"</li>
+<li>Click "Lưu"</li>
+</ol>
+<h3 id="daily-use">Daily Use</h3>
+<ol>
+<li><strong>Dashboard</strong> → Camera live feed</li>
+<li><strong>Quét QR</strong> → Auto start recording</li>
+<li><strong>Click "Kết thúc"</strong> → Save &amp; upload</li>
+<li><strong>Kho lưu trữ</strong> → Xem videos</li>
+</ol>
+<hr />
+<h2 id="troubleshooting">🐛 Troubleshooting</h2>
+<h3 id="camera-khong-khoi-ong">Camera không khởi động</h3>
+<div class="codehilite"><pre><span></span><code><span class="m">1</span>.<span class="w"> </span>Check<span class="w"> </span>USB<span class="w"> </span>connection
+<span class="m">2</span>.<span class="w"> </span>Close<span class="w"> </span>other<span class="w"> </span>apps<span class="w"> </span>using<span class="w"> </span>camera<span class="w"> </span><span class="o">(</span>Skype,<span class="w"> </span>Zoom...<span class="o">)</span>
+<span class="m">3</span>.<span class="w"> </span>Restart<span class="w"> </span>app
+</code></pre></div>
+
+<h3 id="s3-upload-failed">S3 upload failed</h3>
+<div class="codehilite"><pre><span></span><code><span class="m">1</span>.<span class="w"> </span>Vào<span class="w"> </span><span class="s2">&quot;Cài đặt S3&quot;</span>
+<span class="m">2</span>.<span class="w"> </span>Click<span class="w"> </span><span class="s2">&quot;Test kết nối&quot;</span>
+<span class="m">3</span>.<span class="w"> </span>Check<span class="w"> </span>Access<span class="w"> </span>Key,<span class="w"> </span>Secret<span class="w"> </span>Key,<span class="w"> </span>Bucket<span class="w"> </span>name
+<span class="m">4</span>.<span class="w"> </span>Check<span class="w"> </span>IAM<span class="w"> </span>permissions
+</code></pre></div>
+
+<h3 id="video-lag">Video lag</h3>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Đã fix trong camera_manager.py</span>
+cap.set<span class="o">(</span>cv2.CAP_PROP_BUFFERSIZE,<span class="w"> </span><span class="m">0</span><span class="o">)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="build-requirements">📦 Build Requirements</h2>
+<h3 id="exe-build">EXE Build</h3>
+<ul>
+<li>Python 3.11</li>
+<li>PyInstaller 6.0.0+</li>
+</ul>
+<h3 id="installer-build">Installer Build</h3>
+<ul>
+<li>Inno Setup 6.7.0</li>
+<li>Download: https://jrsoftware.org/isdl.php</li>
+</ul>
+<hr />
+<h2 id="security">🔐 Security</h2>
+<ul>
+<li><strong>Config Encryption</strong>: Fernet symmetric encryption</li>
+<li><strong>S3 Credentials</strong>: Encrypted in config.json</li>
+<li><strong>Encryption Key</strong>: <code>config.key</code> (44 bytes)</li>
+<li><strong>User Storage</strong>: <code>C:\Users\&lt;user&gt;\EcoHub_QR_Scanner\</code></li>
+</ul>
+<hr />
+<h2 id="performance">📊 Performance</h2>
+<ul>
+<li><strong>Camera FPS</strong>: 15-30 FPS</li>
+<li><strong>AI Scanner</strong>: 5 FPS (timestamp-based)</li>
+<li><strong>Recording</strong>: 15 FPS (async thread)</li>
+<li><strong>Upload</strong>: Multipart (50MB threshold, 10MB chunks)</li>
+<li><strong>Memory</strong>: Periodic cleanup (60s interval)</li>
+</ul>
+<hr />
+<h2 id="threading-model">🎬 Threading Model</h2>
+<div class="codehilite"><pre><span></span><code><span class="n">Main</span><span class="w"> </span><span class="n">Thread</span><span class="p">:</span><span class="w">        </span><span class="n">Flask</span><span class="w"> </span><span class="n">HTTP</span><span class="w"> </span><span class="n">Server</span>
+<span class="n">Camera</span><span class="w"> </span><span class="n">Threads</span><span class="p">:</span><span class="w">     </span><span class="n">Read</span><span class="w"> </span><span class="n">frames</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="mi">2</span><span class="w"> </span><span class="n">threads</span><span class="p">)</span>
+<span class="n">AI</span><span class="w"> </span><span class="n">Scanner</span><span class="w"> </span><span class="n">Threads</span><span class="p">:</span><span class="w"> </span><span class="n">QR</span><span class="w"> </span><span class="n">detection</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="mi">2</span><span class="w"> </span><span class="n">threads</span><span class="p">)</span>
+<span class="n">Recorder</span><span class="w"> </span><span class="n">Thread</span><span class="p">:</span><span class="w">    </span><span class="n">Video</span><span class="w"> </span><span class="n">writing</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="n">thread</span><span class="p">)</span>
+<span class="n">Upload</span><span class="w"> </span><span class="n">Thread</span><span class="p">:</span><span class="w">      </span><span class="n">S3</span><span class="w"> </span><span class="n">upload</span><span class="w"> </span><span class="n">worker</span><span class="w"> </span><span class="p">(</span><span class="mi">1</span><span class="w"> </span><span class="n">thread</span><span class="p">)</span>
+</code></pre></div>
+
+<hr />
+<h2 id="version-history">📝 Version History</h2>
+<h3 id="v100-09022026">v1.0.0 (09/02/2026)</h3>
+<ul>
+<li>✅ Initial release</li>
+<li>✅ USB/RTSP camera support (max 2)</li>
+<li>✅ ZXing-CPP QR scanner</li>
+<li>✅ Async video recorder</li>
+<li>✅ S3 upload with retry</li>
+<li>✅ Safe camera startup</li>
+<li>✅ Upload history with daily cleanup</li>
+<li>✅ GMT+7 timezone</li>
+<li>✅ PyInstaller build support</li>
+<li>✅ Inno Setup installer</li>
+</ul>
+<hr />
+<h2 id="contributing">🤝 Contributing</h2>
+<p>Dự án nội bộ - EcoHub Team only.</p>
+<hr />
+<h2 id="support">📞 Support</h2>
+<p><strong>Console Logs:</strong></p>
+<div class="codehilite"><pre><span></span><code><span class="c1"># Development</span>
+python<span class="w"> </span>app.py
+
+<span class="c1"># Production</span>
+EcoHub_QR_Scanner.exe
+</code></pre></div>
+
+<p><strong>Common Issues:</strong>
+- Check <code>DOCS.md</code> → Section 9: Xử lý sự cố
+- Check console logs
+- Check camera permissions
+- Check S3 credentials</p>
+<hr />
+<h2 id="license">📄 License</h2>
+<p>Copyright © 2026 EcoHub Team. All rights reserved.</p>
+<hr />
+<p><strong>Tác giả:</strong> EcoHub Development Team<br />
+<strong>Version:</strong> 1.0.0<br />
+<strong>Updated:</strong> 09/02/2026</p>
+</body>
+</html>
