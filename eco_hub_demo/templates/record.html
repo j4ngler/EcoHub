@@ -39,7 +39,7 @@
         <p class="text-muted small mt-2 mb-0">Quay video có thể bắt đầu ngay cả khi chưa quét mã (hệ thống sẽ dùng mã tạm).</p>
       </div>
     </div>
-    <div class="card card-ecohub">
+    <div class="card card-ecohub mb-3">
       <div class="card-header">Quay video</div>
       <div class="card-body">
         <p class="mb-2">Trạng thái: <span id="recordStatus" class="badge badge-status bg-secondary">Idle</span></p>
@@ -49,6 +49,16 @@
           <button id="pauseBtn" class="btn btn-outline-warning btn-lg" disabled>Tạm dừng</button>
           <button id="resumeBtn" class="btn btn-outline-primary btn-lg" disabled>Tiếp tục</button>
           <button id="stopBtn" class="btn btn-outline-danger btn-lg" disabled>Kết thúc</button>
+        </div>
+      </div>
+    </div>
+    <div class="card card-ecohub">
+      <div class="card-header">Trạng thái đóng gói (POC)</div>
+      <div class="card-body">
+        <!-- packingStatus sẽ được main.js render lại sau mỗi lần poll /status.
+             POC chỉ hiển thị 1 dòng tổng "tất cả sản phẩm" dựa trên serial_state "__all__". -->
+        <div id="packingStatus" class="small text-muted">
+          Chưa có dữ liệu – hãy quét mã đơn để bắt đầu.
         </div>
       </div>
     </div>
