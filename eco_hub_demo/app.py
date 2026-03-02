@@ -316,6 +316,7 @@ app_state = {
     "current_order_code": None,
     "current_order_info": None,
     "auto_record_on_qr": False,  # Tự động quay khi quét được QR
+    "is_paused": False,
 }
 
 
@@ -337,16 +338,21 @@ def _default_camera_config():
 def load_config():
     """
     Đọc cấu hình từ file config.json (nếu có).
-    Trả về: (camera_configs, scan_sensitivity, scan_interval_sec, auto_record_on_qr, storage_mode, s3_config)
+    Trả về: (camera_configs, scan_sensitivity, scan_interval_sec, auto_record_on_qr, storage_mode, s3_config, qr_cooldown_seconds)
     """
     if not os.path.exists(CONFIG_FILE):
-        return ([_default_camera_config()], SENSITIVITY_NORMAL, 0.05, False, "s3", None)
+        return ([_default_camera_config()], SENSITIVITY_NORMAL, 0.05, False, "s3", None, 5)
     try:
         with open(CONFIG_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
         configs = data.get("camera_configs", [_default_camera_config()])
         sensitivity = data.get("scan_sensitivity", SENSITIVITY_NORMAL)
         auto_record = data.get("auto_record_on_qr", False)
+        qr_cooldown = int(data.get("qr_cooldown_seconds", 5) or 5)
+        if qr_cooldown < 1:
+            qr_cooldown = 1
+        if qr_cooldown > 60:
+            qr_cooldown = 60
         storage_mode = "s3"  # Luôn dùng S3
         
         interval_map = {SENSITIVITY_LOW: 0.1, SENSITIVITY_NORMAL: 0.05, SENSITIVITY_HIGH: 0.03}
@@ -365,13 +371,13 @@ def load_config():
                 prefix=s3_data.get("prefix", ""),
             )
         
-        return (configs, sensitivity, interval, auto_record, storage_mode, s3_config)
+        return (configs, sensitivity, interval, auto_record, storage_mode, s3_config, qr_cooldown)
     except Exception as e:
         print("Loi doc config.json: %s" % str(e))
-        return ([_default_camera_config()], SENSITIVITY_NORMAL, 0.05, False, "s3", None)
+        return ([_default_camera_config()], SENSITIVITY_NORMAL, 0.05, False, "s3", None, 5)
 
 
-def save_config(configs, scan_sensitivity, auto_record_on_qr=False, storage_mode="s3", s3_config=None):
+def save_config(configs, scan_sensitivity, auto_record_on_qr=False, storage_mode="s3", s3_config=None, qr_cooldown_seconds: int = 5):
     """
     Ghi cấu hình vào file config.json.
     QUAN TRỌNG: Nếu s3_config = None, sẽ giữ lại s3_config hiện có trong file.
@@ -393,6 +399,7 @@ def save_config(configs, scan_sensitivity, auto_record_on_qr=False, storage_mode
             "scan_sensitivity": scan_sensitivity,
             "auto_record_on_qr": auto_record_on_qr,
             "storage_mode": "s3",  # Luôn dùng S3
+            "qr_cooldown_seconds": int(qr_cooldown_seconds or 5),
         }
         
         # Lưu S3 config (encrypt sensitive data)
@@ -457,7 +464,7 @@ def on_code_detected(code: str):
         threading.Thread(target=_auto_start, daemon=True).start()
 
 
-def build_managers_and_scanners(configs, scan_interval_sec=0.05, sensitivity=SENSITIVITY_NORMAL):
+def build_managers_and_scanners(configs, scan_interval_sec=0.05, sensitivity=SENSITIVITY_NORMAL, qr_cooldown_seconds: int = 5):
     """Dừng toàn bộ camera/scanner cũ, tạo mới theo configs. Recorder gắn vào manager đầu."""
     global camera_managers, ai_scanners
     for m in camera_managers:
@@ -484,6 +491,7 @@ def build_managers_and_scanners(configs, scan_interval_sec=0.05, sensitivity=SEN
             on_code_detected=on_code_detected,
             scan_interval_sec=scan_interval_sec,
             sensitivity=sensitivity,
+            cooldown_seconds=qr_cooldown_seconds,
         )
         ai_scanners.append(sc)
     if camera_managers:
@@ -623,6 +631,16 @@ def camera_settings():
         if scan_sensitivity not in (SENSITIVITY_LOW, SENSITIVITY_NORMAL, SENSITIVITY_HIGH):
             scan_sensitivity = SENSITIVITY_NORMAL
         interval_map = {SENSITIVITY_LOW: 0.1, SENSITIVITY_NORMAL: 0.05, SENSITIVITY_HIGH: 0.03}
+
+        # Nhận cấu hình cooldown quét QR (giây)
+        try:
+            qr_cooldown_seconds = int(request.form.get("qr_cooldown_seconds", "5") or "5")
+        except ValueError:
+            qr_cooldown_seconds = 5
+        if qr_cooldown_seconds < 1:
+            qr_cooldown_seconds = 1
+        if qr_cooldown_seconds > 60:
+            qr_cooldown_seconds = 60
         
         # Nhận tùy chọn "Tự động quay khi quét QR"
         auto_record = request.form.get("auto_record_on_qr") == "1"
@@ -632,6 +650,7 @@ def camera_settings():
                 configs,
                 scan_interval_sec=interval_map[scan_sensitivity],
                 sensitivity=scan_sensitivity,
+                qr_cooldown_seconds=qr_cooldown_seconds,
             )
             camera_configs.clear()
             camera_configs.extend(configs)
@@ -641,7 +660,7 @@ def camera_settings():
                 app_state["auto_record_on_qr"] = auto_record
             
             # Lưu cấu hình vào file JSON
-            save_config(configs, scan_sensitivity, auto_record)
+            save_config(configs, scan_sensitivity, auto_record, qr_cooldown_seconds=qr_cooldown_seconds)
             flash("Da ap dung cai dat camera (%d camera)." % len(configs))
         except RuntimeError as e:
             flash("Khong mo duoc camera: %s" % str(e))
@@ -655,6 +674,9 @@ def camera_settings():
     # Lấy auto_record_on_qr từ app_state
     with state_lock:
         auto_record = app_state.get("auto_record_on_qr", False)
+    
+    # Lấy qr_cooldown_seconds từ config
+    _, _, _, _, _, _, qr_cooldown_seconds = load_config()
     
     # Lấy camera status
     with camera_status_lock:
@@ -674,6 +696,7 @@ def camera_settings():
         is_running=primary.is_running if primary else False,
         scan_sensitivity=scan_sensitivity,
         scan_interval_sec=scan_interval_sec,
+        qr_cooldown_seconds=qr_cooldown_seconds,
         auto_record_on_qr=auto_record,
         camera_status=cam_status,
         SOURCE_USB=SOURCE_USB,
@@ -696,7 +719,7 @@ def storage_settings():
         storage_mode = "s3"
         
         # Load config hiện tại
-        _, saved_sensitivity, _, saved_auto_record, _, existing_s3_config = load_config()
+        _, saved_sensitivity, _, saved_auto_record, _, existing_s3_config, _ = load_config()
         
         # Lấy thông tin từ form
         new_endpoint = request.form.get("s3_endpoint", "").strip()
@@ -749,7 +772,7 @@ def storage_settings():
         return redirect(url_for("storage_settings"))
     
     # GET - hiển thị form
-    _, _, _, _, storage_mode, s3_config = load_config()
+    _, _, _, _, storage_mode, s3_config, _ = load_config()
     
     return render_template(
         "storage_settings.html",
@@ -766,8 +789,8 @@ def delete_s3_account():
     
     try:
         # Load config và xóa S3
-        _, saved_sensitivity, _, saved_auto_record, _, _ = load_config()
-        save_config(camera_configs, saved_sensitivity, saved_auto_record, "s3", None)
+        _, saved_sensitivity, _, saved_auto_record, _, _, saved_qr_cooldown = load_config()
+        save_config(camera_configs, saved_sensitivity, saved_auto_record, "s3", None, saved_qr_cooldown)
         
         # Clear s3_service
         s3_service.config = None
@@ -967,7 +990,7 @@ def test_camera():
     
     try:
         # Load config
-        saved_configs, _, _, _, _, _ = load_config()
+        saved_configs, _, _, _, _, _, _ = load_config()
         if not saved_configs:
             saved_configs = [_default_camera_config()]
         
@@ -1024,14 +1047,19 @@ def start_cameras():
     """
     try:
         # Load config
-        saved_configs, saved_sensitivity, saved_interval, saved_auto_record, _, saved_s3_config = load_config()
+        saved_configs, saved_sensitivity, saved_interval, saved_auto_record, _, saved_s3_config, saved_qr_cooldown = load_config()
         
         if not saved_configs:
             saved_configs = [_default_camera_config()]
         
         # Build and start cameras
         print("[START CAMERAS] Building camera managers...")
-        build_managers_and_scanners(saved_configs, scan_interval_sec=saved_interval, sensitivity=saved_sensitivity)
+        build_managers_and_scanners(
+            saved_configs,
+            scan_interval_sec=saved_interval,
+            sensitivity=saved_sensitivity,
+            qr_cooldown_seconds=saved_qr_cooldown,
+        )
         
         camera_configs.clear()
         camera_configs.extend(saved_configs)
@@ -1149,9 +1177,19 @@ def status():
         start = app_state["recording_start"]
         current_order_code = app_state["current_order_code"]
         order_info = app_state["current_order_info"]
+        is_paused = app_state.get("is_paused", False)
 
     now = time.time()
     recording_seconds = int(now - start) if is_recording and start else 0
+
+    # Tính tổng số lượng sản phẩm trong đơn hiện tại (nếu có)
+    total_items = 0
+    if order_info and isinstance(order_info, dict):
+        try:
+            items = order_info.get("items") or []
+            total_items = sum(int((it or {}).get("qty", 0) or 0) for it in items)
+        except Exception:
+            total_items = 0
 
     return jsonify(
         {
@@ -1159,6 +1197,8 @@ def status():
             "recording_seconds": recording_seconds,
             "current_order_code": current_order_code,
             "order_info": order_info,
+            "is_paused": is_paused,
+            "total_items": total_items,
             "num_cameras": len(camera_managers),
         }
     )
@@ -1169,40 +1209,8 @@ def _trigger_auto_recording(code: str):
     Helper function để tự động bắt đầu quay video (gọi từ on_code_detected).
     """
     try:
-        with state_lock:
-            if app_state["is_recording"]:
-                return
-            app_state["recording_order_code"] = code
-
-        video_path = storage_service.start_new_recording(VIDEOS_DIR, code)
-
-        primary = _primary_camera_manager
-        w = (primary.width if primary else 1280) or 1280
-        h = (primary.height if primary else 720) or 720
-        if w < 320:
-            w = 1280
-        if h < 240:
-            h = 720
-        frame_size = (int(w), int(h))
-
-        # PAUSE AI scanner
-        print("[AUTO-RECORD] Tam dung AI scanner...")
-        for scanner in ai_scanners:
-            if scanner:
-                scanner.pause()
-        time.sleep(0.2)
-
-        # Bắt đầu quay
-        recorder.start(video_path, frame_size=frame_size, fps=15.0)
-
-        if recorder.file_path and recorder.file_path != video_path:
-            storage_service.update_recording_path(code, recorder.file_path)
-
-        with state_lock:
-            app_state["is_recording"] = True
-            app_state["recording_start"] = time.time()
-
-        print(f"[AUTO-RECORD] Da bat dau quay tu dong cho QR: {code}")
+        # Dùng chung core logic với start_recording
+        _start_recording_internal(code, auto=True)
     except Exception as e:
         print(f"[AUTO-RECORD] Loi khi tu dong quay: {e}")
         import traceback
@@ -1223,50 +1231,23 @@ def start_recording():
             return jsonify({"error": "Camera chưa khởi động! Vui lòng Start Camera trước."}), 400
 
     try:
+        # Nếu đã quay thì không tạo phiên mới
         with state_lock:
             if app_state["is_recording"]:
                 return jsonify({"ok": True, "message": "Đang quay"}), 200
-            code = app_state["current_order_code"]
-            if code is None:
-                code = "recording_" + str(int(time.time()))
-            app_state["recording_order_code"] = code
 
-        video_path = storage_service.start_new_recording(VIDEOS_DIR, code)
-
-        primary = _primary_camera_manager
-        w = (primary.width if primary else 1280) or 1280
-        h = (primary.height if primary else 720) or 720
-        if w < 320:
-            w = 1280
-        if h < 240:
-            h = 720
-        frame_size = (int(w), int(h))
-        
-        print(f"[DEBUG app.py] primary camera: width={primary.width if primary else 'None'}, height={primary.height if primary else 'None'}")
-        print(f"[DEBUG app.py] frame_size truyen vao recorder: {frame_size}")
-        print(f"[DEBUG app.py] recorder.is_recording truoc khi start: {recorder.is_recording}")
-
-        # Tat AI scanner khi dang record de tranh conflict va tang performance
-        print("[INFO] PAUSE AI QR scanner when starting record...")
-        for scanner in ai_scanners:
-            if scanner:
-                scanner.pause()
-        
-        # Chờ 200ms để scanner giải phóng frame
-        time.sleep(0.2)
-        
-        # Bắt đầu quay video (FPS 15 để tránh timestamp conflict với RTSP)
-        print(f"[INFO] Starting ASYNC recorder (FPS=15, size={frame_size})")
-        print(f"[INFO] Recorder has SEPARATE THREAD with 90-frame buffer")
-        recorder.start(video_path, frame_size=frame_size, fps=15.0)
-        
-        # Cập nhật path thực tế nếu recorder đổi extension (mp4 -> avi)
-        if recorder.file_path and recorder.file_path != video_path:
-            storage_service.update_recording_path(code, recorder.file_path)
-
+        # Sử dụng mã đơn hiện tại (nếu có), nếu không thì tạo mã tạm
+        code = None
         with state_lock:
-            app_state["is_recording"] = True
-            app_state["recording_start"] = time.time()
+            code = app_state.get("current_order_code")
+        if code is None:
+            code = "recording_" + str(int(time.time()))
+
+        # Gọi chung logic bắt đầu quay (dùng chung cho auto-record và manual)
+        result = _start_recording_internal(code, auto=False)
+        if not result.get("ok"):
+            # Nếu có lý do đặc biệt, trả về cho FE (hiện tại chỉ có already_recording)
+            return jsonify({"error": result.get("reason", "Không thể bắt đầu quay")}), 400
 
         return jsonify({"ok": True})
     except Exception as e:
@@ -1281,6 +1262,77 @@ def start_recording():
         with state_lock:
             app_state["recording_order_code"] = None
         return jsonify({"error": error_msg}), 500
+
+
+def _start_recording_internal(code: str, auto: bool = False) -> dict:
+    """
+    Core logic bắt đầu quay video.
+    - Tạo file mới
+    - Pause AI scanner
+    - Gọi recorder.start(...)
+    - Cập nhật app_state
+    """
+    try:
+        with state_lock:
+            if app_state["is_recording"]:
+                return {"ok": False, "reason": "already_recording"}
+            # Ghi nhận mã đơn gắn với video
+            app_state["recording_order_code"] = code
+            app_state["is_paused"] = False
+
+        video_path = storage_service.start_new_recording(VIDEOS_DIR, code)
+
+        primary = _primary_camera_manager
+        w = (primary.width if primary else 1280) or 1280
+        h = (primary.height if primary else 720) or 720
+        if w < 320:
+            w = 1280
+        if h < 240:
+            h = 720
+        frame_size = (int(w), int(h))
+
+        if not auto:
+            print(
+                f"[DEBUG app.py] primary camera: width={primary.width if primary else 'None'}, "
+                f"height={primary.height if primary else 'None'}"
+            )
+            print(f"[DEBUG app.py] frame_size truyen vao recorder: {frame_size}")
+            print(f"[DEBUG app.py] recorder.is_recording truoc khi start: {recorder.is_recording}")
+
+        # Tạm dừng AI scanner khi đang record để tránh conflict và tăng performance
+        print("[INFO] PAUSE AI QR scanner when starting record...")
+        for scanner in ai_scanners:
+            if scanner:
+                scanner.pause()
+
+        # Chờ 200ms để scanner giải phóng frame
+        time.sleep(0.2)
+
+        # Bắt đầu quay video (FPS 15 để tránh timestamp conflict với RTSP)
+        print(f"[INFO] Starting ASYNC recorder (FPS=15, size={frame_size})")
+        print(f"[INFO] Recorder has SEPARATE THREAD with 90-frame buffer")
+        recorder.start(video_path, frame_size=frame_size, fps=15.0)
+
+        # Cập nhật path thực tế nếu recorder đổi extension (mp4 -> avi)
+        if recorder.file_path and recorder.file_path != video_path:
+            storage_service.update_recording_path(code, recorder.file_path)
+
+        with state_lock:
+            app_state["is_recording"] = True
+            app_state["recording_start"] = time.time()
+
+        if auto:
+            print(f"[AUTO-RECORD] Da bat dau quay tu dong cho QR: {code}")
+
+        return {"ok": True, "code": code}
+    except Exception as e:
+        print(f"[START RECORD] Loi khi bat dau quay: {e}")
+        import traceback
+
+        traceback.print_exc()
+        with state_lock:
+            app_state["recording_order_code"] = None
+        return {"ok": False, "reason": str(e)}
 
 
 @app.route("/stop_recording", methods=["POST"])
@@ -1311,6 +1363,7 @@ def stop_recording():
         app_state["recording_order_code"] = None
         app_state["current_order_code"] = None
         app_state["current_order_info"] = None
+        app_state["is_paused"] = False
 
     # Reset tat ca scanner, CLEAR QUEUE cu va RESUME scanner
     print("[INFO] RESUME AI scanner and CLEAR QUEUE after stopping record...")
@@ -1362,6 +1415,44 @@ def stop_recording():
         print(f"[WARNING] No video file to upload")
 
     return jsonify({"ok": True, "duration": duration, "message": "In xong"})
+
+
+@app.route("/pause_recording", methods=["POST"])
+def pause_recording():
+    """
+    Tạm dừng ghi video (không đóng file, chỉ bỏ qua frame mới).
+    """
+    if "user" not in session:
+        return jsonify({"error": "Chưa đăng nhập"}), 401
+
+    with state_lock:
+        if not app_state["is_recording"]:
+            return jsonify({"error": "Không ở trạng thái quay"}), 400
+        if app_state.get("is_paused"):
+            return jsonify({"ok": True, "message": "Đã ở trạng thái tạm dừng"}), 200
+        app_state["is_paused"] = True
+
+    recorder.pause()
+    return jsonify({"ok": True})
+
+
+@app.route("/resume_recording", methods=["POST"])
+def resume_recording():
+    """
+    Tiếp tục ghi video sau khi tạm dừng.
+    """
+    if "user" not in session:
+        return jsonify({"error": "Chưa đăng nhập"}), 401
+
+    with state_lock:
+        if not app_state["is_recording"]:
+            return jsonify({"error": "Không ở trạng thái quay"}), 400
+        if not app_state.get("is_paused"):
+            return jsonify({"ok": True, "message": "Đang ở trạng thái quay"}), 200
+        app_state["is_paused"] = False
+
+    recorder.resume()
+    return jsonify({"ok": True})
 
 
 @app.route("/reset_order", methods=["POST"])
@@ -1441,7 +1532,7 @@ if __name__ == "__main__":
         print(f"[STARTUP] Error scanning local videos: {e}")
     
     # Load cấu hình từ file (KHÔNG TỰ ĐỘNG KHỞI ĐỘNG CAMERA)
-    saved_configs, saved_sensitivity, saved_interval, saved_auto_record, saved_storage_mode, saved_s3_config = load_config()
+    saved_configs, saved_sensitivity, saved_interval, saved_auto_record, saved_storage_mode, saved_s3_config, saved_qr_cooldown = load_config()
     
     # Load S3 config (nếu có)
     if saved_s3_config:

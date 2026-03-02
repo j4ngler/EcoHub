@@ -22,6 +22,7 @@ class VideoRecorder:
         self._start_time: Optional[float] = None
         self._original_size: Optional[Tuple[int, int]] = None
         self._target_size: Optional[Tuple[int, int]] = None
+        self._paused: bool = False
         
         # ASYNC RECORDING: Queue và thread riêng
         self._frame_queue = queue.Queue(maxsize=90)  # Buffer 90 frames (~3s @ 30fps)
@@ -110,6 +111,7 @@ class VideoRecorder:
         self._target_size = (target_w, target_h)
         self._start_time = time.time()
         self.is_recording = True
+        self._paused = False
         
         # Start async writer thread
         self._running = True
@@ -156,7 +158,7 @@ class VideoRecorder:
         Đẩy frame vào queue (NON-BLOCKING).
         Camera thread không bị block, writer thread xử lý async.
         """
-        if not self.is_recording:
+        if not self.is_recording or self._paused:
             return
         
         try:
@@ -170,6 +172,16 @@ class VideoRecorder:
             self._frame_queue.put_nowait(frame.copy())  # Copy để tránh race condition
         except queue.Full:
             pass  # Skip frame này nếu queue vẫn đầy
+
+    def pause(self):
+        """Tạm dừng ghi (bỏ qua frame mới, không đóng file)."""
+        if self.is_recording:
+            self._paused = True
+
+    def resume(self):
+        """Tiếp tục ghi sau khi pause."""
+        if self.is_recording:
+            self._paused = False
 
     def stop(self) -> int:
         """

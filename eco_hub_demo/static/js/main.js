@@ -4,6 +4,8 @@ function formatSeconds(sec) {
   return String(m).padStart(2, "0") + ":" + String(s).padStart(2, "0");
 }
 
+let lastOrderCode = null;
+
 async function fetchStatus() {
   try {
     const res = await fetch("/status");
@@ -16,6 +18,9 @@ async function fetchStatus() {
     const recordTimerEl = document.getElementById("recordTimer");
     const startBtn = document.getElementById("startBtn");
     const stopBtn = document.getElementById("stopBtn");
+    const pauseBtn = document.getElementById("pauseBtn");
+    const resumeBtn = document.getElementById("resumeBtn");
+    const qtyWarningAudio = document.getElementById("qtyWarningAudio");
 
     if (orderCodeEl) {
       orderCodeEl.textContent = data.current_order_code || "Chưa quét được mã";
@@ -34,19 +39,50 @@ async function fetchStatus() {
       orderInfoEl.innerHTML = html;
     }
 
+    // Cảnh báo âm thanh khi quét đơn mới có nhiều sản phẩm
+    const currentCode = data.current_order_code || null;
+    const totalItems = typeof data.total_items === "number" ? data.total_items : 0;
+    const WARNING_THRESHOLD = 5; // Đơn có từ 5 sản phẩm trở lên sẽ cảnh báo
+
+    if (currentCode && currentCode !== lastOrderCode) {
+      if (totalItems >= WARNING_THRESHOLD && qtyWarningAudio) {
+        try {
+          qtyWarningAudio.currentTime = 0;
+          qtyWarningAudio.play();
+        } catch (e) {
+          console.warn("Không phát được âm thanh cảnh báo:", e);
+        }
+      }
+      lastOrderCode = currentCode;
+    }
+
     if (recordStatusEl && recordTimerEl && startBtn && stopBtn) {
-      if (data.is_recording) {
-        recordStatusEl.textContent = "Recording";
-        recordStatusEl.className = "badge bg-danger";
+      const isRecording = !!data.is_recording;
+      const isPaused = !!data.is_paused;
+
+      if (isRecording) {
+        if (isPaused) {
+          recordStatusEl.textContent = "Paused";
+          recordStatusEl.className = "badge bg-warning";
+        } else {
+          recordStatusEl.textContent = "Recording";
+          recordStatusEl.className = "badge bg-danger";
+        }
         recordTimerEl.textContent = formatSeconds(data.recording_seconds);
+
         startBtn.disabled = true;
         stopBtn.disabled = false;
+        if (pauseBtn) pauseBtn.disabled = isPaused;
+        if (resumeBtn) resumeBtn.disabled = !isPaused;
       } else {
         recordStatusEl.textContent = "Idle";
         recordStatusEl.className = "badge bg-secondary";
         recordTimerEl.textContent = "00:00";
+
         startBtn.disabled = false;
         stopBtn.disabled = true;
+        if (pauseBtn) pauseBtn.disabled = true;
+        if (resumeBtn) resumeBtn.disabled = true;
       }
     }
   } catch (e) {
@@ -103,6 +139,32 @@ async function stopRecording() {
   }
 }
 
+async function pauseRecording() {
+  try {
+    const res = await fetch("/pause_recording", { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.error || "Không tạm dừng được.");
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Lỗi kết nối. Kiểm tra server đã chạy chưa.");
+  }
+}
+
+async function resumeRecording() {
+  try {
+    const res = await fetch("/resume_recording", { method: "POST" });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      alert(data.error || "Không tiếp tục quay được.");
+    }
+  } catch (e) {
+    console.error(e);
+    alert("Lỗi kết nối. Kiểm tra server đã chạy chưa.");
+  }
+}
+
 function showToast(message) {
   const toastEl = document.getElementById("successToast");
   const toastBody = document.getElementById("toastBody");
@@ -124,10 +186,14 @@ async function resetOrder() {
 document.addEventListener("DOMContentLoaded", () => {
   const startBtn = document.getElementById("startBtn");
   const stopBtn = document.getElementById("stopBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const resumeBtn = document.getElementById("resumeBtn");
   const resetOrderBtn = document.getElementById("resetOrderBtn");
 
   if (startBtn) startBtn.addEventListener("click", startRecording);
   if (stopBtn) stopBtn.addEventListener("click", stopRecording);
+  if (pauseBtn) pauseBtn.addEventListener("click", pauseRecording);
+  if (resumeBtn) resumeBtn.addEventListener("click", resumeRecording);
   if (resetOrderBtn) resetOrderBtn.addEventListener("click", resetOrder);
 
   // Poll mỗi 1s

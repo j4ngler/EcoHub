@@ -506,6 +506,17 @@
         </select>
       </div>
 
+      <div class="setting-item">
+        <label for="qr_cooldown_seconds">Cooldown QR (giây)</label>
+        <select name="qr_cooldown_seconds" id="qr_cooldown_seconds" class="form-select">
+          {% for sec in [2,3,5,10] %}
+            <option value="{{ sec }}" {% if qr_cooldown_seconds == sec %}selected{% endif %}>
+              {{ sec }} giây
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
       <div class="auto-record-box">
         <input type="checkbox" 
                name="auto_record_on_qr" 

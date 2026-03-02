@@ -46,11 +46,14 @@
         <p class="mb-3">Thời gian: <span id="recordTimer">00:00</span></p>
         <div class="d-grid gap-2">
           <button id="startBtn" class="btn btn-ecohub btn-lg">Bắt đầu quay</button>
+          <button id="pauseBtn" class="btn btn-outline-warning btn-lg" disabled>Tạm dừng</button>
+          <button id="resumeBtn" class="btn btn-outline-primary btn-lg" disabled>Tiếp tục</button>
           <button id="stopBtn" class="btn btn-outline-danger btn-lg" disabled>Kết thúc</button>
         </div>
       </div>
     </div>
   </div>
 </div>
+<audio id="qtyWarningAudio" src="{{ url_for('static', filename='audio/qty_warning.mp3') }}" preload="auto"></audio>
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 {% endblock %}

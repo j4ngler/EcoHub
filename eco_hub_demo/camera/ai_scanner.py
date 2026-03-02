@@ -18,7 +18,7 @@ class AIBarcodeScanner:
     - Cooldown: Không quét lại cùng mã trong COOLDOWN_SECONDS giây.
     """
     
-    COOLDOWN_SECONDS = 5  # 5 phút cooldown cho mỗi mã
+    DEFAULT_COOLDOWN_SECONDS = 5  # 5 giây cooldown cho mỗi mã
 
     def __init__(
         self,
@@ -26,11 +26,13 @@ class AIBarcodeScanner:
         on_code_detected: Callable[[str], None],
         scan_interval_sec: float = 0.01,  # OPTIMIZATION: Giảm từ 0.05 → 0.01 (nhanh hơn)
         sensitivity: str = SENSITIVITY_NORMAL,
+        cooldown_seconds: float = None,
     ):
         self.camera_manager = camera_manager
         self.on_code_detected = on_code_detected
         self._scan_interval = max(0.005, min(0.1, scan_interval_sec))  # OPTIMIZATION: Min 0.005s
         self._sensitivity = sensitivity if sensitivity in (SENSITIVITY_LOW, SENSITIVITY_NORMAL, SENSITIVITY_HIGH) else SENSITIVITY_NORMAL
+        self._cooldown_seconds: float = max(0.0, float(cooldown_seconds)) if cooldown_seconds is not None else float(self.DEFAULT_COOLDOWN_SECONDS)
 
         self._thread = None
         self._running = False
@@ -47,6 +49,11 @@ class AIBarcodeScanner:
                 self._scan_interval = max(0.02, min(0.2, scan_interval_sec))
             if sensitivity in (SENSITIVITY_LOW, SENSITIVITY_NORMAL, SENSITIVITY_HIGH):
                 self._sensitivity = sensitivity
+
+    def set_cooldown(self, cooldown_seconds: float):
+        """Cập nhật thời gian cooldown giữa 2 lần quét cùng một mã."""
+        with self._lock:
+            self._cooldown_seconds = max(0.0, float(cooldown_seconds))
 
     def get_sensitivity(self) -> tuple:
         """Trả về (scan_interval_sec, sensitivity_level)."""
@@ -146,14 +153,14 @@ class AIBarcodeScanner:
                             if self._locked_code is None:
                                 # Kiểm tra cooldown: đã quét mã này trong vòng COOLDOWN_SECONDS giây chưa?
                                 last_detected = self._code_history.get(code_data, 0)
-                                if current_time - last_detected >= self.COOLDOWN_SECONDS:
+                                if current_time - last_detected >= self._cooldown_seconds:
                                     # OK, có thể quét mã này
                                     self._locked_code = code_data
                                     self._code_history[code_data] = current_time
                                     self.on_code_detected(code_data)
                                 else:
                                     # Mã này đã được quét gần đây, bỏ qua
-                                    remaining = int(self.COOLDOWN_SECONDS - (current_time - last_detected))
+                                    remaining = int(self._cooldown_seconds - (current_time - last_detected))
                                     print(f"[SCANNER COOLDOWN] QR code '{code_data}' scanned recently. "
                                           f"{remaining}s cooldown remaining.")
                     
@@ -167,7 +174,7 @@ class AIBarcodeScanner:
                             # Xóa các entries cũ hơn COOLDOWN_SECONDS
                             codes_to_remove = [
                                 code for code, timestamp in self._code_history.items()
-                                if current_time - timestamp > self.COOLDOWN_SECONDS
+                                if current_time - timestamp > self._cooldown_seconds
                             ]
                             for code in codes_to_remove:
                                 del self._code_history[code]
