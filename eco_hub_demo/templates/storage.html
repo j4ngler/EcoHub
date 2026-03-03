@@ -416,6 +416,28 @@
   <p>☁️ Quản lý video trên S3 Cloud Storage và theo dõi tiến trình upload</p>
 </div>
 
+<!-- Giới hạn dung lượng video (local) – thanh % + cảnh báo 70/90/100% -->
+<div class="card mb-3" style="border: 1px solid #e2e8f0;">
+  <div class="card-header bg-light fw-bold">Dung lượng video (giới hạn local)</div>
+  <div class="card-body">
+    <div id="storagePageUsagePlaceholder" class="text-muted small">Đang tải...</div>
+    <div id="storagePageUsageContent" style="display: none;">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <p class="mb-1"><strong><span id="spUsedGb">0</span> GB</strong> / <span id="spLimitGb">0</span> GB</p>
+          <p class="mb-2 small text-muted"><span id="spVideoCount">0</span> video · <span id="spDurationMin">0</span> phút</p>
+          <div class="progress mb-2" style="height: 10px;">
+            <div id="spProgressBar" class="progress-bar" role="progressbar" style="width: 0%;"></div>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div id="spAlertBox" class="small"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Stats Cards -->
 <div class="row mb-3">
   <div class="col-md-4">
@@ -900,6 +922,58 @@ function switchTab(tabId) {
   // Cập nhật mỗi 2 giây
   updateUploadStatus();
   setInterval(updateUploadStatus, 2000);
+})();
+
+// =============================
+// VIDEO STORAGE USAGE (giới hạn local – cảnh báo 70/90/100%)
+// =============================
+(function() {
+  const placeholder = document.getElementById('storagePageUsagePlaceholder');
+  const content = document.getElementById('storagePageUsageContent');
+  const spUsedGb = document.getElementById('spUsedGb');
+  const spLimitGb = document.getElementById('spLimitGb');
+  const spVideoCount = document.getElementById('spVideoCount');
+  const spDurationMin = document.getElementById('spDurationMin');
+  const spProgressBar = document.getElementById('spProgressBar');
+  const spAlertBox = document.getElementById('spAlertBox');
+  if (!placeholder) return;
+
+  function render() {
+    fetch('/api/video_storage_usage')
+      .then(function(r) {
+        if (r.status === 401) { placeholder.textContent = 'Cần đăng nhập'; return null; }
+        return r.json();
+      })
+      .then(function(data) {
+        if (!data || !data.success || !data.usage) {
+          if (data && !data.success) placeholder.textContent = data.error || 'Lỗi';
+          return;
+        }
+        const u = data.usage;
+        const limitGb = u.storage_limit_gb || 0;
+        const usedGb = u.used_gb || 0;
+        const percent = Math.min(100, Math.round(u.percent_used || 0));
+        placeholder.style.display = 'none';
+        content.style.display = 'block';
+        spUsedGb.textContent = usedGb.toFixed(2);
+        spLimitGb.textContent = limitGb > 0 ? limitGb.toFixed(2) : '∞';
+        spVideoCount.textContent = u.video_count || 0;
+        spDurationMin.textContent = (u.total_duration_min || 0).toFixed(1);
+        spProgressBar.style.width = percent + '%';
+        spProgressBar.classList.remove('bg-success', 'bg-warning', 'bg-danger');
+        if (percent >= 90) spProgressBar.classList.add('bg-danger');
+        else if (percent >= 70) spProgressBar.classList.add('bg-warning');
+        else spProgressBar.classList.add('bg-success');
+        var alertHtml = '';
+        if (percent >= 100) alertHtml = '<div class="alert alert-danger py-2 mb-0 small">≥100%: Auto cleanup đang kích hoạt</div>';
+        else if (percent >= 90) alertHtml = '<div class="alert alert-danger py-2 mb-0 small">≥90%: Cảnh báo nguy hiểm</div>';
+        else if (percent >= 70) alertHtml = '<div class="alert alert-warning py-2 mb-0 small">≥70%: Cảnh báo sớm</div>';
+        spAlertBox.innerHTML = alertHtml;
+      })
+      .catch(function() { placeholder.textContent = 'Lỗi kết nối'; });
+  }
+  render();
+  setInterval(render, 10000);
 })();
 </script>
 {% endblock %}

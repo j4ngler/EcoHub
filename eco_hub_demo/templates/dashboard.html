@@ -67,7 +67,7 @@
         {% endif %}
       </div>
     </div>
-    <div class="card card-ecohub">
+    <div class="card card-ecohub mb-3">
       <div class="card-header">Quay video</div>
       <div class="card-body">
         <p class="mb-2">Trạng thái: <span id="recordStatus" class="badge badge-status bg-secondary">Idle</span></p>
@@ -78,8 +78,92 @@
         </div>
       </div>
     </div>
+    <!-- Dung lượng video: giới hạn + cảnh báo 70% / 90% / 100% -->
+    <div class="card card-ecohub">
+      <div class="card-header">Dung lượng video</div>
+      <div class="card-body">
+        <div id="videoStorageUsagePlaceholder" class="text-muted small">
+          Đang tải...
+        </div>
+        <div id="videoStorageUsageContent" style="display: none;">
+          <p class="mb-1"><strong><span id="vsUsedGb">0</span> GB</strong> / <span id="vsLimitGb">0</span> GB</p>
+          <p class="mb-2 small text-muted"><span id="vsVideoCount">0</span> video · <span id="vsDurationMin">0</span> phút</p>
+          <div class="progress mb-2" style="height: 8px;">
+            <div id="vsProgressBar" class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+          <div id="vsAlertBox" class="small"></div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
 <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script>
+(function() {
+  const placeholder = document.getElementById('videoStorageUsagePlaceholder');
+  const content = document.getElementById('videoStorageUsageContent');
+  const vsUsedGb = document.getElementById('vsUsedGb');
+  const vsLimitGb = document.getElementById('vsLimitGb');
+  const vsVideoCount = document.getElementById('vsVideoCount');
+  const vsDurationMin = document.getElementById('vsDurationMin');
+  const vsProgressBar = document.getElementById('vsProgressBar');
+  const vsAlertBox = document.getElementById('vsAlertBox');
+
+  function renderUsage(data) {
+    if (!data || !data.usage) {
+      placeholder.textContent = 'Không có dữ liệu';
+      return;
+    }
+    const u = data.usage;
+    const limitGb = u.storage_limit_gb || 0;
+    const usedGb = u.used_gb || 0;
+    const percent = Math.min(100, Math.round(u.percent_used || 0));
+    const count = u.video_count || 0;
+    const durationMin = (u.total_duration_min || 0).toFixed(1);
+
+    placeholder.style.display = 'none';
+    content.style.display = 'block';
+    vsUsedGb.textContent = usedGb.toFixed(2);
+    vsLimitGb.textContent = limitGb > 0 ? limitGb.toFixed(2) : '∞';
+    vsVideoCount.textContent = count;
+    vsDurationMin.textContent = durationMin;
+
+    vsProgressBar.style.width = percent + '%';
+    vsProgressBar.setAttribute('aria-valuenow', percent);
+    vsProgressBar.classList.remove('bg-success', 'bg-warning', 'bg-danger');
+    if (percent >= 90) vsProgressBar.classList.add('bg-danger');
+    else if (percent >= 70) vsProgressBar.classList.add('bg-warning');
+    else vsProgressBar.classList.add('bg-success');
+
+    var alertHtml = '';
+    if (percent >= 100) {
+      alertHtml = '<div class="alert alert-danger py-2 mb-0 small">⚠️ ≥100%: Auto cleanup đang kích hoạt</div>';
+    } else if (percent >= 90) {
+      alertHtml = '<div class="alert alert-danger py-2 mb-0 small">⚠️ ≥90%: Cảnh báo nguy hiểm</div>';
+    } else if (percent >= 70) {
+      alertHtml = '<div class="alert alert-warning py-2 mb-0 small">⚠️ ≥70%: Cảnh báo sớm</div>';
+    }
+    vsAlertBox.innerHTML = alertHtml;
+  }
+
+  fetch('/api/video_storage_usage')
+    .then(function(r) {
+      if (r.status === 401) {
+        placeholder.textContent = 'Cần đăng nhập';
+        return null;
+      }
+      return r.json();
+    })
+    .then(function(data) {
+      if (data && data.success) renderUsage(data);
+      else if (data && !data.success) placeholder.textContent = data.error || 'Lỗi tải dữ liệu';
+      else if (data === null) return;
+      else placeholder.textContent = 'Lỗi tải dữ liệu';
+    })
+    .catch(function() {
+      placeholder.textContent = 'Lỗi kết nối';
+    });
+})();
+</script>
 {% endblock %}
