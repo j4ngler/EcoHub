@@ -6,6 +6,9 @@ function formatSeconds(sec) {
 
 let lastOrderCode = null;
 
+// Trạng thái packing lần trước để so sánh và trigger âm thanh/cảnh báo thông minh hơn.
+let lastPackingStateJson = null;
+
 async function fetchStatus() {
   try {
     const res = await fetch("/status");
@@ -21,6 +24,8 @@ async function fetchStatus() {
     const pauseBtn = document.getElementById("pauseBtn");
     const resumeBtn = document.getElementById("resumeBtn");
     const qtyWarningAudio = document.getElementById("qtyWarningAudio");
+    const serialErrorAudio = document.getElementById("serialErrorAudio");
+    const packingStatusEl = document.getElementById("packingStatus");
 
     if (orderCodeEl) {
       orderCodeEl.textContent = data.current_order_code || "Chưa quét được mã";
@@ -54,6 +59,28 @@ async function fetchStatus() {
         }
       }
       lastOrderCode = currentCode;
+    }
+
+    // Cảnh báo âm thanh khi thừa serial: phát khi vừa chuyển sang has_excess (đọc state cũ trước khi render ghi đè).
+    const packing = data.packing_state || {};
+    let prevPacking = null;
+    try {
+      prevPacking = lastPackingStateJson ? JSON.parse(lastPackingStateJson) : null;
+    } catch (_) {}
+    const nowExcess = !!packing.has_excess;
+    const prevExcess = prevPacking && prevPacking.has_excess;
+    if (serialErrorAudio && nowExcess && !prevExcess) {
+      try {
+        serialErrorAudio.currentTime = 0;
+        serialErrorAudio.play();
+      } catch (e) {
+        console.warn("Không phát được âm thanh cảnh báo serial:", e);
+      }
+    }
+
+    // Render bảng trạng thái đóng gói (POC) — sau render sẽ cập nhật lastPackingStateJson cho lần poll tiếp theo.
+    if (packingStatusEl) {
+      renderPackingStatus(packingStatusEl, data.packing_state);
     }
 
     if (recordStatusEl && recordTimerEl && startBtn && stopBtn) {
@@ -128,9 +155,19 @@ async function stopRecording() {
     const res = await fetch("/stop_recording", { method: "POST" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      // Cảnh báo âm thanh khi backend chặn vì chưa quét đủ hoặc thừa serial
+      const packing = data.packing_state || {};
+      if (packing.has_missing || packing.has_excess) {
+        const serialErrorEl = document.getElementById("serialErrorAudio");
+        if (serialErrorEl) {
+          try {
+            serialErrorEl.currentTime = 0;
+            serialErrorEl.play();
+          } catch (_) {}
+        }
+      }
       alert(data.error || "Không dừng quay được.");
     } else {
-      // Hiện thông báo "In xong" bằng toast
       showToast("✅ In xong! Thời lượng: " + (data.duration || 0) + " giây");
     }
   } catch (e) {
@@ -162,6 +199,82 @@ async function resumeRecording() {
   } catch (e) {
     console.error(e);
     alert("Lỗi kết nối. Kiểm tra server đã chạy chưa.");
+  }
+}
+
+/**
+ * Render trạng thái đóng gói lên card #packingStatus.
+ *
+ * POC hiện tại chỉ có 1 bucket "__all__" đại diện cho toàn bộ số lượng sản phẩm.
+ * Các trạng thái:
+ * - missing: chưa quét đủ serial / số lượng
+ * - ok     : đã quét đủ
+ * - excess : đang thừa serial / số lượng
+ */
+function renderPackingStatus(container, packingState) {
+  if (!container) return;
+
+  if (!packingState || !Array.isArray(packingState.items) || packingState.items.length === 0) {
+    container.innerHTML =
+      '<p class="mb-0 text-muted">Chưa có dữ liệu serial. Hãy quét mã đơn, sau đó quét serial trong quá trình đóng gói.</p>';
+    lastPackingStateJson = null;
+    return;
+  }
+
+  const items = packingState.items;
+
+  // Hiện tại POC chỉ quan tâm tới bucket tổng "__all__",
+  // nhưng code vẫn lặp qua toàn bộ để dễ mở rộng sau này.
+  let rowsHtml = "";
+  items.forEach((it) => {
+    const status = it.status || "missing";
+    let badgeClass = "bg-secondary";
+    let label = "Chưa rõ";
+
+    if (status === "ok") {
+      badgeClass = "bg-success";
+      label = "Đủ";
+    } else if (status === "missing") {
+      badgeClass = "bg-warning text-dark";
+      label = "Thiếu";
+    } else if (status === "excess") {
+      badgeClass = "bg-danger";
+      label = "Thừa";
+    }
+
+    rowsHtml += `
+      <tr>
+        <td>Tổng tất cả sản phẩm</td>
+        <td class="text-end">${it.required_qty}</td>
+        <td class="text-end">${it.scanned_count}</td>
+        <td class="text-center"><span class="badge ${badgeClass}">${label}</span></td>
+      </tr>
+    `;
+  });
+
+  container.innerHTML = `
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Sản phẩm</th>
+            <th class="text-end">SL yêu cầu</th>
+            <th class="text-end">SL đã quét</th>
+            <th class="text-center">Trạng thái</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rowsHtml}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // Lưu snapshot để sau này có thể so sánh và trigger âm thanh tinh vi hơn nếu cần.
+  try {
+    lastPackingStateJson = JSON.stringify(packingState);
+  } catch {
+    lastPackingStateJson = null;
   }
 }
 

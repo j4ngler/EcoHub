@@ -307,6 +307,11 @@ def upload_worker():
 # ==========================
 # TRẠNG THÁI TOÀN CỤC (DEMO)
 # ==========================
+#
+# state_lock bảo vệ mọi truy cập/ghi app_state để tránh race condition
+# giữa các thread (camera, AI scanner, upload worker, Flask request).
+# app_state chỉ lưu những thứ "phiên hiện tại" – không phải dữ liệu lâu dài.
+# Khi bạn reset đơn hoặc dừng quay, app_state được đưa về trạng thái sạch.
 
 state_lock = threading.Lock()
 app_state = {
@@ -317,6 +322,17 @@ app_state = {
     "current_order_info": None,
     "auto_record_on_qr": False,  # Tự động quay khi quét được QR
     "is_paused": False,
+    # serial_state: trạng thái quét serial trong POC hiện tại.
+    # Để đơn giản, POC gom toàn bộ số lượng sản phẩm trong đơn
+    # thành một "bucket" duy nhất "__all__" thay vì theo từng dòng sản phẩm.
+    # Sau này khi có API thật và mapping serial → OrderItem,
+    # ta chỉ cần thay đổi cấu trúc này cho chi tiết hơn.
+    "serial_state": {},
+    # packing_evaluation: snapshot đánh giá số lượng đã quét so với yêu cầu.
+    # Được tính lại sau mỗi lần quét serial và dùng để:
+    # - Trả về frontend qua /status
+    # - Quyết định có cho phép stop_recording hay không.
+    "packing_evaluation": None,
 }
 
 
@@ -436,32 +452,233 @@ s3_service = S3Service()
 # Encryption cho sensitive data (use CONFIG_KEY_FILE from DATA_DIR)
 encryptor = get_encryptor(CONFIG_KEY_FILE)
 
+# ---------------------------------------------------------------------------
+# Phân loại mã quét: mã đơn vs mã serial (theo prefix).
+# Dùng trong on_code_detected để quyết định gọi _handle_order_code hay _handle_serial_code.
+# Có thể chỉnh ORDER_CODE_PREFIXES / SERIAL_CODE_PREFIXES cho đúng quy ước tem in thực tế.
+# ---------------------------------------------------------------------------
+ORDER_CODE_PREFIXES = ("ORD-", "DEMO-ORDER-", "ORDER")
+SERIAL_CODE_PREFIXES = ("SN-", "SERIAL-", "SR-")
+
+
+def looks_like_order_code(code: str) -> bool:
+    """
+    Kiểm tra mã quét có phải là mã đơn hàng không (theo prefix).
+    Ví dụ: ORD-123, DEMO-ORDER-0001, ORDER-ABC.
+    """
+    if not code or not isinstance(code, str):
+        return False
+    c = code.strip().upper()
+    for p in ORDER_CODE_PREFIXES:
+        if c.startswith(p.upper()):
+            return True
+    return False
+
+
+def looks_like_serial_code(code: str) -> bool:
+    """
+    Kiểm tra mã quét có phải là mã serial sản phẩm không (theo prefix).
+    Ví dụ: SN-xxx, SERIAL-xxx, SR-xxx.
+    Nếu không khớp mã đơn thì cũng coi là serial (backward compat).
+    """
+    if not code or not isinstance(code, str):
+        return False
+    c = code.strip().upper()
+    for p in SERIAL_CODE_PREFIXES:
+        if c.startswith(p.upper()):
+            return True
+    # Mã không giống mã đơn thì coi là serial (để mã lạ vẫn được tính vào serial_state)
+    return not looks_like_order_code(code)
+
 
 def on_code_detected(code: str):
-    """Callback khi bất kỳ AI scanner nào (từ mọi camera) phát hiện mã. Chỉ lock 1 mã/phiên."""
+    """
+    Callback khi AI scanner phát hiện mã.
+
+    Ưu tiên phân loại theo format (prefix):
+    - looks_like_order_code(code)  => xử lý như mã đơn (_handle_order_code).
+    - looks_like_serial_code(code)  => xử lý như mã serial (_handle_serial_code).
+    - Không khớp format            => fallback: chưa có đơn thì coi là đơn, đã có đơn thì coi là serial.
+    """
     with state_lock:
-        if app_state["current_order_code"] is not None:
-            return
-        app_state["current_order_code"] = code
-        app_state["current_order_info"] = order_service.get_order(code)
-        
-        # Tự động bắt đầu quay video nếu bật tính năng
+        has_order = app_state["current_order_code"] is not None
         should_auto_record = app_state.get("auto_record_on_qr", False)
         is_recording = app_state.get("is_recording", False)
-    
-    # Trigger auto-record (ngoài lock để tránh deadlock)
+
+    if looks_like_order_code(code):
+        _handle_order_code(code, should_auto_record=should_auto_record, is_recording=is_recording)
+    elif looks_like_serial_code(code):
+        _handle_serial_code(code)
+    else:
+        # Fallback: giữ hành vi cũ (mã đầu = đơn, mã sau = serial) khi không khớp prefix
+        if not has_order:
+            _handle_order_code(code, should_auto_record=should_auto_record, is_recording=is_recording)
+        else:
+            _handle_serial_code(code)
+
+
+def _init_serial_state_for_order(order_info: dict) -> dict:
+    """
+    Khởi tạo serial_state cho 1 đơn.
+
+    POC hiện tại gom toàn bộ số lượng sản phẩm thành một bucket "__all__".
+    Điều này đủ để kiểm tra "đã quét đủ N serial chưa?" mà không cần biết
+    serial thuộc dòng sản phẩm nào.
+    """
+    if not isinstance(order_info, dict):
+        return {}
+    items = order_info.get("items") or []
+    try:
+        required_qty = sum(int((it or {}).get("qty", 0) or 0) for it in items)
+    except Exception:
+        required_qty = 0
+    if required_qty <= 0:
+        return {}
+    return {
+        "__all__": {
+            "required_qty": required_qty,
+            # Dùng set để:
+            # - Tự loại bỏ duplicate serial
+            # - Cho phép đếm nhanh số serial khác nhau đã quét
+            "scanned_serials": set(),
+        }
+    }
+
+
+def _evaluate_packing_state(order_info: dict, serial_state: dict) -> dict:
+    """
+    Đánh giá trạng thái đóng gói dựa trên serial_state hiện tại.
+
+    Đầu ra ở dạng đơn giản để frontend dễ render:
+    {
+      "items": [
+        {
+          "key": "__all__",
+          "required_qty": 3,
+          "scanned_count": 2,
+          "status": "missing" | "ok" | "excess",
+        }
+      ],
+      "has_missing": true/false,
+      "has_excess": true/false
+    }
+    """
+    evaluation = {
+        "items": [],
+        "has_missing": False,
+        "has_excess": False,
+    }
+
+    if not isinstance(serial_state, dict) or not serial_state:
+        return evaluation
+
+    for key, state in serial_state.items():
+        required = int((state or {}).get("required_qty", 0) or 0)
+        scanned_serials = (state or {}).get("scanned_serials") or set()
+        scanned_count = len(scanned_serials)
+
+        if scanned_count < required:
+            status = "missing"
+            evaluation["has_missing"] = True
+        elif scanned_count == required:
+            status = "ok"
+        else:
+            status = "excess"
+            evaluation["has_excess"] = True
+
+        evaluation["items"].append(
+            {
+                "key": key,
+                "required_qty": required,
+                "scanned_count": scanned_count,
+                "status": status,
+            }
+        )
+
+    return evaluation
+
+
+def _handle_order_code(code: str, should_auto_record: bool, is_recording: bool) -> None:
+    """
+    Xử lý khi phát hiện mã đơn mới:
+    - Load thông tin đơn (mock) từ order_service.
+    - Ghi vào app_state (mã đơn, order_info, serial_state, packing_evaluation).
+    - Nếu bật auto_record_on_qr và chưa quay => tự động start_recording.
+    """
+    try:
+        order_info = order_service.get_order(code)
+    except Exception as e:
+        print(f"[ORDER] Loi khi doc thong tin don cho QR '{code}': {e}")
+        return
+
+    serial_state = _init_serial_state_for_order(order_info)
+    evaluation = _evaluate_packing_state(order_info, serial_state)
+
+    with state_lock:
+        app_state["current_order_code"] = code
+        app_state["current_order_info"] = order_info
+        app_state["serial_state"] = serial_state
+        app_state["packing_evaluation"] = evaluation
+
+    # Tự động bắt đầu quay nếu được bật trong cấu hình và hiện chưa quay
     if should_auto_record and not is_recording:
         print(f"[AUTO-RECORD] Phat hien QR '{code}', tu dong bat dau quay video...")
-        # Gọi logic start_recording trong thread riêng
+
         def _auto_start():
-            time.sleep(0.5)  # Đợi UI cập nhật
+            # Chờ UI cập nhật 1 chút để người dùng kịp thấy mã đơn
+            time.sleep(0.5)
             try:
-                # Gọi nội dung logic start_recording (không qua Flask route)
                 _trigger_auto_recording(code)
             except Exception as e:
                 print(f"[AUTO-RECORD] Loi: {e}")
-        
+
         threading.Thread(target=_auto_start, daemon=True).start()
+
+
+def _handle_serial_code(code: str) -> None:
+    """
+    Xử lý khi phát hiện mã serial trong quá trình đóng gói.
+
+    POC hiện tại:
+    - Nếu chưa có đơn hiện tại => bỏ qua (log cảnh báo).
+    - Nếu có đơn:
+      - Thêm serial vào bucket "__all__".
+      - Tính lại packing_evaluation.
+    Sau này, khi biết mapping serial → OrderItem, logic này sẽ tách theo từng item.
+    """
+    with state_lock:
+        order_code = app_state.get("current_order_code")
+        order_info = app_state.get("current_order_info")
+        serial_state = app_state.get("serial_state") or {}
+
+    if not order_code or not order_info:
+        print(f"[SERIAL] Bo qua serial '{code}' vi chua co don hien tai.")
+        return
+
+    if "__all__" not in serial_state:
+        # Nếu vì lý do nào đó serial_state chưa được init (ví dụ crash trước đó),
+        # khởi tạo lại từ order_info để tránh KeyError.
+        serial_state = _init_serial_state_for_order(order_info)
+
+    bucket = serial_state.get("__all__")
+    if bucket is None:
+        bucket = {"required_qty": 0, "scanned_serials": set()}
+        serial_state["__all__"] = bucket
+
+    scanned_serials = bucket.get("scanned_serials")
+    if not isinstance(scanned_serials, set):
+        scanned_serials = set(scanned_serials or [])
+        bucket["scanned_serials"] = scanned_serials
+
+    scanned_serials.add(code)
+
+    evaluation = _evaluate_packing_state(order_info, serial_state)
+
+    with state_lock:
+        app_state["serial_state"] = serial_state
+        app_state["packing_evaluation"] = evaluation
+
+    print(f"[SERIAL] Quet serial '{code}' cho don '{order_code}'. State: {evaluation}")
 
 
 def build_managers_and_scanners(configs, scan_interval_sec=0.05, sensitivity=SENSITIVITY_NORMAL, qr_cooldown_seconds: int = 5):
@@ -1178,6 +1395,8 @@ def status():
         current_order_code = app_state["current_order_code"]
         order_info = app_state["current_order_info"]
         is_paused = app_state.get("is_paused", False)
+        serial_state = app_state.get("serial_state") or {}
+        packing_evaluation = app_state.get("packing_evaluation")
 
     now = time.time()
     recording_seconds = int(now - start) if is_recording and start else 0
@@ -1200,6 +1419,17 @@ def status():
             "is_paused": is_paused,
             "total_items": total_items,
             "num_cameras": len(camera_managers),
+            # serial_state_raw: POC chỉ có 1 bucket "__all__", FE không dùng trực tiếp
+            # nhưng giữ lại để dễ debug hoặc hiển thị chi tiết sau này.
+            "serial_state": {
+                key: {
+                    "required_qty": int((state or {}).get("required_qty", 0) or 0),
+                    "scanned_count": len((state or {}).get("scanned_serials") or []),
+                }
+                for key, state in serial_state.items()
+            },
+            # packing_state: thông tin đã được tính sẵn để FE render bảng trạng thái đóng gói.
+            "packing_state": packing_evaluation,
         }
     )
 
@@ -1348,6 +1578,23 @@ def stop_recording():
             return jsonify({"ok": True, "message": "Không ở trạng thái quay"}), 200
         start = app_state["recording_start"]
         code = app_state.get("recording_order_code") or app_state["current_order_code"]
+        order_info = app_state.get("current_order_info")
+        serial_state = app_state.get("serial_state") or {}
+
+    # Trước khi dừng quay, kiểm tra trạng thái serial để tránh "chốt" video
+    # khi vẫn còn thiếu/thừa số lượng so với yêu cầu.
+    packing_evaluation = _evaluate_packing_state(order_info, serial_state)
+    if packing_evaluation.get("has_missing") or packing_evaluation.get("has_excess"):
+        # Giữ nguyên trạng thái quay, để nhân viên tiếp tục quét/điều chỉnh.
+        return (
+            jsonify(
+                {
+                    "error": "Chưa quét đủ hoặc đang thừa số lượng serial. Vui lòng kiểm tra bảng trạng thái đóng gói.",
+                    "packing_state": packing_evaluation,
+                }
+            ),
+            400,
+        )
 
     duration = recorder.stop()
     video_path = recorder.file_path  # Lưu path trước khi reset
@@ -1364,6 +1611,8 @@ def stop_recording():
         app_state["current_order_code"] = None
         app_state["current_order_info"] = None
         app_state["is_paused"] = False
+        app_state["serial_state"] = {}
+        app_state["packing_evaluation"] = None
 
     # Reset tat ca scanner, CLEAR QUEUE cu va RESUME scanner
     print("[INFO] RESUME AI scanner and CLEAR QUEUE after stopping record...")
@@ -1466,6 +1715,8 @@ def reset_order():
     with state_lock:
         app_state["current_order_code"] = None
         app_state["current_order_info"] = None
+        app_state["serial_state"] = {}
+        app_state["packing_evaluation"] = None
     for sc in ai_scanners:
         sc.reset()
     return jsonify({"ok": True})
