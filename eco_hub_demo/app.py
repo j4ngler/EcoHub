@@ -38,6 +38,13 @@ from camera.recorder import VideoRecorder
 from services import order_service, storage_service
 from services.s3_service import S3Service, S3Config
 from services.config_encryption import get_encryptor
+from services.video_metadata import (
+    insert_video,
+    mark_uploaded,
+    list_active_videos_for_shop,
+    mark_deleted,
+    log_video_deletion,
+)
 
 
 # ==========================
@@ -67,6 +74,7 @@ else:
 VIDEOS_DIR = os.path.join(DATA_DIR, "videos")
 CONFIG_FILE = os.path.join(DATA_DIR, "config.json")
 CONFIG_KEY_FILE = os.path.join(DATA_DIR, "config.key")
+VIDEO_METADATA_DB = os.path.join(DATA_DIR, "video_metadata.db")
 os.makedirs(VIDEOS_DIR, exist_ok=True)
 os.makedirs(DATA_DIR, exist_ok=True)
 
@@ -120,6 +128,8 @@ class UploadTask:
     status: str = "pending"  # pending, uploading, success, failed
     error_msg: str = ""
     created_at: datetime = field(default_factory=lambda: datetime.now(GMT7))
+    # Liên kết tới bản ghi metadata (SQLite). Có thể None với video cũ hoặc POC chưa dùng metadata.
+    video_id: int | None = None
     
 upload_queue = Queue()  # Queue FIFO để upload tuần tự
 upload_status_lock = threading.Lock()
@@ -238,7 +248,14 @@ def upload_worker():
                     
                     if success:
                         print(f"[UPLOAD WORKER] Success: {result}")
-                        
+
+                        # Cập nhật metadata: đánh dấu đã upload (nếu có video_id)
+                        if task.video_id is not None:
+                            try:
+                                mark_uploaded(VIDEO_METADATA_DB, task.video_id)
+                            except Exception as meta_e:
+                                print(f"[UPLOAD WORKER] Error marking video {task.video_id} as uploaded: {meta_e}")
+
                         # Cập nhật status = success
                         with upload_status_lock:
                             task.status = "success"
@@ -264,6 +281,13 @@ def upload_worker():
                         
                         # GIỮ LẠI trong upload_status_dict để hiển thị lịch sử cả ngày
                         # Sẽ tự động xóa vào 00:00 ngày hôm sau
+
+                        # Sau khi upload xong 1 video, có thể dung lượng logic vẫn còn cao.
+                        # Gọi auto cleanup để xóa các video cũ hơn nếu cần (theo giới hạn).
+                        try:
+                            enforce_video_storage_limit(None)
+                        except Exception as limit_e:
+                            print(f"[STORAGE LIMIT] Error enforcing limit after upload: {limit_e}")
                     else:
                         # Upload thất bại
                         print(f"[UPLOAD WORKER] Failed: {result}")
@@ -451,6 +475,361 @@ s3_service = S3Service()
 
 # Encryption cho sensitive data (use CONFIG_KEY_FILE from DATA_DIR)
 encryptor = get_encryptor(CONFIG_KEY_FILE)
+
+# ==========================
+# CẤU HÌNH GIỚI HẠN DUNG LƯỢNG VIDEO
+# ==========================
+#
+# Mục tiêu:
+# - Cho phép cấu hình giới hạn dung lượng/tổng số video/tổng thời lượng ở mức GLOBAL.
+# - Sẵn sàng mở rộng per-shop qua hàm get_shop_video_limits(shop_id).
+#
+# Quy ước:
+# - DEFAULT_* dùng khi không có cấu hình nào (env + config.json đều trống).
+# - max_count / max_duration_min = 0 nghĩa là "không giới hạn" (unlimited) cho POC.
+
+DEFAULT_VIDEO_STORAGE_LIMIT_GB = 50.0  # Giới hạn mặc định: 50 GB tổng dung lượng video
+DEFAULT_VIDEO_MAX_COUNT = 0            # 0 = không giới hạn số lượng video
+DEFAULT_VIDEO_MAX_DURATION_MIN = 0     # 0 = không giới hạn tổng thời lượng (phút)
+
+
+def _read_json_config_safe() -> dict:
+    """
+    Đọc config.json thô, NEVER raise exception (trả về {} nếu lỗi).
+    Dùng chung cho các hàm cấu hình khác để tránh lặp code.
+    """
+    if not os.path.exists(CONFIG_FILE):
+        return {}
+    try:
+        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+            return json.load(f) or {}
+    except Exception as e:
+        print(f"[CONFIG] Error reading JSON config: {e}")
+        return {}
+
+
+def _get_env_video_limits() -> dict:
+    """
+    Đọc giới hạn dung lượng video từ ENV (nếu có).
+
+    Ưu tiên:
+    - VIDEO_STORAGE_LIMIT_GB
+    - VIDEO_MAX_COUNT
+    - VIDEO_MAX_DURATION_MIN
+    """
+    limit_gb = None
+    max_count = None
+    max_duration = None
+
+    raw_limit = os.environ.get("VIDEO_STORAGE_LIMIT_GB")
+    if raw_limit:
+        try:
+            limit_gb = float(raw_limit)
+        except ValueError:
+            print(f"[CONFIG] Invalid VIDEO_STORAGE_LIMIT_GB='{raw_limit}', using defaults.")
+
+    raw_count = os.environ.get("VIDEO_MAX_COUNT")
+    if raw_count:
+        try:
+            max_count = int(raw_count)
+        except ValueError:
+            print(f"[CONFIG] Invalid VIDEO_MAX_COUNT='{raw_count}', ignoring.")
+
+    raw_duration = os.environ.get("VIDEO_MAX_DURATION_MIN")
+    if raw_duration:
+        try:
+            max_duration = int(raw_duration)
+        except ValueError:
+            print(f"[CONFIG] Invalid VIDEO_MAX_DURATION_MIN='{raw_duration}', ignoring.")
+
+    return {
+        "storage_limit_gb": limit_gb,
+        "max_count": max_count,
+        "max_duration_min": max_duration,
+    }
+
+
+def get_global_video_limits() -> dict:
+    """
+    Lấy cấu hình giới hạn dung lượng video ở mức GLOBAL.
+
+    Thứ tự ưu tiên:
+    1) ENV (VIDEO_STORAGE_LIMIT_GB, VIDEO_MAX_COUNT, VIDEO_MAX_DURATION_MIN)
+    2) config.json (trong key "video_limits")
+    3) DEFAULT_* (fallback)
+
+    Trả về dict:
+    {
+      "storage_limit_gb": float,   # tổng dung lượng tối đa cho video
+      "max_count": int,            # số lượng video tối đa (0 = không giới hạn)
+      "max_duration_min": int,     # tổng thời lượng video tối đa (0 = không giới hạn)
+    }
+    """
+    # 1. Đọc từ ENV (nếu có)
+    env_cfg = _get_env_video_limits()
+
+    # 2. Đọc từ config.json
+    data = _read_json_config_safe()
+    file_limits = data.get("video_limits") or {}
+
+    def _pick_float(key: str, default_val: float) -> float:
+        env_val = env_cfg.get(key)
+        if isinstance(env_val, (float, int)):
+            return float(env_val)
+        try:
+            raw = file_limits.get(key)
+            if raw is None or raw == "":
+                return float(default_val)
+            return float(raw)
+        except Exception:
+            return float(default_val)
+
+    def _pick_int(key: str, default_val: int) -> int:
+        env_val = env_cfg.get(key)
+        if isinstance(env_val, int):
+            return env_val
+        try:
+            raw = file_limits.get(key)
+            if raw is None or raw == "":
+                return int(default_val)
+            return int(raw)
+        except Exception:
+            return int(default_val)
+
+    storage_limit_gb = _pick_float("storage_limit_gb", DEFAULT_VIDEO_STORAGE_LIMIT_GB)
+    max_count = _pick_int("max_count", DEFAULT_VIDEO_MAX_COUNT)
+    max_duration_min = _pick_int("max_duration_min", DEFAULT_VIDEO_MAX_DURATION_MIN)
+
+    return {
+        "storage_limit_gb": storage_limit_gb,
+        "max_count": max_count,
+        "max_duration_min": max_duration_min,
+    }
+
+
+def get_shop_video_limits(shop_id: str | None) -> dict:
+    """
+    Lấy cấu hình giới hạn dung lượng video cho một shop cụ thể.
+
+    POC hiện tại:
+    - Chưa có multi-shop thật → luôn trả về cấu hình GLOBAL.
+    - Sau này có thể map shop_id → cấu hình riêng (DB/config khác).
+    """
+    # TODO: Khi có cơ chế multi-tenant, thay logic này bằng:
+    # 1) Đọc cấu hình riêng của shop (nếu có)
+    # 2) Fallback về get_global_video_limits() nếu shop không có cấu hình riêng
+    return get_global_video_limits()
+
+
+def get_video_storage_usage(shop_id: str | None) -> dict:
+    """
+    Tính toán tình trạng sử dụng dung lượng video cho 1 shop.
+
+    Đầu ra:
+    {
+      "shop_id": str | None,
+      "storage_limit_gb": float,
+      "used_bytes": int,
+      "used_gb": float,
+      "percent_used": float,        # 0–100
+      "video_count": int,
+      "total_duration_sec": int,
+      "total_duration_min": float,
+    }
+    """
+    limits = get_shop_video_limits(shop_id)
+    videos = list_active_videos_for_shop(VIDEO_METADATA_DB, shop_id)
+
+    total_size_bytes = 0
+    total_duration_sec = 0
+    total_count = 0
+
+    for v in videos:
+        # videos đã được filter is_deleted=0 trong list_active_videos_for_shop
+        total_size_bytes += int(v.size_bytes or 0)
+        total_duration_sec += int(v.duration_sec or 0)
+        total_count += 1
+
+    storage_limit_gb = float(limits.get("storage_limit_gb") or 0.0)
+    used_gb = total_size_bytes / (1024.0 * 1024.0 * 1024.0) if total_size_bytes > 0 else 0.0
+
+    percent_used = 0.0
+    if storage_limit_gb > 0:
+        percent_used = (used_gb / storage_limit_gb) * 100.0
+        if percent_used < 0:
+            percent_used = 0.0
+        if percent_used > 999.0:
+            percent_used = 999.0
+
+    total_duration_min = total_duration_sec / 60.0 if total_duration_sec > 0 else 0.0
+
+    # Giới hạn theo số lượng và thời lượng (optional – dùng cho hiển thị / mở rộng cleanup)
+    max_count = int(limits.get("max_count") or 0)
+    max_duration_min = int(limits.get("max_duration_min") or 0)
+    percent_used_count = 0.0
+    percent_used_duration = 0.0
+    if max_count > 0 and total_count > 0:
+        percent_used_count = min(999.0, (total_count / max_count) * 100.0)
+    if max_duration_min > 0 and total_duration_min > 0:
+        percent_used_duration = min(999.0, (total_duration_min / max_duration_min) * 100.0)
+
+    return {
+        "shop_id": shop_id,
+        "storage_limit_gb": storage_limit_gb,
+        "used_bytes": total_size_bytes,
+        "used_gb": used_gb,
+        "percent_used": percent_used,
+        "video_count": total_count,
+        "total_duration_sec": total_duration_sec,
+        "total_duration_min": total_duration_min,
+        "max_count": max_count,
+        "max_duration_min": max_duration_min,
+        "percent_used_count": percent_used_count,
+        "percent_used_duration": percent_used_duration,
+    }
+
+
+VIDEO_STORAGE_SAFE_THRESHOLD_PERCENT = 95.0
+
+
+def _usage_exceeds_cleanup_threshold(usage: dict) -> bool:
+    """True nếu ít nhất một trong: dung lượng, số lượng, thời lượng vượt ngưỡng 95%."""
+    pct = usage.get("percent_used") or 0.0
+    if pct >= VIDEO_STORAGE_SAFE_THRESHOLD_PERCENT:
+        return True
+    max_count = int(usage.get("max_count") or 0)
+    max_duration_min = int(usage.get("max_duration_min") or 0)
+    if max_count > 0 and (usage.get("percent_used_count") or 0.0) >= VIDEO_STORAGE_SAFE_THRESHOLD_PERCENT:
+        return True
+    if max_duration_min > 0 and (usage.get("percent_used_duration") or 0.0) >= VIDEO_STORAGE_SAFE_THRESHOLD_PERCENT:
+        return True
+    return False
+
+
+def _usage_below_threshold_after(used_bytes: int, total_count: int, total_duration_sec: int,
+                                  limit_gb: float, max_count: int, max_duration_min: int) -> bool:
+    """True nếu sau khi trừ (used_bytes, total_count, total_duration_sec) thì tất cả dưới ngưỡng 95%."""
+    if limit_gb > 0:
+        used_gb = used_bytes / (1024.0 * 1024.0 * 1024.0)
+        if (used_gb / limit_gb) * 100.0 >= VIDEO_STORAGE_SAFE_THRESHOLD_PERCENT:
+            return False
+    if max_count > 0 and total_count > 0:
+        if (total_count / max_count) * 100.0 >= VIDEO_STORAGE_SAFE_THRESHOLD_PERCENT:
+            return False
+    if max_duration_min > 0:
+        duration_min = total_duration_sec / 60.0
+        if duration_min > 0 and (duration_min / max_duration_min) * 100.0 >= VIDEO_STORAGE_SAFE_THRESHOLD_PERCENT:
+            return False
+    return True
+
+
+def enforce_video_storage_limit(shop_id: str | None) -> dict:
+    """
+    Auto cleanup dung lượng video:
+    - Kích hoạt khi: percent_used >= 95% HOẶC (max_count>0 và percent_used_count >= 95%) HOẶC (max_duration_min>0 và percent_used_duration >= 95%).
+    - Xóa lần lượt video cũ nhất (đã upload, không tranh chấp) cho tới khi tất cả các chỉ số về dưới 95%.
+
+    Trả về:
+    {
+      "before": usage_truoc,
+      "after": usage_sau,
+      "deleted_video_ids": [ ... ],
+    }
+    """
+    before_usage = get_video_storage_usage(shop_id)
+
+    limit_gb = float(before_usage.get("storage_limit_gb") or 0.0)
+    max_count = int(before_usage.get("max_count") or 0)
+    max_duration_min = int(before_usage.get("max_duration_min") or 0)
+
+    # Không cấu hình bất kỳ giới hạn nào => không cleanup
+    if limit_gb <= 0 and max_count <= 0 and max_duration_min <= 0:
+        return {
+            "before": before_usage,
+            "after": before_usage,
+            "deleted_video_ids": [],
+            "reason": "no_limit_configured",
+        }
+
+    if not _usage_exceeds_cleanup_threshold(before_usage):
+        return {
+            "before": before_usage,
+            "after": before_usage,
+            "deleted_video_ids": [],
+            "reason": "below_threshold",
+        }
+
+    print(
+        f"[STORAGE LIMIT] Usage (storage/count/duration) vượt {VIDEO_STORAGE_SAFE_THRESHOLD_PERCENT}%, starting cleanup..."
+    )
+
+    videos = list_active_videos_for_shop(VIDEO_METADATA_DB, shop_id)
+
+    # Danh sách ứng viên: video đã upload, không tranh chấp.
+    candidates = [v for v in videos if v.is_uploaded and not v.is_disputed]
+    deleted_ids: list[int] = []
+
+    used_bytes = int(before_usage.get("used_bytes") or 0)
+    total_duration_sec = int(before_usage.get("total_duration_sec") or 0)
+    total_count = int(before_usage.get("video_count") or 0)
+
+    for v in candidates:
+        # Dừng khi tất cả: dung lượng, số lượng, thời lượng đều dưới ngưỡng 95%
+        if _usage_below_threshold_after(
+            used_bytes, total_count, total_duration_sec,
+            limit_gb, max_count, max_duration_min,
+        ):
+            break
+
+        # Xóa file local nếu còn tồn tại (best-effort – nếu đã bị xóa trước đó thì bỏ qua).
+        try:
+            if v.file_path and os.path.exists(v.file_path):
+                os.remove(v.file_path)
+                print(f"[STORAGE LIMIT] Deleted local file: {v.file_path}")
+        except Exception as e:
+            print(f"[STORAGE LIMIT] Error deleting file '{v.file_path}': {e}")
+
+        # Đánh dấu metadata đã bị xóa + ghi log audit
+        try:
+            if v.id is not None:
+                mark_deleted(VIDEO_METADATA_DB, int(v.id))
+                deleted_ids.append(int(v.id))
+                try:
+                    log_video_deletion(
+                        db_path=VIDEO_METADATA_DB,
+                        video_id=int(v.id),
+                        shop_id=v.shop_id,
+                        file_path=v.file_path,
+                        reason="auto_cleanup",
+                        trigger="limit_exceeded",
+                        deleted_by="system",
+                    )
+                except Exception as log_e:
+                    print(f"[VIDEO LOG] Error logging auto delete for video {v.id}: {log_e}")
+        except Exception as e:
+            print(f"[STORAGE LIMIT] Error marking video {v.id} as deleted: {e}")
+            continue
+
+        # Cập nhật usage tạm để tránh gọi DB nhiều lần
+        used_bytes = max(0, used_bytes - int(v.size_bytes or 0))
+        total_duration_sec = max(0, total_duration_sec - int(v.duration_sec or 0))
+        total_count = max(0, total_count - 1)
+
+    # Tính lại usage sau cleanup (dựa trên metadata hiện tại)
+    after_usage = get_video_storage_usage(shop_id)
+
+    print(
+        f"[STORAGE LIMIT] Cleanup done. Deleted={len(deleted_ids)} video(s). "
+        f"After: storage={after_usage.get('percent_used', 0):.2f}%, "
+        f"count={after_usage.get('percent_used_count', 0):.2f}%, duration={after_usage.get('percent_used_duration', 0):.2f}%."
+    )
+
+    return {
+        "before": before_usage,
+        "after": after_usage,
+        "deleted_video_ids": deleted_ids,
+        "reason": "cleanup_executed" if deleted_ids else "no_candidates",
+    }
 
 # ---------------------------------------------------------------------------
 # Phân loại mã quét: mã đơn vs mã serial (theo prefix).
@@ -1111,6 +1490,27 @@ def get_upload_status():
         return jsonify({"success": False, "error": str(e)})
 
 
+@app.route("/api/video_storage_usage", methods=["GET"])
+def api_video_storage_usage():
+    """
+    API: Trả về số liệu sử dụng dung lượng video (global hoặc theo shop).
+    Dùng cho dashboard và kiểm thử.
+
+    Query: shop_id (optional) – nếu có thì lấy usage theo shop; không có thì global.
+    """
+    if "user" not in session:
+        return jsonify({"error": "Chưa đăng nhập"}), 401
+
+    try:
+        shop_id = request.args.get("shop_id")
+        if shop_id == "":
+            shop_id = None
+        usage = get_video_storage_usage(shop_id)
+        return jsonify({"success": True, "usage": usage})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
 @app.route("/storage")
 def storage_page():
     if "user" not in session:
@@ -1189,6 +1589,23 @@ def delete_video(filename):
     try:
         success, message = s3_service.delete_video(filename)
         if success:
+            # Ghi log audit cho hành động xóa video trên S3 bởi admin.
+            try:
+                user = session.get("user", {}).get("username", "unknown")
+            except Exception:
+                user = "unknown"
+            try:
+                log_video_deletion(
+                    db_path=VIDEO_METADATA_DB,
+                    video_id=None,
+                    shop_id=None,
+                    file_path=filename,
+                    reason="manual_s3_delete",
+                    trigger="admin_action",
+                    deleted_by=user,
+                )
+            except Exception as log_e:
+                print(f"[VIDEO LOG] Error logging manual delete for '{filename}': {log_e}")
             flash(f"✅ Đã xóa video: {filename}")
         else:
             flash(f"❌ {message}", "error")
@@ -1600,6 +2017,26 @@ def stop_recording():
     video_path = recorder.file_path  # Lưu path trước khi reset
     order_code = code or "unknown"
 
+    # Ghi metadata video (local) để phục vụ tính dung lượng / auto cleanup sau này.
+    video_id = None
+    try:
+        size_bytes = 0
+        if video_path and os.path.exists(video_path):
+            size_bytes = os.path.getsize(video_path)
+        video_id = insert_video(
+            db_path=VIDEO_METADATA_DB,
+            shop_id=None,  # POC: chưa có multi-shop
+            order_id=order_code,
+            file_path=video_path or "",
+            size_bytes=size_bytes,
+            duration_sec=int(duration or 0),
+            is_uploaded=False,
+            is_disputed=False,
+        )
+        print(f"[VIDEO META] Inserted metadata for video_id={video_id}, path={video_path}, size={size_bytes}")
+    except Exception as meta_e:
+        print(f"[VIDEO META] Error inserting video metadata: {meta_e}")
+
     if code:
         storage_service.finish_recording_for_order(code, duration_seconds=duration)
 
@@ -1652,7 +2089,8 @@ def stop_recording():
             filename=filename,
             path=video_path,
             order_code=order_code,
-            status="pending"
+            status="pending",
+            video_id=video_id,
         )
         
         with upload_status_lock:
@@ -1662,6 +2100,13 @@ def stop_recording():
         print(f"[UPLOAD QUEUE] Added to queue: {filename} (queue size: {upload_queue.qsize()})")
     else:
         print(f"[WARNING] No video file to upload")
+
+    # Sau khi ghi xong 1 video và đưa vào hàng đợi upload, kiểm tra giới hạn dung lượng.
+    # Video mới quay chưa upload (is_uploaded=False) nên sẽ KHÔNG bị xóa trong lần cleanup này.
+    try:
+        enforce_video_storage_limit(None)
+    except Exception as e:
+        print(f"[STORAGE LIMIT] Error enforcing limit after stop_recording: {e}")
 
     return jsonify({"ok": True, "duration": duration, "message": "In xong"})
 

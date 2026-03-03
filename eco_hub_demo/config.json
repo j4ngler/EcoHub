@@ -9,6 +9,11 @@
       "fps": 20.0
     }
   ],
+  "video_limits": {
+  "storage_limit_gb": 50,
+  "max_count": 0,
+  "max_duration_min": 0
+  },
   "scan_sensitivity": "low",
   "auto_record_on_qr": false,
   "storage_mode": "s3",
@@ -20,4 +25,5 @@
     "region": "hn-2",
     "prefix": "Tuyền"
   }
+  
 }
