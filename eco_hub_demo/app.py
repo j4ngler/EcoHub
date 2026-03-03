@@ -452,29 +452,69 @@ s3_service = S3Service()
 # Encryption cho sensitive data (use CONFIG_KEY_FILE from DATA_DIR)
 encryptor = get_encryptor(CONFIG_KEY_FILE)
 
+# ---------------------------------------------------------------------------
+# Phân loại mã quét: mã đơn vs mã serial (theo prefix).
+# Dùng trong on_code_detected để quyết định gọi _handle_order_code hay _handle_serial_code.
+# Có thể chỉnh ORDER_CODE_PREFIXES / SERIAL_CODE_PREFIXES cho đúng quy ước tem in thực tế.
+# ---------------------------------------------------------------------------
+ORDER_CODE_PREFIXES = ("ORD-", "DEMO-ORDER-", "ORDER")
+SERIAL_CODE_PREFIXES = ("SN-", "SERIAL-", "SR-")
+
+
+def looks_like_order_code(code: str) -> bool:
+    """
+    Kiểm tra mã quét có phải là mã đơn hàng không (theo prefix).
+    Ví dụ: ORD-123, DEMO-ORDER-0001, ORDER-ABC.
+    """
+    if not code or not isinstance(code, str):
+        return False
+    c = code.strip().upper()
+    for p in ORDER_CODE_PREFIXES:
+        if c.startswith(p.upper()):
+            return True
+    return False
+
+
+def looks_like_serial_code(code: str) -> bool:
+    """
+    Kiểm tra mã quét có phải là mã serial sản phẩm không (theo prefix).
+    Ví dụ: SN-xxx, SERIAL-xxx, SR-xxx.
+    Nếu không khớp mã đơn thì cũng coi là serial (backward compat).
+    """
+    if not code or not isinstance(code, str):
+        return False
+    c = code.strip().upper()
+    for p in SERIAL_CODE_PREFIXES:
+        if c.startswith(p.upper()):
+            return True
+    # Mã không giống mã đơn thì coi là serial (để mã lạ vẫn được tính vào serial_state)
+    return not looks_like_order_code(code)
+
 
 def on_code_detected(code: str):
     """
-    Callback khi bất kỳ AI scanner nào (từ mọi camera) phát hiện mã.
+    Callback khi AI scanner phát hiện mã.
 
-    POC hiện tại dùng quy ước đơn giản:
-    - Nếu CHƯA có current_order_code  => coi mã này là mã đơn, load thông tin đơn + init serial_state.
-    - Nếu ĐÃ có current_order_code    => coi mã này là serial trong quá trình đóng gói, cập nhật serial_state.
-
-    Sau này khi có quy ước rõ ràng cho format mã đơn/mã serial, ta có thể
-    thay nhánh quyết định này bằng looks_like_order_code / looks_like_serial_code.
+    Ưu tiên phân loại theo format (prefix):
+    - looks_like_order_code(code)  => xử lý như mã đơn (_handle_order_code).
+    - looks_like_serial_code(code)  => xử lý như mã serial (_handle_serial_code).
+    - Không khớp format            => fallback: chưa có đơn thì coi là đơn, đã có đơn thì coi là serial.
     """
     with state_lock:
         has_order = app_state["current_order_code"] is not None
         should_auto_record = app_state.get("auto_record_on_qr", False)
         is_recording = app_state.get("is_recording", False)
 
-    if not has_order:
-        # Mã đầu tiên trong phiên: xử lý như mã đơn hàng
+    if looks_like_order_code(code):
         _handle_order_code(code, should_auto_record=should_auto_record, is_recording=is_recording)
-    else:
-        # Đang có đơn hiện tại: xử lý như mã serial gắn với đơn đó
+    elif looks_like_serial_code(code):
         _handle_serial_code(code)
+    else:
+        # Fallback: giữ hành vi cũ (mã đầu = đơn, mã sau = serial) khi không khớp prefix
+        if not has_order:
+            _handle_order_code(code, should_auto_record=should_auto_record, is_recording=is_recording)
+        else:
+            _handle_serial_code(code)
 
 
 def _init_serial_state_for_order(order_info: dict) -> dict:

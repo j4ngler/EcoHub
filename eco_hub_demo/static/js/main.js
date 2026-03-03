@@ -24,6 +24,7 @@ async function fetchStatus() {
     const pauseBtn = document.getElementById("pauseBtn");
     const resumeBtn = document.getElementById("resumeBtn");
     const qtyWarningAudio = document.getElementById("qtyWarningAudio");
+    const serialErrorAudio = document.getElementById("serialErrorAudio");
     const packingStatusEl = document.getElementById("packingStatus");
 
     if (orderCodeEl) {
@@ -60,8 +61,24 @@ async function fetchStatus() {
       lastOrderCode = currentCode;
     }
 
-    // Render bảng trạng thái đóng gói (POC)
-    // packing_state được backend tính sẵn dựa trên serial_state.
+    // Cảnh báo âm thanh khi thừa serial: phát khi vừa chuyển sang has_excess (đọc state cũ trước khi render ghi đè).
+    const packing = data.packing_state || {};
+    let prevPacking = null;
+    try {
+      prevPacking = lastPackingStateJson ? JSON.parse(lastPackingStateJson) : null;
+    } catch (_) {}
+    const nowExcess = !!packing.has_excess;
+    const prevExcess = prevPacking && prevPacking.has_excess;
+    if (serialErrorAudio && nowExcess && !prevExcess) {
+      try {
+        serialErrorAudio.currentTime = 0;
+        serialErrorAudio.play();
+      } catch (e) {
+        console.warn("Không phát được âm thanh cảnh báo serial:", e);
+      }
+    }
+
+    // Render bảng trạng thái đóng gói (POC) — sau render sẽ cập nhật lastPackingStateJson cho lần poll tiếp theo.
     if (packingStatusEl) {
       renderPackingStatus(packingStatusEl, data.packing_state);
     }
@@ -138,9 +155,19 @@ async function stopRecording() {
     const res = await fetch("/stop_recording", { method: "POST" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      // Cảnh báo âm thanh khi backend chặn vì chưa quét đủ hoặc thừa serial
+      const packing = data.packing_state || {};
+      if (packing.has_missing || packing.has_excess) {
+        const serialErrorEl = document.getElementById("serialErrorAudio");
+        if (serialErrorEl) {
+          try {
+            serialErrorEl.currentTime = 0;
+            serialErrorEl.play();
+          } catch (_) {}
+        }
+      }
       alert(data.error || "Không dừng quay được.");
     } else {
-      // Hiện thông báo "In xong" bằng toast
       showToast("✅ In xong! Thời lượng: " + (data.duration || 0) + " giây");
     }
   } catch (e) {
