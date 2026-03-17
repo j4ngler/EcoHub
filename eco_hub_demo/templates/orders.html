@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Quản lý đơn hàng{% endblock %}
+{% block content %}
+<div class="row">
+  <div class="col-lg-8">
+    <div class="card card-ecohub mb-3">
+      <div class="card-header">Hàng chờ đơn (quét liên tục)</div>
+      <div class="card-body">
+        {% if order_queue and order_queue|length > 0 %}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th>Mã đơn</th>
+                  <th>Trạng thái</th>
+                  <th class="text-end">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for o in order_queue %}
+                  <tr>
+                    <td class="fw-semibold">{{ o.order_code }}</td>
+                    <td>
+                      {% if current_order_id and o.id == current_order_id %}
+                        <span class="badge bg-primary">Đang xử lý</span>
+                      {% else %}
+                        <span class="badge bg-secondary">Đang chờ</span>
+                      {% endif %}
+                    </td>
+                    <td class="text-end">
+                      <div class="d-inline-flex gap-2">
+                        <form method="post" action="{{ url_for('orders_select') }}">
+                          <input type="hidden" name="order_id" value="{{ o.id }}">
+                          <button type="submit" class="btn btn-outline-primary btn-sm">Chọn</button>
+                        </form>
+                        <form method="post" action="{{ url_for('orders_delete') }}" onsubmit="return confirm('Xóa đơn này khỏi hàng chờ?');">
+                          <input type="hidden" name="order_id" value="{{ o.id }}">
+                          <button type="submit" class="btn btn-outline-danger btn-sm">Xóa</button>
+                        </form>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="small text-muted mt-2 mb-0">
+            Gợi ý: Quét nhiều mã đơn liên tục sẽ tự thêm vào hàng chờ. Serial sẽ áp vào đơn “Đang xử lý”.
+          </p>
+        {% else %}
+          <p class="text-muted mb-0">Chưa có đơn nào trong hàng chờ. Hãy quét QR mã đơn ở Dashboard.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card card-ecohub mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span>Đơn hàng hiện tại</span>
+        {% if current_order_code %}
+          <span class="badge bg-primary">Đang quét</span>
+        {% else %}
+          <span class="badge bg-secondary">Chưa có đơn</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+        {% if current_order_code %}
+          <p class="mb-2"><strong>Mã đơn:</strong> {{ current_order_code }}</p>
+          {% if current_order_info %}
+            <p class="mb-1"><strong>Nền tảng:</strong> {{ current_order_info.platform }}</p>
+            <ul class="mb-3 ps-3">
+              {% for item in current_order_info.get('items', []) %}
+                <li>{{ item.qty }} x {{ item.name }}</li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% else %}
+          <p class="text-muted mb-0">Chưa có đơn hàng nào được quét. Vui lòng quét QR mã đơn ở Dashboard.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card card-ecohub">
+      <div class="card-header">Danh sách serial đã quét</div>
+      <div class="card-body">
+        {% if serial_summary and serial_summary|length > 0 %}
+          {% for bucket in serial_summary %}
+            <div class="mb-3">
+              <h6 class="mb-1">Nhóm: {{ bucket.key }}</h6>
+              <p class="small mb-1">
+                Yêu cầu: <strong>{{ bucket.required_qty }}</strong> · Đã quét: <strong>{{ bucket.scanned_count }}</strong>
+              </p>
+              {% if bucket.scanned_serials %}
+                <div class="serial-list small border rounded p-2 bg-light">
+                  {% for s in bucket.scanned_serials %}
+                    <span class="badge bg-secondary me-1 mb-1">{{ s }}</span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="text-muted small mb-0">Chưa có serial nào.</p>
+              {% endif %}
+            </div>
+          {% endfor %}
+        {% else %}
+          <p class="text-muted mb-0">Chưa có dữ liệu serial. Hãy quét serial ở Dashboard trước.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-4">
+    <div class="card card-ecohub">
+      <div class="card-header">Trạng thái đóng gói</div>
+      <div class="card-body">
+        {% if packing_state %}
+          <p class="mb-2">
+            {% if packing_state.has_missing %}
+              <span class="badge bg-warning text-dark">Thiếu hàng</span>
+            {% elif packing_state.has_excess %}
+              <span class="badge bg-danger">Thừa hàng</span>
+            {% else %}
+              <span class="badge bg-success">Đủ hàng</span>
+            {% endif %}
+          </p>
+          {% if packing_state["items"] %}
+            <ul class="list-group small">
+              {% for it in packing_state["items"] %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                  <span>{{ it.key }}</span>
+                  <span>
+                    {{ it.scanned_count }}/{{ it.required_qty }}
+                    {% if it.status == 'ok' %}
+                      <span class="badge bg-success ms-2">OK</span>
+                    {% elif it.status == 'missing' %}
+                      <span class="badge bg-warning text-dark ms-2">Thiếu</span>
+                    {% elif it.status == 'excess' %}
+                      <span class="badge bg-danger ms-2">Thừa</span>
+                    {% endif %}
+                  </span>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% else %}
+          <p class="text-muted mb-0">Chưa có dữ liệu đánh giá đóng gói.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

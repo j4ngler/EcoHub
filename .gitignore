@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+.Python
+venv/
+.venv/
+
+# Local demo artifacts
+eco_hub_demo/video_metadata.db

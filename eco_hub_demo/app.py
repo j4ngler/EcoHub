@@ -344,6 +344,11 @@ app_state = {
     "recording_order_code": None,
     "current_order_code": None,
     "current_order_info": None,
+    # Hàng chờ mã đơn (quét liên tục không cần reset).
+    # Mỗi phần tử: {"id": str, "order_code": str, "order_info": dict|None, "serial_state": dict, "packing_evaluation": dict|None, "created_at": float}
+    "order_queue": [],
+    # Con trỏ đơn đang xử lý trong queue (id). current_order_* sẽ mirror theo entry này.
+    "current_order_id": None,
     "auto_record_on_qr": False,  # Tự động quay khi quét được QR
     "is_paused": False,
     # serial_state: trạng thái quét serial trong POC hiện tại.
@@ -358,6 +363,64 @@ app_state = {
     # - Quyết định có cho phép stop_recording hay không.
     "packing_evaluation": None,
 }
+
+
+def _queue_find_entry_by_id(order_id: str | None) -> dict | None:
+    if not order_id:
+        return None
+    q = app_state.get("order_queue") or []
+    for e in q:
+        if (e or {}).get("id") == order_id:
+            return e
+    return None
+
+
+def _queue_find_entry_by_code(order_code: str) -> dict | None:
+    if not order_code:
+        return None
+    q = app_state.get("order_queue") or []
+    for e in q:
+        if (e or {}).get("order_code") == order_code:
+            return e
+    return None
+
+
+def _queue_set_current(order_id: str | None) -> None:
+    """
+    Set đơn đang xử lý theo order_id và mirror ra các field current_* để phần còn lại của app dùng chung.
+    """
+    app_state["current_order_id"] = order_id
+    entry = _queue_find_entry_by_id(order_id)
+    if not entry:
+        app_state["current_order_code"] = None
+        app_state["current_order_info"] = None
+        app_state["serial_state"] = {}
+        app_state["packing_evaluation"] = None
+        return
+
+    app_state["current_order_code"] = entry.get("order_code")
+    app_state["current_order_info"] = entry.get("order_info")
+    app_state["serial_state"] = entry.get("serial_state") or {}
+    app_state["packing_evaluation"] = entry.get("packing_evaluation")
+
+
+def _queue_advance_to_next() -> None:
+    """
+    Chuyển sang đơn tiếp theo trong queue (FIFO). Nếu queue rỗng thì clear current.
+    """
+    q = app_state.get("order_queue") or []
+    if not q:
+        _queue_set_current(None)
+        return
+    # Nếu current đang là phần tử đầu tiên thì chuyển sang phần tử tiếp theo, nếu không thì chọn phần tử đầu
+    cur_id = app_state.get("current_order_id")
+    if cur_id and q and (q[0] or {}).get("id") == cur_id:
+        if len(q) >= 2:
+            _queue_set_current((q[1] or {}).get("id"))
+        else:
+            _queue_set_current(None)
+    else:
+        _queue_set_current((q[0] or {}).get("id"))
 
 
 # ==========================
@@ -836,7 +899,9 @@ def enforce_video_storage_limit(shop_id: str | None) -> dict:
 # Dùng trong on_code_detected để quyết định gọi _handle_order_code hay _handle_serial_code.
 # Có thể chỉnh ORDER_CODE_PREFIXES / SERIAL_CODE_PREFIXES cho đúng quy ước tem in thực tế.
 # ---------------------------------------------------------------------------
-ORDER_CODE_PREFIXES = ("ORD-", "DEMO-ORDER-", "ORDER")
+# Prefix nhận diện mã đơn.
+# Tạm thời chấp nhận cả "OD-" để tương thích với QR hiện tại.
+ORDER_CODE_PREFIXES = ("ORD-", "DEMO-ORDER-", "ORDER", "OD-")
 SERIAL_CODE_PREFIXES = ("SN-", "SERIAL-", "SR-")
 
 
@@ -994,10 +1059,35 @@ def _handle_order_code(code: str, should_auto_record: bool, is_recording: bool) 
     evaluation = _evaluate_packing_state(order_info, serial_state)
 
     with state_lock:
-        app_state["current_order_code"] = code
-        app_state["current_order_info"] = order_info
-        app_state["serial_state"] = serial_state
-        app_state["packing_evaluation"] = evaluation
+        # Nếu mã đơn đã có trong queue thì chỉ set current về đơn đó (không tạo trùng)
+        existing = _queue_find_entry_by_code(code)
+        if existing:
+            existing["order_info"] = order_info
+            # Nếu entry đã có serial_state thì giữ lại, chỉ init nếu rỗng
+            if not (existing.get("serial_state") or {}):
+                existing["serial_state"] = serial_state
+            existing["packing_evaluation"] = _evaluate_packing_state(order_info, existing.get("serial_state") or {})
+            _queue_set_current(existing.get("id"))
+        else:
+            import uuid
+
+            entry = {
+                "id": str(uuid.uuid4()),
+                "order_code": code,
+                "order_info": order_info,
+                "serial_state": serial_state,
+                "packing_evaluation": evaluation,
+                "created_at": time.time(),
+            }
+            q = app_state.get("order_queue")
+            if not isinstance(q, list):
+                q = []
+                app_state["order_queue"] = q
+            q.append(entry)
+
+            # Nếu chưa có đơn đang xử lý thì tự set current vào đơn mới; nếu đã có thì chỉ xếp hàng
+            if not app_state.get("current_order_id"):
+                _queue_set_current(entry["id"])
 
     # Tự động bắt đầu quay nếu được bật trong cấu hình và hiện chưa quay
     if should_auto_record and not is_recording:
@@ -1028,6 +1118,7 @@ def _handle_serial_code(code: str) -> None:
     with state_lock:
         order_code = app_state.get("current_order_code")
         order_info = app_state.get("current_order_info")
+        order_id = app_state.get("current_order_id")
         serial_state = app_state.get("serial_state") or {}
 
     if not order_code or not order_info:
@@ -1054,8 +1145,14 @@ def _handle_serial_code(code: str) -> None:
     evaluation = _evaluate_packing_state(order_info, serial_state)
 
     with state_lock:
+        # Mirror vào app_state hiện tại
         app_state["serial_state"] = serial_state
         app_state["packing_evaluation"] = evaluation
+        # Cập nhật entry trong queue (nếu có)
+        entry = _queue_find_entry_by_id(order_id)
+        if entry:
+            entry["serial_state"] = serial_state
+            entry["packing_evaluation"] = evaluation
 
     print(f"[SERIAL] Quet serial '{code}' cho don '{order_code}'. State: {evaluation}")
 
@@ -1160,7 +1257,141 @@ def dashboard():
     with camera_status_lock:
         cam_status = camera_status.copy()
     
-    return render_template("dashboard.html", num_cameras=len(camera_managers), camera_status=cam_status)
+    with state_lock:
+        order_code = app_state.get("current_order_code")
+        order_info = app_state.get("current_order_info")
+        packing_state = app_state.get("packing_evaluation")
+        serial_state = app_state.get("serial_state") or {}
+    
+    return render_template(
+        "dashboard.html",
+        num_cameras=len(camera_managers),
+        camera_status=cam_status,
+        current_order_code=order_code,
+        current_order_info=order_info,
+        packing_state=packing_state,
+        serial_state=serial_state,
+    )
+
+
+@app.route("/orders")
+def orders_page():
+    """
+    Trang quản lý đơn hàng hiện tại:
+    - Hiển thị mã đơn đang được quét.
+    - Thông tin chi tiết đơn (items).
+    - Trạng thái đóng gói (packing_evaluation).
+    - Danh sách serial đã quét (theo bucket).
+    """
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    with state_lock:
+        order_code = app_state.get("current_order_code")
+        order_id = app_state.get("current_order_id")
+        order_info = app_state.get("current_order_info")
+        packing_state = app_state.get("packing_evaluation")
+        serial_state = app_state.get("serial_state") or {}
+        order_queue = list(app_state.get("order_queue") or [])
+
+    # Chuyển serial_state thành dạng dễ render
+    serial_summary = []
+    if isinstance(serial_state, dict):
+        for key, bucket in serial_state.items():
+            scanned = bucket.get("scanned_serials") or []
+            # Nếu là set thì convert sang list để render
+            if isinstance(scanned, set):
+                scanned_list = sorted(list(scanned))
+            else:
+                scanned_list = list(scanned)
+            serial_summary.append(
+                {
+                    "key": key,
+                    "required_qty": bucket.get("required_qty", 0),
+                    "scanned_serials": scanned_list,
+                    "scanned_count": len(scanned_list),
+                }
+            )
+
+    return render_template(
+        "orders.html",
+        current_order_id=order_id,
+        current_order_code=order_code,
+        current_order_info=order_info,
+        packing_state=packing_state,
+        serial_summary=serial_summary,
+        order_queue=order_queue,
+    )
+
+
+@app.route("/orders/select", methods=["POST"])
+def orders_select():
+    """Chọn đơn đang xử lý từ hàng chờ."""
+    if "user" not in session:
+        return redirect(url_for("login"))
+    order_id = (request.form.get("order_id") or "").strip()
+    with state_lock:
+        if _queue_find_entry_by_id(order_id):
+            _queue_set_current(order_id)
+            flash("✅ Đã chuyển sang đơn được chọn")
+        else:
+            flash("❌ Không tìm thấy đơn trong hàng chờ", "error")
+    return redirect(url_for("orders_page"))
+
+
+@app.route("/orders/delete", methods=["POST"])
+def orders_delete():
+    """Xóa một đơn khỏi hàng chờ (khi quét nhầm/không hợp lệ)."""
+    if "user" not in session:
+        return redirect(url_for("login"))
+    order_id = (request.form.get("order_id") or "").strip()
+    with state_lock:
+        q = app_state.get("order_queue") or []
+        before = len(q)
+        app_state["order_queue"] = [e for e in q if (e or {}).get("id") != order_id]
+        after = len(app_state["order_queue"])
+        if before == after:
+            flash("❌ Không tìm thấy đơn để xóa", "error")
+        else:
+            # Nếu đang xóa đơn hiện tại thì advance
+            if app_state.get("current_order_id") == order_id:
+                _queue_advance_to_next()
+            flash("🗑️ Đã xóa đơn khỏi hàng chờ")
+    return redirect(url_for("orders_page"))
+
+
+@app.route("/manual-scan", methods=["POST"])
+def manual_scan():
+    """
+    Nhận mã từ đầu đọc (scanner hoạt động như keyboard) và đẩy vào luồng xử lý quét mã hiện tại.
+    Dùng lại callback on_code_detected để giữ nguyên toàn bộ logic phân loại order/serial, auto-record, packing,...
+    """
+    if "user" not in session:
+        return redirect(url_for("login"))
+
+    raw_code = (request.form.get("code") or "").strip()
+    if not raw_code:
+        flash("Không có mã để quét.")
+        return redirect(url_for("dashboard"))
+
+    # Chuẩn hóa mã để tránh lỗi bộ gõ/IME làm sai ký tự (ví dụ: ỎD-TÉT-001)
+    try:
+        import unicodedata
+
+        # Loại bỏ dấu và ký tự không thuộc ASCII
+        nfkd = unicodedata.normalize("NFKD", raw_code)
+        normalized = "".join(ch for ch in nfkd if ord(ch) < 128)
+        code = normalized.strip() or raw_code
+    except Exception:
+        code = raw_code
+
+    try:
+        on_code_detected(code)
+        flash(f"Đã xử lý mã: {code}")
+    except Exception as e:
+        flash(f"Lỗi khi xử lý mã: {e}")
+
+    return redirect(url_for("dashboard"))
 
 
 @app.route("/record")
@@ -2040,16 +2271,22 @@ def stop_recording():
     if code:
         storage_service.finish_recording_for_order(code, duration_seconds=duration)
 
-    # Reset mã đơn sau khi in xong (quay xong)
+    # Sau khi quay xong:
+    # - reset trạng thái ghi
+    # - tự động hoàn tất đơn hiện tại và chuyển sang đơn kế tiếp trong hàng chờ (nếu có)
     with state_lock:
         app_state["is_recording"] = False
         app_state["recording_start"] = None
         app_state["recording_order_code"] = None
-        app_state["current_order_code"] = None
-        app_state["current_order_info"] = None
         app_state["is_paused"] = False
-        app_state["serial_state"] = {}
-        app_state["packing_evaluation"] = None
+
+        cur_id = app_state.get("current_order_id")
+        if cur_id:
+            q = app_state.get("order_queue") or []
+            # remove current order from queue (coi như đã hoàn tất)
+            app_state["order_queue"] = [e for e in q if (e or {}).get("id") != cur_id]
+
+        _queue_advance_to_next()
 
     # Reset tat ca scanner, CLEAR QUEUE cu va RESUME scanner
     print("[INFO] RESUME AI scanner and CLEAR QUEUE after stopping record...")
@@ -2158,10 +2395,13 @@ def reset_order():
         return jsonify({"error": "Chưa đăng nhập"}), 401
 
     with state_lock:
-        app_state["current_order_code"] = None
-        app_state["current_order_info"] = None
-        app_state["serial_state"] = {}
-        app_state["packing_evaluation"] = None
+        # Reset theo mô hình hàng chờ: bỏ đơn hiện tại ra khỏi queue (coi như bỏ qua),
+        # rồi chuyển sang đơn tiếp theo (nếu có).
+        cur_id = app_state.get("current_order_id")
+        if cur_id:
+            q = app_state.get("order_queue") or []
+            app_state["order_queue"] = [e for e in q if (e or {}).get("id") != cur_id]
+        _queue_advance_to_next()
     for sc in ai_scanners:
         sc.reset()
     return jsonify({"ok": True})

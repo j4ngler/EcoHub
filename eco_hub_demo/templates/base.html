@@ -18,6 +18,7 @@
         <div class="collapse navbar-collapse" id="navbarMain">
           <div class="navbar-nav">
             <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
+            <a class="nav-link {{ 'active' if request.endpoint == 'orders_page' }}" href="{{ url_for('orders_page') }}">Quản lý đơn</a>
             <a class="nav-link {{ 'active' if request.endpoint == 'camera_settings' }}" href="{{ url_for('camera_settings') }}">Cài đặt camera</a>
             <a class="nav-link {{ 'active' if request.endpoint == 'storage_settings' }}" href="{{ url_for('storage_settings') }}">Tài khoản S3</a>
             <a class="nav-link {{ 'active' if request.endpoint == 'storage_page' }}" href="{{ url_for('storage_page') }}">Kho lưu trữ</a>

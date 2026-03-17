@@ -52,6 +52,28 @@
       </div>
     </div>
     <div class="card card-ecohub mb-3">
+      <div class="card-header">Quét mã bằng đầu đọc (scanner)</div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('manual_scan') }}">
+          <div class="mb-2">
+            <input
+              type="text"
+              name="code"
+              id="manualScanInput"
+              class="form-control"
+              placeholder="Click vào đây rồi quét bằng đầu đọc..."
+              autofocus
+              autocomplete="off"
+            >
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm">Gửi mã</button>
+        </form>
+        <p class="small text-muted mt-2 mb-0">
+          Đặt con trỏ vào ô này, sau đó dùng đầu đọc quét QR/Barcode. Nếu đầu đọc gửi phím Enter, form sẽ tự gửi.
+        </p>
+      </div>
+    </div>
+    <div class="card card-ecohub mb-3">
       <div class="card-header">Thông tin đơn hàng</div>
       <div class="card-body" id="orderInfo">
         {% if current_order_info %}
@@ -165,5 +187,32 @@
       placeholder.textContent = 'Lỗi kết nối';
     });
 })();
+
+// Giữ focus tự động ở ô quét mã bằng đầu đọc (scanner)
+document.addEventListener('DOMContentLoaded', function () {
+  var input = document.getElementById('manualScanInput');
+  if (!input) return;
+
+  // Focus ngay khi load
+  input.focus();
+
+  // Nếu input bị mất focus và không có ô nào khác được chọn, tự focus lại
+  input.addEventListener('blur', function () {
+    setTimeout(function () {
+      var active = document.activeElement;
+      if (!active || active === document.body) {
+        input.focus();
+      }
+    }, 100);
+  });
+
+  // Nếu người vận hành bấm phím khi không đứng trong ô nào, tự focus vào ô scanner
+  window.addEventListener('keydown', function () {
+    var active = document.activeElement;
+    if (!active || active === document.body) {
+      input.focus();
+    }
+  });
+});
 </script>
 {% endblock %}
