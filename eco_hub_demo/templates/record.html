@@ -68,5 +68,5 @@
 <audio id="qtyWarningAudio" src="{{ url_for('static', filename='audio/qty_warning.mp3') }}" preload="auto"></audio>
 <!-- Cảnh báo sai số lượng / chưa đủ mã serial (thiếu hoặc thừa). POC dùng chung file; có thể đổi sang serial_error.mp3 sau. -->
 <audio id="serialErrorAudio" src="{{ url_for('static', filename='audio/qty_warning.mp3') }}" preload="auto"></audio>
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js', v='tts-audio-3') }}"></script>
 {% endblock %}

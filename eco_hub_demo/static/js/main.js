@@ -9,6 +9,181 @@ let lastOrderCode = null;
 // Trạng thái packing lần trước để so sánh và trigger âm thanh/cảnh báo thông minh hơn.
 let lastPackingStateJson = null;
 
+// Một số trình duyệt chặn autoplay audio nếu chưa có tương tác người dùng.
+// Dùng WebAudio: chỉ cần resume AudioContext 1 lần trong user gesture.
+let audioCtx = null;
+let audioUnlocked = false;
+
+function unlockAudioContext() {
+  try {
+    if (!audioCtx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return false;
+      audioCtx = new Ctx();
+    }
+    if (audioCtx.state !== "running") {
+      audioCtx.resume();
+    }
+    audioUnlocked = true;
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+window.addEventListener("click", unlockAudioContext, { once: true });
+window.addEventListener("keydown", unlockAudioContext, { once: true });
+document.addEventListener("input", unlockAudioContext, { once: true, capture: true });
+
+const TTS_AUDIO_BASE = "/static/audio/tts";
+
+function audioPath(token) {
+  return `${TTS_AUDIO_BASE}/${token}.mp3`;
+}
+
+// Chuyển số -> danh sách token theo quy tắc tiếng Việt (đủ dùng tới 9999 cho POC).
+// Token map sang file mp3:
+// - 0..9
+// - muoi (mười), muoi2 (mươi)
+// - tram, nghin, le
+// - mot (mốt), lam (lăm)
+// - don_hang_co, san_pham
+function numberToVietnameseTokens(n) {
+  n = Number(n);
+  if (!Number.isFinite(n)) return [];
+  n = Math.floor(Math.abs(n));
+  if (n === 0) return ["0"];
+
+  const out = [];
+  const onesToken = (d) => String(d); // 0..9
+
+  function readTwoDigits(x, full) {
+    const tens = Math.floor(x / 10);
+    const unit = x % 10;
+    const t = [];
+    if (tens > 1) {
+      t.push(onesToken(tens), "muoi2");
+      if (unit === 1) t.push("mot"); // mốt
+      else if (unit === 5) t.push("lam"); // lăm
+      else if (unit > 0) t.push(onesToken(unit));
+    } else if (tens === 1) {
+      t.push("muoi");
+      if (unit === 5) t.push("lam");
+      else if (unit > 0) t.push(onesToken(unit));
+    } else if (tens === 0) {
+      if (full && unit > 0) t.push("le", onesToken(unit));
+      else if (unit > 0) t.push(onesToken(unit));
+    }
+    return t;
+  }
+
+  function readThreeDigits(x) {
+    const hundred = Math.floor(x / 100);
+    const rest = x % 100;
+    const t = [];
+    if (hundred > 0) {
+      t.push(onesToken(hundred), "tram");
+      if (rest > 0) t.push(...readTwoDigits(rest, true));
+    } else {
+      t.push(...readTwoDigits(rest, false));
+    }
+    return t;
+  }
+
+  if (n < 100) return readTwoDigits(n, false);
+  if (n < 1000) return readThreeDigits(n);
+  if (n < 10000) {
+    const thousand = Math.floor(n / 1000);
+    const rest = n % 1000;
+    out.push(onesToken(thousand), "nghin");
+    if (rest > 0) {
+      // 1005 => "một nghìn không trăm lẻ năm" => token: 1 nghin 0 tram le 5
+      if (rest < 100) out.push("0", "tram");
+      out.push(...readThreeDigits(rest));
+    }
+    return out;
+  }
+
+  // Nếu lớn hơn 9999: fallback đọc theo số từng chữ số (đảm bảo "đếm được càng nhiều càng tốt" mà không cần thêm file đơn vị)
+  return String(n).split("").filter((c) => c >= "0" && c <= "9");
+}
+
+let audioQueue = [];
+let currentAudio = null;
+let lastSpeakTokens = null;
+
+// WebAudio playback (tránh Range 416 và tránh bị chặn sau await)
+const bufferCache = new Map();
+let playSeqId = 0;
+
+async function loadBuffer(src) {
+  if (!audioCtx) return null;
+  if (bufferCache.has(src)) return bufferCache.get(src);
+  const res = await fetch(src, { cache: "no-store" });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const arr = await res.arrayBuffer();
+  const buf = await audioCtx.decodeAudioData(arr);
+  bufferCache.set(src, buf);
+  return buf;
+}
+
+function playBuffer(buf) {
+  return new Promise((resolve) => {
+    if (!audioCtx || !buf) return resolve();
+    const src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(audioCtx.destination);
+    src.onended = () => resolve();
+    src.start();
+  });
+}
+
+async function playTokens(tokens) {
+  if (!unlockAudioContext()) {
+    showToast("⚠️ Hãy click vào trang để bật âm thanh, rồi quét lại.");
+    return;
+  }
+  const myId = ++playSeqId;
+  for (const t of tokens) {
+    if (myId !== playSeqId) return; // bị hủy bởi lần đọc mới
+    const src = audioPath(t);
+    try {
+      const buf = await loadBuffer(src);
+      await playBuffer(buf);
+    } catch (_) {
+      showToast("⚠️ Thiếu/không đọc được file: " + `${t}.mp3`);
+      // skip token lỗi
+    }
+  }
+}
+
+function speakCountByAudio(totalItems) {
+  const tokens = ["don_hang_co", ...numberToVietnameseTokens(totalItems), "san_pham"];
+  lastSpeakTokens = tokens;
+  showToast("🔊 Đang đọc: " + tokens.join(" "));
+  // hủy chuỗi đang đọc và phát chuỗi mới
+  playSeqId++;
+  playTokens(tokens);
+}
+
+async function submitManualScanAjax(code) {
+  try {
+    const fd = new FormData();
+    fd.set("code", code);
+    const res = await fetch("/manual-scan-api", { method: "POST", body: fd });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      showToast("❌ " + (data.error || "Không gửi mã được"));
+      return false;
+    }
+    return true;
+  } catch (e) {
+    console.error(e);
+    showToast("❌ Lỗi kết nối khi gửi mã");
+    return false;
+  }
+}
+
 async function fetchStatus() {
   try {
     const res = await fetch("/status");
@@ -58,10 +233,12 @@ async function fetchStatus() {
           console.warn("Không phát được âm thanh cảnh báo:", e);
         }
       }
+      // Đọc số lượng sản phẩm bằng tiếng Việt bằng MP3 tokens
+      speakCountByAudio(totalItems);
       lastOrderCode = currentCode;
     }
 
-    // Cảnh báo âm thanh khi thừa serial: phát khi vừa chuyển sang has_excess (đọc state cũ trước khi render ghi đè).
+    // Cảnh báo âm thanh khi sai số lượng (thừa): phát khi vừa chuyển sang has_excess.
     const packing = data.packing_state || {};
     let prevPacking = null;
     try {
@@ -112,6 +289,22 @@ async function fetchStatus() {
         if (resumeBtn) resumeBtn.disabled = true;
       }
     }
+
+    // Hiển thị notifications từ backend (toast)
+    const notifs = Array.isArray(data.notifications) ? data.notifications : [];
+    notifs.forEach((n) => {
+      const level = (n && n.level) ? String(n.level) : "info";
+      const msg = (n && n.message) ? String(n.message) : "";
+      if (!msg) return;
+      // Dùng toast sẵn có (màu xanh). Với lỗi nghiêm trọng có thể alert.
+      if (level === "error") {
+        showToast("❌ " + msg);
+      } else if (level === "warning") {
+        showToast("⚠️ " + msg);
+      } else {
+        showToast(msg);
+      }
+    });
   } catch (e) {
     console.error("fetchStatus error", e);
   }
@@ -155,9 +348,9 @@ async function stopRecording() {
     const res = await fetch("/stop_recording", { method: "POST" });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      // Cảnh báo âm thanh khi backend chặn vì chưa quét đủ hoặc thừa serial
+      // Chỉ cảnh báo âm thanh khi sai số lượng (thừa). Thiếu serial sẽ do máy quét cảnh báo.
       const packing = data.packing_state || {};
-      if (packing.has_missing || packing.has_excess) {
+      if (packing.has_excess) {
         const serialErrorEl = document.getElementById("serialErrorAudio");
         if (serialErrorEl) {
           try {
@@ -308,6 +501,28 @@ document.addEventListener("DOMContentLoaded", () => {
   if (pauseBtn) pauseBtn.addEventListener("click", pauseRecording);
   if (resumeBtn) resumeBtn.addEventListener("click", resumeRecording);
   if (resetOrderBtn) resetOrderBtn.addEventListener("click", resetOrder);
+
+  // Tránh scanner dính chuỗi nhiều mã (do input không được clear kịp).
+  const scanForm = document.getElementById("manualScanForm");
+  const scanInput = document.getElementById("manualScanInput");
+  if (scanForm && scanInput) {
+    scanForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      // Scanner submit bằng Enter => unlock WebAudio ngay trong user gesture
+      unlockAudioContext();
+      const code = (scanInput.value || "").trim();
+      // Clear ngay để lần quét tiếp theo không bị nối chuỗi
+      setTimeout(() => {
+        try { scanInput.value = ""; scanInput.focus(); } catch (_) {}
+      }, 0);
+      if (!code) return;
+      const ok = await submitManualScanAjax(code);
+      if (ok) {
+        // Pull status ngay để trigger đọc số lượng
+        setTimeout(fetchStatus, 100);
+      }
+    });
+  }
 
   // Poll mỗi 1s
   setInterval(fetchStatus, 1000);

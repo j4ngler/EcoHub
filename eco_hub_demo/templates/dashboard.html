@@ -54,7 +54,7 @@
     <div class="card card-ecohub mb-3">
       <div class="card-header">Quét mã bằng đầu đọc (scanner)</div>
       <div class="card-body">
-        <form method="post" action="{{ url_for('manual_scan') }}">
+        <form id="manualScanForm" method="post" action="{{ url_for('manual_scan') }}">
           <div class="mb-2">
             <input
               type="text"
@@ -120,7 +120,7 @@
   </div>
 </div>
 
-<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<script src="{{ url_for('static', filename='js/main.js', v='tts-audio-3') }}"></script>
 <script>
 (function() {
   const placeholder = document.getElementById('videoStorageUsagePlaceholder');

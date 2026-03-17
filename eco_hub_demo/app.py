@@ -103,6 +103,22 @@ app = Flask(__name__,
             template_folder=template_folder,
             static_folder=static_folder)
 app.secret_key = "ecohub-demo-secret"
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0  # giảm cache static để test dễ hơn
+
+
+@app.after_request
+def _disable_cache_for_tts_assets(response):
+    """
+    Tránh cache gây hiểu nhầm khi đang phát triển luồng âm thanh/token.
+    Chỉ áp dụng cho JS chính và các file TTS token.
+    """
+    try:
+        path = (request.path or "")
+        if path.endswith("/static/js/main.js") or path.startswith("/static/audio/tts/"):
+            response.headers["Cache-Control"] = "no-store, max-age=0"
+    except Exception:
+        pass
+    return response
 
 print(f"[STARTUP] BASE_DIR: {BASE_DIR}")
 print(f"[STARTUP] Templates: {template_folder}")
@@ -349,7 +365,11 @@ app_state = {
     "order_queue": [],
     # Con trỏ đơn đang xử lý trong queue (id). current_order_* sẽ mirror theo entry này.
     "current_order_id": None,
+    # Thông báo realtime (đẩy về frontend qua /status). Mỗi phần tử: {"level": "info"|"warning"|"error", "message": str, "ts": float}
+    "notifications": [],
     "auto_record_on_qr": False,  # Tự động quay khi quét được QR
+    # POC mới: chỉ có 1 loại mã (QR/Barcode) đại diện cho đơn. Nếu đơn hợp lệ thì auto quay.
+    "auto_record_on_code": True,
     "is_paused": False,
     # serial_state: trạng thái quét serial trong POC hiện tại.
     # Để đơn giản, POC gom toàn bộ số lượng sản phẩm trong đơn
@@ -363,6 +383,38 @@ app_state = {
     # - Quyết định có cho phép stop_recording hay không.
     "packing_evaluation": None,
 }
+
+def normalize_scanned_code(raw_code: str) -> str:
+    """
+    Chuẩn hóa chuỗi mã quét:
+    - trim
+    - loại bỏ dấu/Unicode lạ do IME (đặc biệt khi scanner giả lập keyboard)
+    """
+    if not raw_code or not isinstance(raw_code, str):
+        return ""
+    s = raw_code.strip()
+    if not s:
+        return ""
+    try:
+        import unicodedata
+
+        nfkd = unicodedata.normalize("NFKD", s)
+        ascii_only = "".join(ch for ch in nfkd if ord(ch) < 128)
+        return (ascii_only.strip() or s).strip()
+    except Exception:
+        return s
+
+def _push_notification(message: str, level: str = "info") -> None:
+    try:
+        lvl = (level or "info").strip().lower()
+        if lvl not in ("info", "warning", "error"):
+            lvl = "info"
+        app_state.get("notifications", []).append({"level": lvl, "message": str(message), "ts": time.time()})
+        # Tránh phình vô hạn nếu client không poll
+        if len(app_state.get("notifications", [])) > 50:
+            app_state["notifications"] = app_state["notifications"][-50:]
+    except Exception:
+        pass
 
 
 def _queue_find_entry_by_id(order_id: str | None) -> dict | None:
@@ -904,6 +956,28 @@ def enforce_video_storage_limit(shop_id: str | None) -> dict:
 ORDER_CODE_PREFIXES = ("ORD-", "DEMO-ORDER-", "ORDER", "OD-")
 SERIAL_CODE_PREFIXES = ("SN-", "SERIAL-", "SR-")
 
+SERIAL_VALID_PREFIXES = ("SN-", "SERIAL-", "SR-")
+
+
+def is_valid_serial(code: str) -> bool:
+    """
+    Rule serial hợp lệ (tự định nghĩa trước):
+    - Bắt đầu bằng một trong SERIAL_VALID_PREFIXES
+    - Phần còn lại tối thiểu 3 ký tự, chỉ gồm A-Z / 0-9 / '-' / '_'
+    """
+    if not code or not isinstance(code, str):
+        return False
+    c = code.strip().upper()
+    if not any(c.startswith(p) for p in SERIAL_VALID_PREFIXES):
+        return False
+    tail = c.split("-", 1)[1] if "-" in c else ""
+    if len(tail) < 3:
+        return False
+    for ch in tail:
+        if not (("A" <= ch <= "Z") or ("0" <= ch <= "9") or ch in "-_"):
+            return False
+    return True
+
 
 def looks_like_order_code(code: str) -> bool:
     """
@@ -939,26 +1013,17 @@ def on_code_detected(code: str):
     """
     Callback khi AI scanner phát hiện mã.
 
-    Ưu tiên phân loại theo format (prefix):
-    - looks_like_order_code(code)  => xử lý như mã đơn (_handle_order_code).
-    - looks_like_serial_code(code)  => xử lý như mã serial (_handle_serial_code).
-    - Không khớp format            => fallback: chưa có đơn thì coi là đơn, đã có đơn thì coi là serial.
+    POC mới: chỉ có 1 loại mã QR/Barcode đại diện cho đơn hàng.
+    Mọi mã quét được sẽ được coi là mã đơn để gọi API lấy order_info, kiểm tra huỷ/trùng,
+    và (nếu hợp lệ) tự bắt đầu quay.
     """
+    code = normalize_scanned_code(code)
+    if not code:
+        return
     with state_lock:
-        has_order = app_state["current_order_code"] is not None
-        should_auto_record = app_state.get("auto_record_on_qr", False)
+        should_auto_record = app_state.get("auto_record_on_code", True)
         is_recording = app_state.get("is_recording", False)
-
-    if looks_like_order_code(code):
-        _handle_order_code(code, should_auto_record=should_auto_record, is_recording=is_recording)
-    elif looks_like_serial_code(code):
-        _handle_serial_code(code)
-    else:
-        # Fallback: giữ hành vi cũ (mã đầu = đơn, mã sau = serial) khi không khớp prefix
-        if not has_order:
-            _handle_order_code(code, should_auto_record=should_auto_record, is_recording=is_recording)
-        else:
-            _handle_serial_code(code)
+    _handle_order_code(code, should_auto_record=should_auto_record, is_recording=is_recording)
 
 
 def _init_serial_state_for_order(order_info: dict) -> dict:
@@ -1053,7 +1118,24 @@ def _handle_order_code(code: str, should_auto_record: bool, is_recording: bool) 
         order_info = order_service.get_order(code)
     except Exception as e:
         print(f"[ORDER] Loi khi doc thong tin don cho QR '{code}': {e}")
+        with state_lock:
+            _push_notification(f"❌ Không lấy được thông tin đơn: {code}", "error")
         return
+
+    # Không tìm thấy đơn
+    if not order_info:
+        with state_lock:
+            _push_notification(f"❌ Không tìm thấy đơn: {code}", "error")
+        return
+
+    # Đơn bị huỷ => thông báo và không đưa vào queue
+    try:
+        if hasattr(order_service, "is_cancelled") and order_service.is_cancelled(order_info):
+            with state_lock:
+                _push_notification(f"⚠️ Đơn đã bị huỷ: {code}", "warning")
+            return
+    except Exception:
+        pass
 
     serial_state = _init_serial_state_for_order(order_info)
     evaluation = _evaluate_packing_state(order_info, serial_state)
@@ -1062,12 +1144,9 @@ def _handle_order_code(code: str, should_auto_record: bool, is_recording: bool) 
         # Nếu mã đơn đã có trong queue thì chỉ set current về đơn đó (không tạo trùng)
         existing = _queue_find_entry_by_code(code)
         if existing:
-            existing["order_info"] = order_info
-            # Nếu entry đã có serial_state thì giữ lại, chỉ init nếu rỗng
-            if not (existing.get("serial_state") or {}):
-                existing["serial_state"] = serial_state
-            existing["packing_evaluation"] = _evaluate_packing_state(order_info, existing.get("serial_state") or {})
-            _queue_set_current(existing.get("id"))
+            # Đơn trùng: thông báo và KHÔNG auto quay lại.
+            _push_notification(f"⚠️ Đơn trùng lặp: {code}", "warning")
+            return
         else:
             import uuid
 
@@ -1086,12 +1165,19 @@ def _handle_order_code(code: str, should_auto_record: bool, is_recording: bool) 
             q.append(entry)
 
             # Nếu chưa có đơn đang xử lý thì tự set current vào đơn mới; nếu đã có thì chỉ xếp hàng
+            became_current = False
             if not app_state.get("current_order_id"):
                 _queue_set_current(entry["id"])
+                became_current = True
 
-    # Tự động bắt đầu quay nếu được bật trong cấu hình và hiện chưa quay
-    if should_auto_record and not is_recording:
-        print(f"[AUTO-RECORD] Phat hien QR '{code}', tu dong bat dau quay video...")
+            _push_notification(f"✅ Đã nhận đơn: {code}", "info")
+
+    # Tự động bắt đầu quay khi:
+    # - đơn hợp lệ (API OK, không huỷ, không trùng)
+    # - đơn trở thành current (đang ở vị trí camera)
+    # - được bật config và hiện chưa quay
+    if should_auto_record and (not is_recording) and became_current:
+        print(f"[AUTO-RECORD] Nhan ma '{code}', tu dong bat dau quay video...")
 
         def _auto_start():
             # Chờ UI cập nhật 1 chút để người dùng kịp thấy mã đơn
@@ -1104,7 +1190,7 @@ def _handle_order_code(code: str, should_auto_record: bool, is_recording: bool) 
         threading.Thread(target=_auto_start, daemon=True).start()
 
 
-def _handle_serial_code(code: str) -> None:
+def _handle_serial_code(code: str, should_auto_record_serial: bool, is_recording: bool) -> None:
     """
     Xử lý khi phát hiện mã serial trong quá trình đóng gói.
 
@@ -1123,6 +1209,8 @@ def _handle_serial_code(code: str) -> None:
 
     if not order_code or not order_info:
         print(f"[SERIAL] Bo qua serial '{code}' vi chua co don hien tai.")
+        with state_lock:
+            _push_notification("⚠️ Chưa có đơn hiện tại, serial bị bỏ qua", "warning")
         return
 
     if "__all__" not in serial_state:
@@ -1153,6 +1241,19 @@ def _handle_serial_code(code: str) -> None:
         if entry:
             entry["serial_state"] = serial_state
             entry["packing_evaluation"] = evaluation
+
+        # Auto-start quay khi serial hợp lệ
+        if should_auto_record_serial and (not is_recording) and is_valid_serial(code):
+            _push_notification(f"🎥 Serial hợp lệ, bắt đầu quay: {order_code}", "info")
+            def _auto_start_by_serial():
+                time.sleep(0.2)
+                try:
+                    _trigger_auto_recording(order_code)
+                except Exception as e:
+                    print(f"[AUTO-RECORD SERIAL] Loi: {e}")
+                    with state_lock:
+                        _push_notification("❌ Không thể bắt đầu quay tự động", "error")
+            threading.Thread(target=_auto_start_by_serial, daemon=True).start()
 
     print(f"[SERIAL] Quet serial '{code}' cho don '{order_code}'. State: {evaluation}")
 
@@ -1374,16 +1475,10 @@ def manual_scan():
         flash("Không có mã để quét.")
         return redirect(url_for("dashboard"))
 
-    # Chuẩn hóa mã để tránh lỗi bộ gõ/IME làm sai ký tự (ví dụ: ỎD-TÉT-001)
-    try:
-        import unicodedata
-
-        # Loại bỏ dấu và ký tự không thuộc ASCII
-        nfkd = unicodedata.normalize("NFKD", raw_code)
-        normalized = "".join(ch for ch in nfkd if ord(ch) < 128)
-        code = normalized.strip() or raw_code
-    except Exception:
-        code = raw_code
+    code = normalize_scanned_code(raw_code)
+    if not code:
+        flash("Mã không hợp lệ.")
+        return redirect(url_for("dashboard"))
 
     try:
         on_code_detected(code)
@@ -1392,6 +1487,26 @@ def manual_scan():
         flash(f"Lỗi khi xử lý mã: {e}")
 
     return redirect(url_for("dashboard"))
+
+
+@app.route("/manual-scan-api", methods=["POST"])
+def manual_scan_api():
+    """
+    API cho scanner (AJAX) để tránh full page reload (giữ user gesture cho autoplay audio).
+    """
+    if "user" not in session:
+        return jsonify({"ok": False, "error": "Chưa đăng nhập"}), 401
+
+    raw_code = (request.form.get("code") or "").strip()
+    code = normalize_scanned_code(raw_code)
+    if not code:
+        return jsonify({"ok": False, "error": "Mã không hợp lệ"}), 400
+
+    try:
+        on_code_detected(code)
+        return jsonify({"ok": True, "code": code})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 500
 
 
 @app.route("/record")
@@ -2045,6 +2160,9 @@ def status():
         is_paused = app_state.get("is_paused", False)
         serial_state = app_state.get("serial_state") or {}
         packing_evaluation = app_state.get("packing_evaluation")
+        notifications = list(app_state.get("notifications") or [])
+        # Clear sau khi đã lấy để không show lặp lại
+        app_state["notifications"] = []
 
     now = time.time()
     recording_seconds = int(now - start) if is_recording and start else 0
@@ -2078,6 +2196,7 @@ def status():
             },
             # packing_state: thông tin đã được tính sẵn để FE render bảng trạng thái đóng gói.
             "packing_state": packing_evaluation,
+            "notifications": notifications,
         }
     )
 
@@ -2087,6 +2206,13 @@ def _trigger_auto_recording(code: str):
     Helper function để tự động bắt đầu quay video (gọi từ on_code_detected).
     """
     try:
+        # Không auto-start nếu camera chưa chạy (giống logic start_recording)
+        with camera_status_lock:
+            if not camera_status.get("running", False):
+                with state_lock:
+                    _push_notification("❌ Camera chưa khởi động, không thể auto quay", "error")
+                return
+
         # Dùng chung core logic với start_recording
         _start_recording_internal(code, auto=True)
     except Exception as e:
