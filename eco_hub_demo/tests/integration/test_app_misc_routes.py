@@ -269,3 +269,59 @@ def test_storage_delete_exception_from_s3_is_handled(logged_in_client, app_modul
     resp = logged_in_client.post("/storage/delete/a.mp4")
     assert resp.status_code == 302
     assert "/storage" in (resp.location or "")
+
+
+def test_login_post_sets_session_and_redirects(client):
+    resp = client.post("/", data={"username": "alice"})
+    assert resp.status_code == 302
+    assert "/dashboard" in (resp.location or "")
+
+
+def test_dashboard_orders_record_require_login(client):
+    assert client.get("/dashboard").status_code == 302
+    assert client.get("/orders").status_code == 302
+    assert client.get("/record").status_code == 302
+
+
+def test_dashboard_orders_record_success_render(logged_in_client, app_module, monkeypatch):
+    monkeypatch.setattr(app_module, "render_template", lambda *_args, **_kwargs: "ok-page")
+    assert logged_in_client.get("/dashboard").get_data(as_text=True) == "ok-page"
+    assert logged_in_client.get("/orders").get_data(as_text=True) == "ok-page"
+    assert logged_in_client.get("/record").get_data(as_text=True) == "ok-page"
+
+
+def test_camera_settings_post_usb_index_invalid(logged_in_client, app_module, monkeypatch):
+    with app_module.state_lock:
+        app_module.app_state["is_recording"] = False
+    monkeypatch.setattr(app_module, "scan_available_cameras", lambda: [0])
+    resp = logged_in_client.post(
+        "/camera-settings",
+        data={
+            "enable_0": "1",
+            "source_type_0": app_module.SOURCE_USB,
+            "camera_index_0": "99",
+        },
+    )
+    assert resp.status_code == 302
+    assert "/camera-settings" in (resp.location or "")
+
+
+def test_camera_settings_post_runtime_error_is_handled(logged_in_client, app_module, monkeypatch):
+    with app_module.state_lock:
+        app_module.app_state["is_recording"] = False
+    monkeypatch.setattr(app_module, "scan_available_cameras", lambda: [0, 1])
+    monkeypatch.setattr(
+        app_module,
+        "build_managers_and_scanners",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("camera init fail")),
+    )
+    resp = logged_in_client.post(
+        "/camera-settings",
+        data={
+            "enable_0": "1",
+            "source_type_0": app_module.SOURCE_USB,
+            "camera_index_0": "0",
+        },
+    )
+    assert resp.status_code == 302
+    assert "/camera-settings" in (resp.location or "")

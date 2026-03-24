@@ -292,3 +292,38 @@ def test_start_recording_internal_error_returns_500(logged_in_client, app_module
     assert resp.status_code == 400
     payload = resp.get_json()
     assert "broken" in payload["error"]
+
+
+def test_start_recording_internal_success_updates_state(app_module, monkeypatch):
+    class _DummyRecorder:
+        is_recording = False
+        file_path = "new.mp4"
+
+        def start(self, *_args, **_kwargs):
+            return None
+
+    class _DummyScanner:
+        def __init__(self):
+            self.pause_called = 0
+
+        def pause(self):
+            self.pause_called += 1
+
+    scanner = _DummyScanner()
+    monkeypatch.setattr(app_module, "recorder", _DummyRecorder())
+    monkeypatch.setattr(app_module, "ai_scanners", [scanner])
+    monkeypatch.setattr(app_module.storage_service, "start_new_recording", lambda *_args, **_kwargs: "tmp.mp4")
+    monkeypatch.setattr(app_module.storage_service, "update_recording_path", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(app_module.time, "sleep", lambda _x: None)
+    monkeypatch.setattr(app_module, "_primary_camera_manager", None)
+
+    with app_module.state_lock:
+        app_module.app_state["is_recording"] = False
+        app_module.app_state["recording_order_code"] = None
+
+    result = app_module._start_recording_internal("ORD-INT-1", auto=False)
+    assert result["ok"] is True
+    with app_module.state_lock:
+        assert app_module.app_state["is_recording"] is True
+        assert app_module.app_state["recording_order_code"] == "ORD-INT-1"
+    assert scanner.pause_called == 1
