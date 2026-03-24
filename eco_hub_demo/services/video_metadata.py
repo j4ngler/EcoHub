@@ -1,7 +1,7 @@
 import os
 import sqlite3
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import List, Optional
 
 
@@ -138,7 +138,7 @@ def insert_video(
     """
     ensure_schema(db_path)
     if created_at is None:
-        created_at = datetime.utcnow()
+        created_at = datetime.now(UTC)
 
     conn = _connect(db_path)
     try:
@@ -280,7 +280,7 @@ def log_video_deletion(
     """
     ensure_schema(db_path)
     if deleted_at is None:
-        deleted_at = datetime.utcnow()
+        deleted_at = datetime.now(UTC)
 
     conn = _connect(db_path)
     try:

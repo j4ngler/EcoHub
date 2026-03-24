@@ -1020,10 +1020,10 @@ def on_code_detected(code: str):
     code = normalize_scanned_code(code)
     if not code:
         return
+    # Luôn tự động bắt đầu quay khi quét được mã đơn hợp lệ
     with state_lock:
-        should_auto_record = app_state.get("auto_record_on_code", True)
         is_recording = app_state.get("is_recording", False)
-    _handle_order_code(code, should_auto_record=should_auto_record, is_recording=is_recording)
+    _handle_order_code(code, should_auto_record=True, is_recording=is_recording)
 
 
 def _init_serial_state_for_order(order_info: dict) -> dict:
