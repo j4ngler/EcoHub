@@ -19,20 +19,18 @@ python app.py
 http://127.0.0.1:5000
 ```
 
-### 📦 Build & Deploy
+### 📦 Build & Deploy (Windows)
 
 ```bash
-# 1. Build EXE
+# 1. Build EXE (PyInstaller onedir + zip giao khách)
 build_exe.bat
 
-# 2. Test EXE
-dist\EcoHub_QR_Scanner\EcoHub_QR_Scanner.exe
+# 2. Chạy thử
+dist\EcoHub\EcoHub.exe
 
-# 3. Build Installer
-build_installer.bat
-
-# 4. Result
-installer_output\EcoHub_QR_Scanner_Setup_v1.0.0.exe
+# 3. Giao khách: cả thư mục dist\EcoHub hoặc file release\EcoHub-portable.zip
+#    Kèm hướng dẫn: dist\EcoHub\GIAO_KHACH_HANG.txt và file .env
+# 4. Release sinh sẵn release\latest.json để dùng cho auto-update
 ```
 
 ---
@@ -47,6 +45,23 @@ installer_output\EcoHub_QR_Scanner_Setup_v1.0.0.exe
 - 🕐 **GMT+7 Timezone** - Timestamp chính xác
 - 🔄 **Upload History** - Daily cleanup at 00:00
 - ⚙️ **Safe Startup** - Manual camera start
+
+---
+
+## Auto Update
+
+1. Build release bình thường bằng `build_exe.bat` hoặc `build_release.ps1`
+2. Upload `release\EcoHub-portable.zip` lên GitHub Release của repo `j4ngler/EcoHub`
+3. Commit/push `release\latest.json` lên `main` trong thư mục `eco_hub_demo/release/latest.json`
+4. Trên máy khách, dùng `ECOHUB_UPDATE_MANIFEST_URL=https://raw.githubusercontent.com/j4ngler/EcoHub/main/eco_hub_demo/release/latest.json` trong `.env`
+5. Trong EcoHub, bấm nút `Cập nhật` trên thanh menu
+
+Ghi chú:
+
+- Updater chỉ ghi đè phần app, không đụng `data\`
+- File `.env` hiện tại của máy khách được giữ nguyên khi update
+- Build script hiện mặc định sinh manifest với URL zip: `https://github.com/j4ngler/EcoHub/releases/latest/download/EcoHub-portable.zip`
+- Nếu cần đổi repo hoặc CDN riêng, đặt biến build `ECOHUB_RELEASE_DOWNLOAD_URL`
 
 ---
 
@@ -205,7 +220,7 @@ cap.set(cv2.CAP_PROP_BUFFERSIZE, 0)
 - **Config Encryption**: Fernet symmetric encryption
 - **S3 Credentials**: Encrypted in config.json
 - **Encryption Key**: `config.key` (44 bytes)
-- **User Storage**: `C:\Users\<user>\EcoHub_QR_Scanner\`
+- **User Storage (frozen .exe)**: `<folder chứa EcoHub.exe>\data\` (config, DB, `videos\`, `logs\`; portable)
 
 ---
 
@@ -261,7 +276,7 @@ Dự án nội bộ - EcoHub Team only.
 python app.py
 
 # Production
-EcoHub_QR_Scanner.exe
+EcoHub.exe
 ```
 
 **Common Issues:**
