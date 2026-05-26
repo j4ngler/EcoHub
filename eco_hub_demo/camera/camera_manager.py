@@ -49,14 +49,14 @@ class CameraManager:
 
     DEFAULT_WIDTH = 1280
     DEFAULT_HEIGHT = 720
-    DEFAULT_FPS = 20.0
+    DEFAULT_FPS = 10.0
 
     def __init__(
         self,
         camera_index: int = 0,
         width: int = 1280,
         height: int = 720,
-        fps: float = 20.0,
+        fps: float = 10.0,
         source_type: str = SOURCE_USB,
         rtsp_url: str = "",
     ):
@@ -92,13 +92,14 @@ class CameraManager:
             cap = cv2.VideoCapture(self.rtsp_url, cv2.CAP_FFMPEG)
             # RTSP: Giảm buffer xuống 0 để realtime (không delay)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 0)
-            # Tối ưu thêm cho RTSP
-            cap.set(cv2.CAP_PROP_FPS, 25)  # Force 25 FPS
+            # Yêu cầu FPS đồng nhất với cấu hình hiện tại.
+            cap.set(cv2.CAP_PROP_FPS, self.fps)
         else:
             is_windows = platform.system().lower() == "windows"
             cap = cv2.VideoCapture(self.camera_index, cv2.CAP_DSHOW) if is_windows else cv2.VideoCapture(self.camera_index)
             cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            cap.set(cv2.CAP_PROP_FPS, self.fps)
             cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)  # USB buffer = 1
         return cap
 

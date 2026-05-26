@@ -43,9 +43,20 @@
         {% if current_order_info %}
           <p class="mb-1"><strong>Mã đơn:</strong> {{ current_order_info.order_id }}</p>
           <p class="mb-1"><strong>Nền tảng:</strong> {{ current_order_info.platform }}</p>
+          {% if current_order_info.get('product_id') %}
+            <p class="mb-1"><strong>Product ID:</strong> {{ current_order_info.get('product_id') }}</p>
+          {% endif %}
           <ul class="mb-0 ps-3">
             {% for item in current_order_info.get('items', []) %}
-              <li>{{ item.qty }} x {{ item.name }}</li>
+              <li>
+                {{ item.qty }} x {{ item.name }}
+                {% if item.get('product_id') %}
+                  <br><small class="text-muted">Product: {{ item.get('product_id') }}</small>
+                {% endif %}
+                {% if item.get('sku_id') %}
+                  <br><small class="text-muted">SKU: {{ item.get('sku_id') }}</small>
+                {% endif %}
+              </li>
             {% endfor %}
           </ul>
         {% else %}

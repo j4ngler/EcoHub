@@ -1,22 +1,20 @@
 {
   "camera_configs": [
     {
-      "source_type": "rtsp",
+      "slot_index": 0,
+      "source_type": "usb",
       "camera_index": 0,
       "rtsp_url": "rtsp://admin:EcoVision1@192.168.0.64:554/Streaming/Channels/101",
       "width": 1280,
       "height": 720,
-      "fps": 20.0
+      "fps": 10.0
     }
   ],
-  "video_limits": {
-  "storage_limit_gb": 50,
-  "max_count": 0,
-  "max_duration_min": 0
-  },
-  "scan_sensitivity": "low",
-  "auto_record_on_qr": false,
-  "storage_mode": "s3",
+  "scan_sensitivity": "normal",
+  "auto_record_on_qr": true,
+  "storage_mode": "local",
+  "qr_cooldown_seconds": 5,
+  "recording_camera_slot": 0,
   "s3_config": {
     "endpoint": "https://s3.hn-2.cloud.cmctelecom.vn",
     "access_key": "Z0FBQUFBQnBoWXdXSzJaNUcyeGdKQ1hxWm95bTM0TmF1X1JyR0Joa3RSOExGamx6enVTdFNycGY4Vi1QRnVoYnptTGZDY1dzczlmSklyanBKQUV1YVVIQXd4ZnoxRkR1cG5fVmNvT1lSQ0hrOXpYUDMyclhPQWM9",
@@ -24,6 +22,10 @@
     "bucket": "komex-demo-before-tet",
     "region": "hn-2",
     "prefix": "Tuyền"
+  },
+  "employee_session": {
+    "employee_name": "admin",
+    "employee_code": "NV001",
+    "work_session_label": "Ca chiều 15/05"
   }
-  
 }

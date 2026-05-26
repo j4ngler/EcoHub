@@ -26,9 +26,19 @@ async function fetchStatus() {
       let html = "";
       html += `<p><strong>Mã đơn:</strong> ${order.order_id}</p>`;
       html += `<p><strong>Nền tảng:</strong> ${order.platform}</p>`;
+      if (order.product_id) {
+        html += `<p><strong>Product ID:</strong> ${order.product_id}</p>`;
+      }
       html += "<ul>";
       (order.items || []).forEach((it) => {
-        html += `<li>${it.qty} x ${it.name}</li>`;
+        html += `<li>${it.qty} x ${it.name}`;
+        if (it.product_id) {
+          html += `<br><small class="text-muted">Product: ${it.product_id}</small>`;
+        }
+        if (it.sku_id) {
+          html += `<br><small class="text-muted">SKU: ${it.sku_id}</small>`;
+        }
+        html += "</li>";
       });
       html += "</ul>";
       orderInfoEl.innerHTML = html;

@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Camera, ScanBarcode, Video, RefreshCw, Table, UploadCloud, XCircle, Play, Eraser } from 'lucide-react';
 import { toast } from 'react-toastify';
-import api, { getErrorMessage } from '@/api/axios';
+import { getErrorMessage } from '@/api/axios';
 import { ordersApi } from '@/api/orders.api';
+import { videosApi } from '@/api/videos.api';
 
 const POSITION_OPTIONS = [
   { value: 'top_left', label: 'Góc trên trái' },
@@ -29,6 +30,16 @@ type UploadRow = {
   error?: string;
 };
 
+type VideoOrder = {
+  id: string;
+  status: string;
+  trackingCode?: string;
+  orderCode?: string;
+  code?: string;
+  customerName?: string;
+  items?: Array<unknown>;
+};
+
 export default function CreateVideoPage() {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -49,11 +60,13 @@ export default function CreateVideoPage() {
     queryFn: () => ordersApi.getOrders({ page: 1, limit: 100 }),
   });
 
-  const selectedOrder = useMemo(() => {
-    return ordersData?.data?.find((o) => o.id === orderId) ?? null;
-  }, [ordersData, orderId]);
+  const orderList = ((ordersData as any)?.data ?? []) as VideoOrder[];
 
-  const orders = (ordersData?.data ?? []).filter((o) =>
+  const selectedOrder = useMemo(() => {
+    return orderList.find((o: VideoOrder) => o.id === orderId) ?? null;
+  }, [orderList, orderId]);
+
+  const orders = orderList.filter((o: VideoOrder) =>
     ['confirmed', 'packing', 'packed'].includes(o.status)
   );
 
@@ -117,17 +130,6 @@ export default function CreateVideoPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const uploadOne = async (rowId: string, file: File, payload: FormData) => {
-    await api.post('/videos/upload', payload, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: (evt) => {
-        const total = evt.total || file.size || 1;
-        const pct = Math.min(100, Math.round((evt.loaded / total) * 100));
-        setRows((prev) => prev.map((r) => (r.id === rowId ? { ...r, progress: pct } : r)));
-      },
-    });
-  };
-
   const startUpload = async () => {
     if (!orderId) {
       toast.error('Vui lòng chọn/scan mã vận đơn để gắn với đơn hàng');
@@ -138,7 +140,7 @@ export default function CreateVideoPage() {
       return;
     }
 
-    const order = ordersData?.data?.find((o) => o.id === orderId);
+    const order = orderList.find((o: VideoOrder) => o.id === orderId);
     if (!order) {
       toast.error('Không tìm thấy đơn hàng');
       return;
@@ -150,13 +152,13 @@ export default function CreateVideoPage() {
       return;
     }
 
-    const txnId = trackingCode.trim() || order.trackingCode || order.orderCode;
+    const txnId = trackingCode.trim() || order.trackingCode || order.orderCode || order.code || '';
     const nowIso = new Date().toISOString();
     const row: UploadRow = {
       id: crypto.randomUUID(),
       txnId,
       orderId,
-      orderCode: order.orderCode,
+      orderCode: order.orderCode || order.code || '',
       trackingCode: trackingCode.trim() || order.trackingCode || '',
       status: 'uploading',
       progress: 0,
@@ -176,7 +178,7 @@ export default function CreateVideoPage() {
       formData.append('trackingCodePosition', trackingCodePosition);
       // note: isReturn hiện chỉ là UI (chưa có field backend)
 
-      await uploadOne(row.id, videoFile, formData);
+      await videosApi.uploadVideo(formData);
       setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, status: 'synced', progress: 100 } : r)));
       toast.success('Upload thành công');
       // giữ lại UI kiểu swifttrack (không auto navigate)

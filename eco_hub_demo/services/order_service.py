@@ -1,120 +1,274 @@
-"""
-Thông tin đơn hàng (mock).
-- Dữ liệu hiển thị: app_state["current_order_info"] (set trong app.py khi AI quét được mã).
-- Nguồn: order_service.get_order(code) — mock; sau có thể thay bằng API EcoHub thật.
-- UI: Dashboard cột phải, card "Thông tin đơn hàng (mock)", id="orderInfo"; cập nhật realtime qua /status + main.js.
-"""
+"""Order service dùng TikTok client chung."""
 
 from __future__ import annotations
 
+import json
 import os
 from typing import Any
 
+from services.tiktok_client import TikTokApiError, TikTokClient, _load_local_env_file
+from services.tiktok_auth_store import list_authorizations
+
+DEFAULT_TIKTOK_ORDER_PATH = "/api/order/202309/orders/query"
+
+
+def get_order_platform() -> str:
+    """
+    tiktok: gọi TikTok Shop API qua get_order().
+    generic: Shopee/Lazada/khác — chưa có API: chỉ dùng mã quét + lưu video, không gọi TikTok.
+    Giá trị env ECOHUB_ORDER_PLATFORM: tiktok | generic | shopee | lazada | other | manual
+    """
+    _load_local_env_file()
+    p = (os.environ.get("ECOHUB_ORDER_PLATFORM") or "tiktok").strip().lower()
+    if p in ("shopee", "lazada", "generic", "other", "manual", "khac", "k"):
+        return "generic"
+    return "tiktok"
+
+
+def build_local_order(code: str) -> dict:
+    """
+    Đơn nội bộ khi không kết nối API (Shopee/Lazada/...).
+    items rỗng => không bắt buộc quét serial khi stop_recording.
+    """
+    _load_local_env_file()
+    label = (os.environ.get("ECOHUB_GENERIC_ORDER_PLATFORM") or "SHOPEE_OTHER").strip() or "SHOPEE_OTHER"
+    return {
+        "code": code,
+        "order_id": code,
+        "platform": label,
+        "status": "ACTIVE",
+        "shipping_status": "",
+        "product_id": None,
+        "sku_id": None,
+        "items": [],
+    }
+
+
+def _normalize_item(raw_item: Any) -> dict:
+    if not isinstance(raw_item, dict):
+        return {}
+    qty = raw_item.get("quantity") or raw_item.get("qty") or raw_item.get("count") or 1
+    try:
+        qty = int(qty)
+    except Exception:
+        qty = 1
+    return {
+        "name": raw_item.get("product_name")
+        or raw_item.get("name")
+        or raw_item.get("title")
+        or "Unknown item",
+        "qty": max(1, qty),
+        "product_id": raw_item.get("product_id") or raw_item.get("productId"),
+        "sku_id": raw_item.get("sku_id") or raw_item.get("skuId"),
+    }
+
+
+def _normalize_order_payload(order_raw: dict, code: str) -> dict:
+    items_raw = (
+        order_raw.get("line_items")
+        or order_raw.get("line_item_list")
+        or order_raw.get("order_line_list")
+        or order_raw.get("items")
+        or order_raw.get("order_items")
+        or []
+    )
+    if not isinstance(items_raw, list):
+        items_raw = []
+    items = [it for it in (_normalize_item(x) for x in items_raw) if it]
+
+    product_id = order_raw.get("product_id") or order_raw.get("productId")
+    sku_id = order_raw.get("sku_id") or order_raw.get("skuId")
+    if not product_id and items:
+        product_id = items[0].get("product_id")
+    if not sku_id and items:
+        sku_id = items[0].get("sku_id")
+
+    shipping_status = (
+        order_raw.get("shipping_status")
+        or order_raw.get("order_status")
+        or order_raw.get("status")
+        or order_raw.get("fulfillment_status")
+        or order_raw.get("delivery_status")
+        or order_raw.get("logistics_status")
+        or ""
+    )
+    shipping_status = str(shipping_status).strip().upper() if shipping_status else ""
+    return {
+        "code": code,
+        "order_id": order_raw.get("order_id") or order_raw.get("id") or code,
+        "platform": "TIKTOK_SHOP",
+        "status": "ACTIVE",
+        "shipping_status": shipping_status,
+        "product_id": product_id,
+        "sku_id": sku_id,
+        "items": items,
+    }
+
+
+def _merge_shop_metadata(order_info: dict, auth_record: dict[str, str]) -> dict:
+    if not isinstance(order_info, dict):
+        return order_info
+    if auth_record.get("shop_id"):
+        order_info["shop_id"] = auth_record["shop_id"]
+    if auth_record.get("shop_cipher"):
+        order_info["shop_cipher"] = auth_record["shop_cipher"]
+    if auth_record.get("merchant_id"):
+        order_info["merchant_id"] = auth_record["merchant_id"]
+    if auth_record.get("id") is not None:
+        order_info["tiktok_auth_id"] = auth_record["id"]
+    return order_info
+
+
+def _build_order_client_candidates() -> list[dict[str, str]]:
+    _load_local_env_file()
+    db_path = os.environ.get("ECOHUB_TIKTOK_AUTH_DB") or os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "tiktok_auth.db",
+    )
+    auth_records = []
+    try:
+        auth_records = list_authorizations(db_path)
+    except Exception:
+        auth_records = []
+    out: list[dict[str, str]] = []
+    for record in auth_records:
+        access_token = (record.access_token or "").strip()
+        shop_cipher = (record.shop_cipher or "").strip()
+        if not access_token or not shop_cipher:
+            continue
+        out.append(
+            {
+                "id": int(record.id),
+                "access_token": access_token,
+                "shop_cipher": shop_cipher,
+                "shop_id": (record.shop_id or "").strip(),
+                "merchant_id": (record.merchant_id or "").strip(),
+            }
+        )
+    return out
+
+
+def _resolve_order_with_client(client: TikTokClient, code: str) -> dict | None:
+    endpoint_path = (os.environ.get("ECOHUB_ORDER_API_ENDPOINT_PATH") or DEFAULT_TIKTOK_ORDER_PATH).strip()
+    lookup_field = (os.environ.get("ECOHUB_ORDER_API_LOOKUP_FIELD") or "").strip()
+    method = (os.environ.get("ECOHUB_ORDER_API_METHOD") or "POST").strip().upper()
+    query_params = _parse_json_object_env("ECOHUB_ORDER_API_QUERY_PARAMS")
+    body_template = _parse_json_object_env("ECOHUB_ORDER_API_BODY_TEMPLATE")
+
+    payload = dict(body_template)
+    lookup_value: Any = None
+    if lookup_field:
+        if lookup_field.endswith("_list"):
+            lookup_value = [str(code)]
+        else:
+            lookup_value = str(code)
+        payload[lookup_field] = lookup_value
+
+    req_query = dict(query_params)
+    req_body = payload if method != "GET" else None
+    if method == "GET" and lookup_field:
+        req_query[lookup_field] = lookup_value
+
+    root: Any = client.request(
+        method=method,
+        path=endpoint_path,
+        query_params=req_query,
+        body=req_body,
+    )
+
+    if not isinstance(root, dict):
+        return None
+
+    api_code = root.get("code")
+    if api_code not in (0, "0", None):
+        msg = root.get("message") or root.get("msg") or "TikTok API trả lỗi"
+        raise RuntimeError(f"TikTok API error code={api_code}: {msg}")
+
+    data = root.get("data") or {}
+    order_raw: dict[str, Any] | None = None
+    if isinstance(data, dict):
+        if isinstance(data.get("order"), dict):
+            order_raw = data.get("order")
+        elif isinstance(data.get("orders"), list) and data.get("orders"):
+            rows = [x for x in data["orders"] if isinstance(x, dict)]
+            for row in rows:
+                row_id = str(row.get("id") or row.get("order_id") or "")
+                row_tracking = str(row.get("tracking_number") or "")
+                if row_id == str(code) or row_tracking == str(code):
+                    order_raw = row
+                    break
+            if not order_raw and rows:
+                order_raw = rows[0]
+        elif isinstance(data.get("order_list"), list) and data.get("order_list"):
+            rows = [x for x in data["order_list"] if isinstance(x, dict)]
+            for row in rows:
+                row_id = str(row.get("id") or row.get("order_id") or "")
+                row_tracking = str(row.get("tracking_number") or "")
+                if row_id == str(code) or row_tracking == str(code):
+                    order_raw = row
+                    break
+            if not order_raw and rows:
+                order_raw = rows[0]
+
+    if not order_raw:
+        return None
+
+    return _normalize_order_payload(order_raw, code)
+
+
+def _parse_json_object_env(env_name: str) -> dict[str, Any]:
+    raw = (os.environ.get(env_name) or "").strip()
+    if not raw:
+        return {}
+    try:
+        value = json.loads(raw)
+    except Exception as e:
+        raise RuntimeError(f"{env_name} phải là JSON object hợp lệ") from e
+    if not isinstance(value, dict):
+        raise RuntimeError(f"{env_name} phải là JSON object hợp lệ")
+    return value
+
 
 def get_order(code: str):
-    """
-    Trả về data đơn hàng theo mã code.
-    - Nếu có cấu hình API qua env thì gọi API thật.
-    - Nếu không có API thì trả mock data để demo.
-
-    Kỳ vọng shape tối thiểu:
-    {
-      "order_id": "...",
-      "platform": "...",
-      "code": "...",
-      "items": [{"name": "...", "qty": 1}, ...],
-      "status": "ACTIVE" | "CANCELLED" | ...
-    }
-    """
+    """Lấy thông tin đơn từ TikTok API theo field lookup cấu hình trong env."""
     if not code:
         return None
-
-    base_url = (os.environ.get("ECOHUB_ORDER_API_BASE_URL") or "").strip()
-    token = (os.environ.get("ECOHUB_ORDER_API_TOKEN") or "").strip()
-    url_template = (os.environ.get("ECOHUB_ORDER_API_URL_TEMPLATE") or "").strip()
-
-    # Nếu có base_url => gọi API thật
-    if base_url:
+    _load_local_env_file()
+    # Tìm đơn theo credential shop cụ thể, ưu tiên các shop đã ủy quyền trong DB.
+    candidates = _build_order_client_candidates()
+    for record in candidates:
         try:
-            import requests  # lazy import để không bắt buộc khi chạy mock
-        except Exception as e:
-            raise RuntimeError("Thiếu thư viện 'requests'. Hãy cài: pip install requests") from e
+            client = TikTokClient.from_tokens(
+                access_token=record["access_token"],
+                shop_cipher=record["shop_cipher"],
+            )
+        except RuntimeError as e:
+            print(f"[ORDER API] Bỏ qua record auth không hợp lệ: {e}")
+            continue
+        try:
+            order_info = _resolve_order_with_client(client, code)
+        except TikTokApiError as e:
+            print(f"[ORDER API] HTTP error shop_cipher={record.get('shop_cipher')}: {e}")
+            continue
+        except RuntimeError as e:
+            print(f"[ORDER API] API error shop_cipher={record.get('shop_cipher')}: {e}")
+            continue
+        if order_info:
+            return _merge_shop_metadata(order_info, record)
 
-        if not url_template:
-            # Default: GET {base}/orders/{code}
-            url_template = base_url.rstrip("/") + "/orders/{code}"
-
-        url = url_template.format(code=code, base=base_url.rstrip("/"))
-        headers: dict[str, str] = {"Accept": "application/json"}
-        if token:
-            headers["Authorization"] = f"Bearer {token}"
-
-        resp = requests.get(url, headers=headers, timeout=10)
-        # 404 => coi như không tìm thấy
-        if resp.status_code == 404:
-            return None
-        resp.raise_for_status()
-        data: Any = resp.json()
-
-        # Cho phép API trả {data: {...}} hoặc trả thẳng object
-        if isinstance(data, dict) and "data" in data and isinstance(data.get("data"), dict):
-            data = data["data"]
-
-        # Chuẩn hóa field cơ bản để UI không vỡ
-        if isinstance(data, dict):
-            if "code" not in data:
-                data["code"] = code
-            if "order_id" not in data:
-                data["order_id"] = data.get("id") or data.get("orderCode") or code
-            if "items" not in data or not isinstance(data.get("items"), list):
-                data["items"] = data.get("order_items") or []
-            if "platform" not in data:
-                data["platform"] = data.get("channel") or data.get("source") or "Unknown"
-            if "status" not in data:
-                data["status"] = data.get("state") or "ACTIVE"
-            return data
-
-        # Nếu API trả format lạ => trả None để app xử lý như không có
+    # Fallback nếu không có shop record hợp lệ hoặc đơn không nằm trong các shop đã lưu.
+    try:
+        client = TikTokClient.from_env()
+        order_info = _resolve_order_with_client(client, code)
+    except TikTokApiError as e:
+        print(f"[ORDER API] HTTP error code={code}: {e}")
+        raise RuntimeError(f"TikTok API HTTP lỗi: {e}") from e
+    except RuntimeError as e:
+        print(f"[ORDER API] Runtime error code={code}: {e}")
+        raise
+    if not order_info:
         return None
-
-    # Fallback mock (khi không cấu hình API)
-    # Cho phép điều khiển số lượng bằng cách nhét số vào code, ví dụ:
-    # - TEST-VOICE-25  => tổng qty = 25
-    # - QTY25          => tổng qty = 25
-    # - ORDER_12       => tổng qty = 12
-    import re
-
-    qty = None
-    m = re.search(r"(?:QTY|qty)[-_ ]?(\d{1,4})", code)
-    if m:
-        try:
-            qty = int(m.group(1))
-        except Exception:
-            qty = None
-    if qty is None:
-        # lấy cụm số ở cuối chuỗi (nếu có)
-        m2 = re.search(r"(\d{1,4})\s*$", code)
-        if m2:
-            try:
-                qty = int(m2.group(1))
-            except Exception:
-                qty = None
-    if qty is None:
-        qty = 3
-    if qty < 0:
-        qty = 0
-    if qty > 9999:
-        qty = 9999
-
-    return {
-        "order_id": "SPX123456",
-        "platform": "Shopee",
-        "code": code,
-        "status": "ACTIVE",
-        "items": [
-            {"name": "Sản phẩm (mock)", "qty": qty},
-        ],
-    }
+    return order_info
 
 
 def is_cancelled(order_info: dict | None) -> bool:

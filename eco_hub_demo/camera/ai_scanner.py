@@ -149,20 +149,18 @@ class AIBarcodeScanner:
                         detections.append({"x": int(x), "y": int(y), "w": int(w), "h": int(h), "text": code_data})
                         
                         with self._lock:
-                            # Kiểm tra xem code này đã bị lock chưa
-                            if self._locked_code is None:
-                                # Kiểm tra cooldown: đã quét mã này trong vòng COOLDOWN_SECONDS giây chưa?
-                                last_detected = self._code_history.get(code_data, 0)
-                                if current_time - last_detected >= self._cooldown_seconds:
-                                    # OK, có thể quét mã này
-                                    self._locked_code = code_data
-                                    self._code_history[code_data] = current_time
-                                    self.on_code_detected(code_data)
-                                else:
-                                    # Mã này đã được quét gần đây, bỏ qua
-                                    remaining = int(self._cooldown_seconds - (current_time - last_detected))
-                                    print(f"[SCANNER COOLDOWN] QR code '{code_data}' scanned recently. "
-                                          f"{remaining}s cooldown remaining.")
+                            # Chỉ dùng cooldown theo mã — không giữ _locked_code vĩnh viễn
+                            # (trước đây lock không mở => chỉ quét được 1 đơn cho tới khi stop/reset).
+                            last_detected = self._code_history.get(code_data, 0)
+                            if current_time - last_detected >= self._cooldown_seconds:
+                                self._code_history[code_data] = current_time
+                                self.on_code_detected(code_data)
+                            else:
+                                remaining = int(self._cooldown_seconds - (current_time - last_detected))
+                                print(
+                                    f"[SCANNER COOLDOWN] QR code '{code_data}' scanned recently. "
+                                    f"{remaining}s cooldown remaining."
+                                )
                     
                     with self._lock:
                         self._last_detections = detections

@@ -1,12 +1,12 @@
 import os
 import subprocess
 import time
+import unicodedata
 from dataclasses import dataclass
 from datetime import datetime
 from typing import List, Tuple, Dict, Optional
 
-# Giới hạn demo
-MAX_TOTAL_BYTES = 1 * 1024 * 1024 * 1024  # 1GB
+# Trạng thái file local hiện tại không cảnh báo theo dung lượng tổng.
 MAX_VIDEO_DURATION_SECONDS = 20 * 60  # 20 phút
 MAX_VIDEO_AGE_DAYS = 20
 RESUME_WINDOW_MINUTES = 10
@@ -23,29 +23,84 @@ class VideoInfo:
 
 _order_index: Dict[str, Dict[str, Optional[float]]] = {}
 
+# Loại luồng quay: hàng gửi (outbound) / hàng hoàn (return)
+RECORDING_FLOW_OUTBOUND = "outbound"
+RECORDING_FLOW_RETURN = "return"
+_RECORDING_FLOW_FOLDER = {
+    RECORDING_FLOW_OUTBOUND: "hang_gui",
+    RECORDING_FLOW_RETURN: "hang_hoan",
+}
+
+
+def normalize_recording_flow(value: str | None) -> str:
+    raw = str(value or "").strip().lower()
+    if raw in (RECORDING_FLOW_RETURN, "hang_hoan", "hoan", "return"):
+        return RECORDING_FLOW_RETURN
+    return RECORDING_FLOW_OUTBOUND
+
+
+def recording_flow_folder_name(flow: str | None) -> str:
+    return _RECORDING_FLOW_FOLDER.get(normalize_recording_flow(flow), "hang_gui")
+
+
+def recording_flow_label(flow: str | None) -> str:
+    if normalize_recording_flow(flow) == RECORDING_FLOW_RETURN:
+        return "Hàng hoàn"
+    return "Hàng gửi"
+
 
 def _ensure_dir(path: str):
     os.makedirs(path, exist_ok=True)
 
 
-def start_new_recording(videos_dir: str, order_code: str) -> str:
+def _sanitize_segment(value: str, fallback: str = "unknown") -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return fallback
+    normalized = unicodedata.normalize("NFKD", raw)
+    ascii_only = "".join(ch for ch in normalized if ord(ch) < 128)
+    cleaned = []
+    for ch in ascii_only:
+        if ch.isalnum() or ch in ("-", "_"):
+            cleaned.append(ch)
+        elif ch in (" ", "."):
+            cleaned.append("_")
+    result = "".join(cleaned).strip("._-")
+    return result[:80] or fallback
+
+
+def start_new_recording(
+    videos_dir: str,
+    order_code: str,
+    employee_code: str = "",
+    employee_name: str = "",
+    work_session_label: str = "",
+    recording_flow: str = RECORDING_FLOW_OUTBOUND,
+) -> str:
     """
     Xác định đường dẫn file tạm để quay video mới cho 1 order.
     File sẽ được finalize / concat trong finish_recording_for_order.
-    
-    Lưu ý: Đường dẫn trả về có extension .mp4, nhưng recorder có thể thay đổi 
+
+    Cấu trúc thư mục:
+      videos / {mã_nv} / {ca}_{ngày} / hang_gui|hang_hoan / {file}.mp4
+
+    Lưu ý: Đường dẫn trả về có extension .mp4, nhưng recorder có thể thay đổi
     thành .avi nếu cần codec khác. Gọi update_recording_path() sau khi recorder start.
     """
     _ensure_dir(videos_dir)
-    
-    # Sanitize order_code: loại bỏ ký tự đặc biệt không hợp lệ cho tên file Windows
-    import re
-    safe_order_code = re.sub(r'[<>:"/\\|?*]', '_', order_code)  # Thay ký tự đặc biệt bằng _
-    safe_order_code = safe_order_code[:50]  # Giới hạn độ dài tên file
-    
+
+    employee_folder = _sanitize_segment(employee_code, "unknown_employee")
+    session_label = _sanitize_segment(work_session_label, "ca")
+    flow_folder = recording_flow_folder_name(recording_flow)
+    safe_employee_name = _sanitize_segment(employee_name, "unknown")
+    safe_order_code = _sanitize_segment(order_code, "order")
+
     ts = time.strftime("%Y%m%d_%H%M%S", time.localtime())
-    filename = f"{safe_order_code}_{ts}.mp4"
-    full_path = os.path.join(videos_dir, filename)
+    session_folder = f"{session_label}_{time.strftime('%Y%m%d', time.localtime())}"
+    target_dir = os.path.join(videos_dir, employee_folder, session_folder, flow_folder)
+    _ensure_dir(target_dir)
+    filename = f"{safe_order_code}_{employee_folder}_{safe_employee_name}_{ts}.mp4"
+    full_path = os.path.join(target_dir, filename)
 
     # Lưu vào index in-memory cho phiên hiện tại
     _order_index.setdefault(order_code, {})
@@ -131,14 +186,42 @@ def finish_recording_for_order(order_code: str, duration_seconds: int):
     _order_index[order_code]["last_record_end"] = time.time()
 
 
+def cancel_recording_for_order(order_code: str, file_path: str | None = None):
+    """
+    Hủy phiên quay hiện tại:
+    - xóa file đang ghi nếu còn tồn tại
+    - dọn index in-memory để lần quay sau bắt đầu sạch
+    """
+    info = _order_index.get(order_code) or {}
+    target_path = file_path or info.get("temp_path") or info.get("base_path")
+
+    if target_path and os.path.exists(target_path):
+        try:
+            os.remove(target_path)
+        except Exception:
+            pass
+
+    if order_code in _order_index:
+        temp_path = info.get("temp_path")
+        base_path = info.get("base_path")
+        if file_path and temp_path == file_path:
+            info["temp_path"] = None
+        if file_path and base_path == file_path:
+            info["base_path"] = None
+        if not file_path:
+            info["temp_path"] = None
+            info["base_path"] = None
+        if not info.get("temp_path") and not info.get("base_path"):
+            _order_index.pop(order_code, None)
+
+
 def get_videos_info(videos_dir: str) -> Tuple[List[VideoInfo], int]:
     """
     Quét thư mục videos, trả về danh sách video + tổng dung lượng.
     Video được sắp xếp theo thời gian (MỚI NHẤT lên đầu).
     Tính trạng thái:
       - "An toàn"
-      - "Sắp tràn dung lượng" (dung lượng > 80% MAX_TOTAL_BYTES)
-      - "Sắp hết hạn" (ngày tạo > MAX_VIDEO_AGE_DAYS - 2)
+      - "File cũ" (ngày tạo > MAX_VIDEO_AGE_DAYS - 2)
     """
     _ensure_dir(videos_dir)
 
@@ -146,27 +229,26 @@ def get_videos_info(videos_dir: str) -> Tuple[List[VideoInfo], int]:
     total_size = 0
     now = time.time()
 
-    for name in os.listdir(videos_dir):
-        # Hỗ trợ cả .mp4 và .avi
-        if not (name.lower().endswith(".mp4") or name.lower().endswith(".avi")):
-            continue
-        path = os.path.join(videos_dir, name)
-        if not os.path.isfile(path):
-            continue
+    for root, _, files in os.walk(videos_dir):
+        for name in files:
+            if not (name.lower().endswith(".mp4") or name.lower().endswith(".avi")):
+                continue
+            path = os.path.join(root, name)
+            if not os.path.isfile(path):
+                continue
 
-        size = os.path.getsize(path)
-        total_size += size
-        ctime = os.path.getctime(path)
-        created_at = datetime.fromtimestamp(ctime)
-        age_days = (now - ctime) / (24 * 3600)
+            size = os.path.getsize(path)
+            total_size += size
+            ctime = os.path.getctime(path)
+            created_at = datetime.fromtimestamp(ctime)
+            age_days = (now - ctime) / (24 * 3600)
 
-        status = "An toàn"
-        if total_size > MAX_TOTAL_BYTES * 0.8:
-            status = "Sắp tràn dung lượng"
-        if age_days > MAX_VIDEO_AGE_DAYS - 2:
-            status = "Sắp hết hạn"
+            status = "An toàn"
+            if age_days > MAX_VIDEO_AGE_DAYS - 2:
+                status = "File cũ"
 
-        videos.append(VideoInfo(name=name, path=path, size_bytes=size, created_at=created_at, status=status))
+            rel_name = os.path.relpath(path, videos_dir).replace("\\", "/")
+            videos.append(VideoInfo(name=rel_name, path=path, size_bytes=size, created_at=created_at, status=status))
 
     # Sắp xếp theo thời gian tạo (mới nhất lên đầu)
     videos.sort(key=lambda v: v.created_at, reverse=True)
@@ -175,6 +257,8 @@ def get_videos_info(videos_dir: str) -> Tuple[List[VideoInfo], int]:
 
 
 def get_storage_status(total_size: int, max_bytes: int) -> str:
+    if max_bytes <= 0:
+        return "Lưu thoải mái"
     if total_size > max_bytes:
         return "Đã vượt giới hạn"
     if total_size > max_bytes * 0.8:
@@ -184,13 +268,17 @@ def get_storage_status(total_size: int, max_bytes: int) -> str:
 
 def delete_video(videos_dir: str, filename: str):
     """
-    Xóa video thủ công, chống path traversal.
+    Xóa video thủ công, cho phép đường dẫn tương đối dưới thư mục videos.
     Thử xóa nhiều lần nếu file đang được sử dụng.
     """
-    if "/" in filename or "\\" in filename:
+    normalized = os.path.normpath(str(filename or "").replace("/", os.sep).replace("\\", os.sep))
+    if normalized.startswith("..") or os.path.isabs(normalized):
         raise ValueError("Tên file không hợp lệ")
-    
-    path = os.path.join(videos_dir, filename)
+
+    path = os.path.normpath(os.path.join(videos_dir, normalized))
+    videos_root = os.path.normcase(os.path.normpath(videos_dir))
+    if not os.path.normcase(path).startswith(videos_root):
+        raise ValueError("Tên file không hợp lệ")
     if not os.path.isfile(path):
         raise FileNotFoundError(f"File không tồn tại: {filename}")
     

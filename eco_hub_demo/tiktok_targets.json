@@ -1,0 +1,120 @@
+{
+  "defaults": {
+    "max_pages": 10,
+    "page_size": 20
+  },
+  "targets": [
+    {
+      "id": "orders_search",
+      "name": "Orders Search",
+      "group": "orders",
+      "enabled": true,
+      "method": "POST",
+      "path": "/order/202309/orders/search",
+      "query": {
+        "version": "202309"
+      },
+      "body": {
+        "page_size": 20
+      },
+      "pagination": {
+        "enabled": true,
+        "request_token_in": "body",
+        "request_token_field": "page_token",
+        "response_token_path": "data.next_page_token",
+        "records_path": "data.orders"
+      }
+    },
+    {
+      "id": "orders_query",
+      "name": "Orders Query",
+      "group": "orders",
+      "enabled": true,
+      "method": "POST",
+      "path": "/api/order/202309/orders/query",
+      "query": {
+        "version": "202309"
+      },
+      "body": {}
+    },
+    {
+      "id": "products_list",
+      "name": "Products List",
+      "group": "products",
+      "enabled": true,
+      "method": "GET",
+      "path": "/product/202309/products/search",
+      "query": {
+        "version": "202309",
+        "page_size": 20
+      },
+      "pagination": {
+        "enabled": true,
+        "request_token_in": "query",
+        "request_token_field": "page_token",
+        "response_token_path": "data.next_page_token",
+        "records_path": "data.products"
+      }
+    },
+    {
+      "id": "finance_statements",
+      "name": "Finance Statements",
+      "group": "finance",
+      "enabled": true,
+      "method": "GET",
+      "path": "/finance/202309/statements",
+      "query": {
+        "version": "202309",
+        "page_size": 20
+      },
+      "pagination": {
+        "enabled": true,
+        "request_token_in": "query",
+        "request_token_field": "page_token",
+        "response_token_path": "data.next_page_token",
+        "records_path": "data.statements"
+      }
+    },
+    {
+      "id": "returns_list",
+      "name": "Returns List",
+      "group": "returns",
+      "enabled": true,
+      "method": "GET",
+      "path": "/return_refund/202309/returns",
+      "query": {
+        "version": "202309",
+        "page_size": 20
+      },
+      "pagination": {
+        "enabled": true,
+        "request_token_in": "query",
+        "request_token_field": "page_token",
+        "response_token_path": "data.next_page_token",
+        "records_path": "data.returns"
+      }
+    },
+    {
+      "id": "logistics_warehouses",
+      "name": "Logistics Warehouses",
+      "group": "logistics",
+      "enabled": true,
+      "method": "GET",
+      "path": "/logistics/202309/warehouses",
+      "query": {
+        "version": "202309"
+      }
+    },
+    {
+      "id": "shops_list",
+      "name": "Shops List",
+      "group": "shop",
+      "enabled": true,
+      "method": "GET",
+      "path": "/seller/202309/shops",
+      "query": {
+        "version": "202309"
+      }
+    }
+  ]
+}

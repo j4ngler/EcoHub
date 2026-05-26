@@ -4,7 +4,10 @@
 <div class="row">
   <div class="col-lg-8">
     <div class="card card-ecohub mb-3">
-      <div class="card-header">Hàng chờ đơn (quét liên tục)</div>
+      <div class="card-header card-header-accent-queue d-flex align-items-center gap-2">
+        <i class="bi bi-hourglass-split text-primary" aria-hidden="true"></i>
+        <span>Hàng chờ đơn (quét liên tục)</span>
+      </div>
       <div class="card-body">
         {% if order_queue and order_queue|length > 0 %}
           <div class="table-responsive">
@@ -46,16 +49,25 @@
           </div>
           <p class="small text-muted mt-2 mb-0">
             Gợi ý: Quét nhiều mã đơn liên tục sẽ tự thêm vào hàng chờ. Serial sẽ áp vào đơn “Đang xử lý”.
+            Trong lúc đang quay video, camera vẫn quét được mã đơn (AI không tắt).
+            Nếu bật “Tự động quay khi quét QR”, lần quét đầu sẽ bắt đầu quay; muốn xếp nhanh nhiều đơn chỉ bằng camera thì có thể tắt tùy chọn đó.
           </p>
         {% else %}
-          <p class="text-muted mb-0">Chưa có đơn nào trong hàng chờ. Hãy quét QR mã đơn ở Dashboard.</p>
+          <div class="empty-state-orders">
+            <div class="empty-icon"><i class="bi bi-inbox" aria-hidden="true"></i></div>
+            <p class="fw-medium text-body mb-1">Chưa có đơn trong hàng chờ</p>
+            <p class="small">Quét mã đơn trên <a href="{{ url_for('dashboard') }}">Dashboard</a> để thêm vào đây.</p>
+          </div>
         {% endif %}
       </div>
     </div>
 
     <div class="card card-ecohub mb-3">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <span>Đơn hàng hiện tại</span>
+      <div class="card-header card-header-accent-current d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span class="d-flex align-items-center gap-2">
+          <i class="bi bi-bag-check text-warning" aria-hidden="true"></i>
+          Đơn hàng hiện tại
+        </span>
         {% if current_order_code %}
           <span class="badge bg-primary">Đang quét</span>
         {% else %}
@@ -67,14 +79,38 @@
           <p class="mb-2"><strong>Mã đơn:</strong> {{ current_order_code }}</p>
           {% if current_order_info %}
             <p class="mb-1"><strong>Nền tảng:</strong> {{ current_order_info.platform }}</p>
+            {% if current_order_info.get('shipping_status') %}
+              <p class="mb-1"><strong>Trạng thái ship:</strong> {{ current_order_info.get('shipping_status') }}</p>
+            {% endif %}
+            {% if current_order_info.get('shop_id') %}
+              <p class="mb-1"><strong>Shop ID:</strong> {{ current_order_info.get('shop_id') }}</p>
+            {% endif %}
+            {% if current_order_info.get('product_id') %}
+              <p class="mb-1"><strong>Product ID:</strong> {{ current_order_info.get('product_id') }}</p>
+            {% endif %}
+            {% if current_order_info.get('sku_id') %}
+              <p class="mb-1"><strong>SKU ID:</strong> {{ current_order_info.get('sku_id') }}</p>
+            {% endif %}
             <ul class="mb-3 ps-3">
               {% for item in current_order_info.get('items', []) %}
-                <li>{{ item.qty }} x {{ item.name }}</li>
+                <li>
+                  {{ item.qty }} x {{ item.name }}
+                  {% if item.get('product_id') %}
+                    <br><small class="text-muted">Product: {{ item.get('product_id') }}</small>
+                  {% endif %}
+                  {% if item.get('sku_id') %}
+                    <br><small class="text-muted">SKU: {{ item.get('sku_id') }}</small>
+                  {% endif %}
+                </li>
               {% endfor %}
             </ul>
           {% endif %}
         {% else %}
-          <p class="text-muted mb-0">Chưa có đơn hàng nào được quét. Vui lòng quét QR mã đơn ở Dashboard.</p>
+          <div class="empty-state-orders">
+            <div class="empty-icon"><i class="bi bi-upc-scan" aria-hidden="true"></i></div>
+            <p class="fw-medium text-body mb-1">Chưa chọn đơn</p>
+            <p class="small">Quét mã trên <a href="{{ url_for('dashboard') }}">Dashboard</a> hoặc chọn một đơn từ hàng chờ phía trên.</p>
+          </div>
         {% endif %}
       </div>
     </div>

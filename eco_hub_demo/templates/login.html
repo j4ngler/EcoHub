@@ -1,26 +1,71 @@
 {% extends "base.html" %}
-{% block title %}EcoHub Demo - Đăng nhập{% endblock %}
+{% block title %}EcoHub - Đăng nhập{% endblock %}
 {% block nav %}{% endblock %}
 {% block content %}
-<div class="row justify-content-center py-5">
+<div class="row justify-content-center py-5 auth-page-wrap">
   <div class="col-md-5">
     <div class="card login-card card-ecohub">
       <div class="card-body">
         <h1 class="text-center">EcoHub</h1>
-        <p class="text-center text-muted small mb-4">Đăng nhập demo</p>
+        <p class="text-center text-muted small mb-4">Đăng nhập bằng tài khoản vận hành</p>
         <form method="post">
           <div class="mb-3">
             <label class="form-label">Tên đăng nhập</label>
-            <input type="text" name="username" class="form-control form-control-lg" placeholder="Nhập tên đăng nhập" required>
+            <div class="input-group input-group-lg">
+              <span class="input-group-text auth-input-addon"><i class="bi bi-person"></i></span>
+              <input type="text" name="username" class="form-control auth-input" placeholder="Nhập tên đăng nhập" required>
+            </div>
           </div>
           <div class="mb-4">
             <label class="form-label">Mật khẩu</label>
-            <input type="password" name="password" class="form-control form-control-lg" placeholder="Nhập mật khẩu" required>
+            <div class="input-group input-group-lg">
+              <span class="input-group-text auth-input-addon"><i class="bi bi-lock"></i></span>
+              <input id="login-password" type="password" name="password" class="form-control auth-input" placeholder="Nhập mật khẩu" required>
+              <button class="btn auth-toggle-password" type="button" data-target="#login-password" aria-label="Ẩn/hiện mật khẩu">
+                <i class="bi bi-eye"></i>
+              </button>
+            </div>
+          </div>
+          {% if show_captcha %}
+          <div class="mb-3">
+            <label class="form-label">Xác minh bảo mật: {{ session.get('login_captcha_question', '') }}</label>
+            <input type="text" name="captcha_answer" class="form-control auth-input" placeholder="Nhập kết quả phép tính" required>
+          </div>
+          {% endif %}
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" value="1" id="rememberMe" name="remember_me">
+            <label class="form-check-label" for="rememberMe">Ghi nhớ tôi</label>
           </div>
           <button type="submit" class="btn btn-ecohub btn-lg w-100">Đăng nhập</button>
         </form>
+        <div class="text-center mt-3 d-flex justify-content-center gap-3 flex-wrap">
+          {% if enable_email_reset %}
+          <a href="{{ url_for('forgot_password') }}" class="small text-muted">Quên mật khẩu?</a>
+          <span class="text-muted">|</span>
+          {% endif %}
+          <small class="text-muted">Chưa có tài khoản?</small>
+          <a href="{{ url_for('register') }}">Đăng ký</a>
+        </div>
       </div>
     </div>
   </div>
 </div>
+<script>
+  (function () {
+    const toggles = document.querySelectorAll(".auth-toggle-password");
+    toggles.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const target = document.querySelector(btn.getAttribute("data-target"));
+        if (!target) return;
+        const icon = btn.querySelector("i");
+        const isPassword = target.type === "password";
+        target.type = isPassword ? "text" : "password";
+        if (icon) {
+          icon.classList.toggle("bi-eye", !isPassword);
+          icon.classList.toggle("bi-eye-slash", isPassword);
+        }
+      });
+    });
+  })();
+</script>
 {% endblock %}

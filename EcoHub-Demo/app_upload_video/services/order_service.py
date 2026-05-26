@@ -5,6 +5,10 @@ Thông tin đơn hàng (mock).
 - UI: Dashboard cột phải, card "Thông tin đơn hàng (mock)", id="orderInfo"; cập nhật realtime qua /status + main.js.
 """
 
+CURRENT_ORDER_ID = "583627165888250890"
+CURRENT_PRODUCT_ID = "1734485384694761005"
+CURRENT_SKU_ID = "1734485387401856557"
+
 
 def get_order(code: str):
     """
@@ -14,12 +18,17 @@ def get_order(code: str):
         return None
 
     return {
-        "order_id": "SPX123456",
-        "platform": "Shopee",
+        "order_id": CURRENT_ORDER_ID,
+        "platform": "TIKTOK_SHOP",
         "code": code,
+        "product_id": CURRENT_PRODUCT_ID,
         "items": [
-            {"name": "Áo thun", "qty": 2},
-            {"name": "Quần jean", "qty": 1},
+            {
+                "name": "EcoVision Edge AI Box - ECVBOX01",
+                "qty": 2,
+                "product_id": CURRENT_PRODUCT_ID,
+                "sku_id": CURRENT_SKU_ID,
+            },
         ],
     }
 

@@ -26,39 +26,39 @@
 }
 
 .config-card {
-  background: white;
+  background: var(--card-bg);
   border-radius: 10px;
   padding: 1.25rem;
   margin-bottom: 1.25rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--card-border);
 }
 
 .section-title {
   font-size: 1rem;
   font-weight: 600;
-  color: #334155;
+  color: var(--text-body);
   margin-bottom: 1rem;
   padding-bottom: 0.75rem;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--card-border);
 }
 
 .info-text {
-  background: #f0fdfa;
+  background: var(--success-soft-bg);
   border-left: 3px solid #0d9488;
   padding: 0.75rem 1rem;
   margin-bottom: 1.25rem;
   border-radius: 4px;
   font-size: 0.875rem;
-  color: #0f766e;
+  color: var(--success-soft-text);
 }
 
 .camera-item {
-  background: #f8fafc;
+  background: var(--surface-soft);
   border-radius: 8px;
   padding: 1rem;
   margin-bottom: 0.75rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--card-border);
   transition: border-color 0.2s;
 }
 
@@ -68,7 +68,7 @@
 
 .camera-item.disabled {
   opacity: 0.6;
-  background: #fafafa;
+  background: var(--surface-soft-alt);
 }
 
 .camera-header {
@@ -98,7 +98,7 @@
 
 .camera-toggle label {
   font-weight: 600;
-  color: #334155;
+  color: var(--text-body);
   font-size: 0.9rem;
   cursor: pointer;
   margin: 0;
@@ -118,15 +118,15 @@
 }
 
 .source-selector {
-  background: white;
+  background: var(--card-bg);
   border-radius: 6px;
   padding: 0.875rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--card-border);
 }
 
 .source-label {
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 0.8rem;
   margin-bottom: 0.5rem;
   display: block;
@@ -152,14 +152,14 @@
   display: block;
   text-align: center;
   padding: 0.5rem 0.75rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--surface-soft);
+  border: 1px solid var(--card-border);
   border-radius: 6px;
   cursor: pointer;
   font-weight: 500;
   font-size: 0.85rem;
   transition: all 0.2s;
-  color: #64748b;
+  color: var(--text-muted);
 }
 
 .source-tabs .form-check-input:checked + .form-check-label {
@@ -179,9 +179,11 @@
 .source-input select,
 .source-input input {
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--card-border);
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
+  background: var(--card-bg);
+  color: var(--text-body);
 }
 
 .source-input select:focus,
@@ -205,7 +207,7 @@
 
 .setting-item label {
   font-weight: 600;
-  color: #64748b;
+  color: var(--text-muted);
   font-size: 0.8rem;
   text-transform: uppercase;
   letter-spacing: 0.3px;
@@ -213,20 +215,22 @@
 
 .setting-item select {
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--card-border);
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   min-width: 140px;
+  background: var(--card-bg);
+  color: var(--text-body);
 }
 
 .auto-record-box {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  background: #f8fafc;
+  background: var(--surface-soft);
   padding: 0.75rem 1rem;
   border-radius: 6px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--card-border);
 }
 
 .auto-record-box .form-check-input {
@@ -245,7 +249,7 @@
   cursor: pointer;
   margin: 0;
   font-weight: 500;
-  color: #334155;
+  color: var(--text-body);
   font-size: 0.875rem;
 }
 
@@ -254,7 +258,7 @@
   gap: 0.75rem;
   margin-top: 1.25rem;
   padding-top: 1rem;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--card-border);
 }
 
 .btn-apply {
@@ -274,9 +278,9 @@
 }
 
 .btn-back {
-  background: white;
-  color: #64748b;
-  border: 1px solid #e2e8f0;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  border: 1px solid var(--card-border);
   padding: 0.6rem 1.5rem;
   border-radius: 6px;
   font-weight: 500;
@@ -290,11 +294,11 @@
 }
 
 .preview-card {
-  background: white;
+  background: var(--card-bg);
   border-radius: 10px;
   padding: 1.25rem;
   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--card-border);
 }
 
 .camera-preview-item {
@@ -411,15 +415,70 @@
 <!-- Configuration Form -->
 <form method="post" action="{{ url_for('camera_settings') }}">
   <div class="config-card">
+    <div class="section-title">Phiên làm việc của nhân viên</div>
+
+    <div class="info-text">
+      Lưu thông tin người đang vận hành ca làm việc hiện tại. Dữ liệu này được ghi cùng cấu hình máy để dùng lại ở các lần mở app sau.
+    </div>
+
+    <div class="row g-3">
+      <div class="col-md-4">
+        <label for="employee_name" class="source-label">Tên nhân viên</label>
+        <input
+          type="text"
+          class="form-control"
+          id="employee_name"
+          name="employee_name"
+          value="{{ employee_session.employee_name }}"
+          placeholder="Ví dụ: Nguyễn Văn A">
+      </div>
+      <div class="col-md-4">
+        <label for="employee_code" class="source-label">Mã nhân viên</label>
+        <input
+          type="text"
+          class="form-control"
+          id="employee_code"
+          name="employee_code"
+          value="{{ employee_session.employee_code }}"
+          placeholder="Ví dụ: NV001">
+      </div>
+      <div class="col-md-4">
+        <label for="work_session_label" class="source-label">Tên phiên / ca làm việc</label>
+        <input
+          type="text"
+          class="form-control"
+          id="work_session_label"
+          name="work_session_label"
+          value="{{ employee_session.work_session_label }}"
+          placeholder="Ví dụ: Ca sáng 15/05">
+      </div>
+    </div>
+  </div>
+  <div class="config-card">
     <div class="section-title">📹 Cấu hình camera ({{ num_cameras }}/{{ MAX_CAMERAS }})</div>
     
     <div class="info-text">
       Bật/tắt từng camera, chọn nguồn (USB hoặc RTSP), sau đó nhấn <strong>Áp dụng</strong>.
     </div>
 
+    <div class="row g-3 mb-3">
+      <div class="col-md-6">
+        <label for="recording_camera_slot" class="source-label">Camera dùng để quay video</label>
+        <select id="recording_camera_slot" name="recording_camera_slot" class="form-control">
+          {% for i in range(MAX_CAMERAS) %}
+            {% set cfg = camera_configs_by_slot[i] %}
+            <option value="{{ i }}" {% if recording_camera_slot == i %}selected{% endif %} {% if not cfg %}disabled{% endif %}>
+              Camera {{ i + 1 }}{% if not cfg %} (chưa bật){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+        <div class="form-text mt-2">Recorder sẽ ghi hình từ camera được chọn ở đây.</div>
+      </div>
+    </div>
+
     {% for i in range(MAX_CAMERAS) %}
-      {% set cfg = camera_configs[i] if i < camera_configs|length else {} %}
-      {% set is_enabled = i < camera_configs|length %}
+      {% set cfg = camera_configs_by_slot[i] or {} %}
+      {% set is_enabled = camera_configs_by_slot[i] is not none %}
       
       <div class="camera-item {% if not is_enabled %}disabled{% endif %}" id="camera-item-{{ i }}">
         <div class="camera-header">
@@ -436,6 +495,9 @@
           <span class="camera-badge {% if not is_enabled %}inactive{% endif %}">
             {% if is_enabled %}Bật{% else %}Tắt{% endif %}
           </span>
+          {% if recording_camera_slot == i and is_enabled %}
+            <span class="badge bg-danger-subtle text-danger border">Quay video</span>
+          {% endif %}
         </div>
 
         <div class="source-selector" id="source-selector-{{ i }}">
@@ -485,55 +547,11 @@
         </div>
       </div>
     {% endfor %}
-  </div>
-
-  <div class="config-card">
-    <div class="section-title">🤖 Cài đặt AI</div>
-
-    <div class="ai-settings">
-      <div class="setting-item">
-        <label for="scan_sensitivity">Độ nhạy quét mã</label>
-        <select name="scan_sensitivity" id="scan_sensitivity" class="form-select">
-          <option value="{{ SENSITIVITY_LOW }}" {% if scan_sensitivity == SENSITIVITY_LOW %}selected{% endif %}>
-            Thấp
-          </option>
-          <option value="{{ SENSITIVITY_NORMAL }}" {% if scan_sensitivity == SENSITIVITY_NORMAL %}selected{% endif %}>
-            Trung bình
-          </option>
-          <option value="{{ SENSITIVITY_HIGH }}" {% if scan_sensitivity == SENSITIVITY_HIGH %}selected{% endif %}>
-            Cao
-          </option>
-        </select>
-      </div>
-
-      <div class="setting-item">
-        <label for="qr_cooldown_seconds">Cooldown QR (giây)</label>
-        <select name="qr_cooldown_seconds" id="qr_cooldown_seconds" class="form-select">
-          {% for sec in [2,3,5,10] %}
-            <option value="{{ sec }}" {% if qr_cooldown_seconds == sec %}selected{% endif %}>
-              {{ sec }} giây
-            </option>
-          {% endfor %}
-        </select>
-      </div>
-
-      <div class="auto-record-box">
-        <input type="checkbox" 
-               name="auto_record_on_qr" 
-               value="1" 
-               id="auto_record_on_qr" 
-               class="form-check-input" 
-               {% if auto_record_on_qr %}checked{% endif %}>
-        <label class="form-check-label" for="auto_record_on_qr">
-          Tự động quay video khi quét được QR
-        </label>
-      </div>
-    </div>
-
     <div class="action-buttons">
       <button type="submit" class="btn btn-apply">Áp dụng</button>
       <a href="{{ url_for('dashboard') }}" class="btn btn-back">Hủy</a>
     </div>
+  </div>    
   </div>
 </form>
 
@@ -665,6 +683,7 @@ function toggleCamera(idx) {
   const checkbox = document.getElementById('enable_' + idx);
   const item = document.getElementById('camera-item-' + idx);
   const selector = document.getElementById('source-selector-' + idx);
+  const recordingSelect = document.getElementById('recording_camera_slot');
   
   if (checkbox.checked) {
     item.classList.remove('disabled');
@@ -672,6 +691,18 @@ function toggleCamera(idx) {
   } else {
     item.classList.add('disabled');
     if (selector) selector.style.opacity = '0.5';
+  }
+  if (recordingSelect) {
+    const opt = recordingSelect.querySelector(`option[value="${idx}"]`);
+    if (opt) {
+      opt.disabled = !checkbox.checked;
+      opt.textContent = checkbox.checked ? `Camera ${idx + 1}` : `Camera ${idx + 1} (chưa bật)`;
+    }
+    const selectedOpt = recordingSelect.options[recordingSelect.selectedIndex];
+    if (selectedOpt && selectedOpt.disabled) {
+      const firstEnabled = Array.from(recordingSelect.options).find((option) => !option.disabled);
+      if (firstEnabled) recordingSelect.value = firstEnabled.value;
+    }
   }
 }
 

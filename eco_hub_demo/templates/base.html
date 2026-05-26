@@ -1,40 +1,91 @@
 <!doctype html>
-<html lang="vi">
+<html lang="vi" data-theme="light">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{% block title %}EcoHub Demo{% endblock %}</title>
+    <title>{% block title %}EcoHub{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/style.css') }}?v=2" rel="stylesheet">
+    <script>
+      (function () {
+        try {
+          var t = localStorage.getItem("ecohub-theme");
+          if (t === "dark" || t === "light") {
+            document.documentElement.setAttribute("data-theme", t);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     {% block nav %}
-    <nav class="navbar navbar-expand-lg navbar-dark navbar-ecohub">
-      <div class="container">
-        <a class="navbar-brand" href="{{ url_for('dashboard') }}">EcoHub</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain">
+    <nav class="navbar navbar-expand-lg navbar-light navbar-ecohub sticky-top">
+      <div class="container-fluid app-shell">
+        <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+          <i class="bi bi-box-seam-fill" aria-hidden="true"></i>
+          EcoHub
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Mở menu">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarMain">
-          <div class="navbar-nav">
-            <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' }}" href="{{ url_for('dashboard') }}">Dashboard</a>
-            <a class="nav-link {{ 'active' if request.endpoint == 'orders_page' }}" href="{{ url_for('orders_page') }}">Quản lý đơn</a>
-            <a class="nav-link {{ 'active' if request.endpoint == 'camera_settings' }}" href="{{ url_for('camera_settings') }}">Cài đặt camera</a>
-            <a class="nav-link {{ 'active' if request.endpoint == 'storage_settings' }}" href="{{ url_for('storage_settings') }}">Tài khoản S3</a>
-            <a class="nav-link {{ 'active' if request.endpoint == 'storage_page' }}" href="{{ url_for('storage_page') }}">Kho lưu trữ</a>
+          <div class="navbar-nav me-auto">
+            <a class="nav-link {{ 'active' if request.endpoint == 'dashboard' }}" href="{{ url_for('dashboard') }}">
+              <i class="bi bi-speedometer2 me-1 d-none d-md-inline" aria-hidden="true"></i>Dashboard
+            </a>
+            <a class="nav-link {{ 'active' if request.endpoint == 'orders_page' }}" href="{{ url_for('orders_page') }}">
+              <i class="bi bi-receipt-cutoff me-1 d-none d-md-inline" aria-hidden="true"></i>Quản lý đơn
+            </a>
+            <a class="nav-link {{ 'active' if request.endpoint == 'camera_settings' }}" href="{{ url_for('camera_settings') }}">
+              <i class="bi bi-camera-video me-1 d-none d-md-inline" aria-hidden="true"></i>Cài đặt camera
+            </a>
+            <a class="nav-link {{ 'active' if request.endpoint == 'storage_page' }}" href="{{ url_for('storage_page') }}">
+              <i class="bi bi-archive me-1 d-none d-md-inline" aria-hidden="true"></i>Kho lưu trữ
+            </a>
+            {% if session.get('user') %}
+              <a class="nav-link {{ 'active' if request.endpoint == 'tiktok_auth_page' }}" href="{{ url_for('tiktok_auth_page') }}">
+                <i class="bi bi-link-45deg me-1 d-none d-md-inline" aria-hidden="true"></i>TikTok Shop
+              </a>
+            {% endif %}
           </div>
+          {% if session.get('user') %}
+          <div class="d-flex align-items-center gap-2 ms-lg-2">
+            <span class="badge text-bg-light border d-none d-xl-inline">v{{ app_version }}</span>
+            {% if update_enabled %}
+            <button type="button" class="btn btn-sm btn-outline-primary" id="checkUpdateBtn">
+              <i class="bi bi-arrow-repeat me-1" aria-hidden="true"></i>Cập nhật
+            </button>
+            {% endif %}
+            <button type="button" class="btn-theme-toggle" id="ecohubThemeToggle" title="Đổi sáng/tối" aria-label="Chế độ sáng tối">
+              <i class="bi bi-moon-stars-fill d-none" id="ecohubThemeIconDark" aria-hidden="true"></i>
+              <i class="bi bi-sun-fill" id="ecohubThemeIconLight" aria-hidden="true"></i>
+            </button>
+            <small class="text-muted-user d-none d-sm-inline">
+              <i class="bi bi-person-circle me-1" aria-hidden="true"></i>{{ session.get('user', {}).get('username') }}
+              <span class="opacity-75">({{ session.get('user', {}).get('role', 'operator') }})</span>
+            </small>
+            <button type="button" class="btn btn-sm btn-outline-danger" id="shutdownAppBtn">Tắt EcoHub</button>
+            <form method="post" action="{{ url_for('logout') }}" class="mb-0">
+              <button type="submit" class="btn btn-sm btn-logout">Đăng xuất</button>
+            </form>
+          </div>
+          {% endif %}
         </div>
       </div>
     </nav>
     {% endblock %}
-    <main class="container py-4">
+    <main class="container-fluid app-shell py-4">
       {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
           <div class="mb-3">
             {% for category, msg in messages %}
               <div class="alert alert-ecohub {% if category == 'error' %}alert-danger{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
                 {{ msg }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Đóng"></button>
               </div>
             {% endfor %}
           </div>
@@ -42,16 +93,136 @@
       {% endwith %}
       {% block content %}{% endblock %}
     </main>
-    
-    <!-- Toast container cho thông báo "In xong" -->
+
     <div class="toast-container position-fixed bottom-0 end-0 p-3">
       <div id="successToast" class="toast align-items-center text-white bg-success border-0" role="alert">
         <div class="d-flex">
           <div class="toast-body" id="toastBody">In xong</div>
-          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+          <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Đóng"></button>
         </div>
       </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      (function () {
+        var root = document.documentElement;
+        function applyTheme(theme) {
+          root.setAttribute("data-theme", theme);
+          try { localStorage.setItem("ecohub-theme", theme); } catch (e) {}
+          var dark = theme === "dark";
+          var iconDark = document.getElementById("ecohubThemeIconDark");
+          var iconLight = document.getElementById("ecohubThemeIconLight");
+          if (iconDark && iconLight) {
+            iconDark.classList.toggle("d-none", !dark);
+            iconLight.classList.toggle("d-none", dark);
+          }
+        }
+        var initial = root.getAttribute("data-theme") || "light";
+        applyTheme(initial === "dark" ? "dark" : "light");
+        var btn = document.getElementById("ecohubThemeToggle");
+        if (btn) {
+          btn.addEventListener("click", function () {
+            var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+            applyTheme(next);
+          });
+        }
+      })();
+      (function () {
+        var updateBtn = document.getElementById("checkUpdateBtn");
+        if (!updateBtn) return;
+
+        function setBusy(busy, label) {
+          updateBtn.disabled = !!busy;
+          updateBtn.dataset.originalLabel = updateBtn.dataset.originalLabel || updateBtn.innerHTML;
+          updateBtn.innerHTML = busy ? label : updateBtn.dataset.originalLabel;
+        }
+
+        function fetchJson(url, options) {
+          return fetch(url, options).then(function (resp) {
+            return resp.json().catch(function () { return {}; }).then(function (data) {
+              if (!resp.ok || data.ok === false) {
+                throw new Error(data.error || data.message || "Yeu cau that bai");
+              }
+              return data;
+            });
+          });
+        }
+
+        updateBtn.addEventListener("click", function () {
+          setBusy(true, "Dang kiem tra...");
+          fetchJson("{{ url_for('api_update_status') }}", {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          })
+            .then(function (data) {
+              if (!data.update_available) {
+                alert("EcoHub dang o ban moi nhat: v" + (data.current_version || "{{ app_version }}"));
+                return;
+              }
+
+              var lines = [
+                "Phien ban hien tai: v" + (data.current_version || "{{ app_version }}"),
+                "Phien ban moi: v" + (data.remote_version || "?")
+              ];
+              if (data.notes) lines.push("", "Ghi chu:", data.notes);
+              if (!window.confirm(lines.join("\n") + "\n\nTai ban cap nhat ngay?")) {
+                return;
+              }
+
+              setBusy(true, "Dang tai...");
+              return fetchJson("{{ url_for('api_update_download') }}", {
+                method: "POST",
+                headers: { "X-Requested-With": "XMLHttpRequest" }
+              }).then(function (downloaded) {
+                var msg = downloaded.message || ("Da tai xong ban " + (downloaded.version || data.remote_version));
+                if (!window.confirm(msg + "\n\nAp dung cap nhat ngay bay gio? EcoHub se tu tat va mo lai.")) {
+                  return;
+                }
+                setBusy(true, "Dang ap dung...");
+                return fetchJson("{{ url_for('api_update_apply') }}", {
+                  method: "POST",
+                  headers: { "X-Requested-With": "XMLHttpRequest" }
+                }).then(function (applied) {
+                  alert(applied.message || "Dang ap dung cap nhat...");
+                  setTimeout(function () {
+                    try { window.close(); } catch (e) {}
+                    window.location.href = "about:blank";
+                  }, 500);
+                });
+              });
+            })
+            .catch(function (err) {
+              alert(err && err.message ? err.message : "Khong kiem tra duoc cap nhat.");
+            })
+            .finally(function () {
+              setBusy(false);
+            });
+        });
+      })();
+      (function () {
+        var shutdownBtn = document.getElementById("shutdownAppBtn");
+        if (!shutdownBtn) return;
+        shutdownBtn.addEventListener("click", function () {
+          if (!window.confirm("Tắt hẳn EcoHub.exe và dừng server nội bộ?")) return;
+          shutdownBtn.disabled = true;
+          shutdownBtn.textContent = "Đang tắt...";
+          fetch("{{ url_for('shutdown_app') }}", {
+            method: "POST",
+            headers: { "X-Requested-With": "XMLHttpRequest" }
+          })
+            .then(function () {
+              setTimeout(function () {
+                try { window.close(); } catch (e) {}
+                window.location.href = "about:blank";
+              }, 300);
+            })
+            .catch(function () {
+              shutdownBtn.disabled = false;
+              shutdownBtn.textContent = "Tắt EcoHub";
+              alert("Không gửi được lệnh tắt EcoHub.");
+            });
+        });
+      })();
+    </script>
   </body>
 </html>
