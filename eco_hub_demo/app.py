@@ -5179,9 +5179,9 @@ def _start_recording_internal(code: str, auto: bool = False) -> dict:
                 scanner.resume()
 
         # Đồng bộ camera và recorder về 10 FPS để giảm tải nhưng vẫn giữ thời gian phát đúng realtime.
-        print(f"[INFO] Starting ASYNC recorder (FPS=10 sampled realtime, size={frame_size})")
+        print(f"[INFO] Starting ASYNC recorder (FPS=7 sampled realtime, size={frame_size})")
         print(f"[INFO] Recorder has SEPARATE THREAD with compact buffer")
-        recorder.start(video_path, frame_size=frame_size, fps=10.0)
+        recorder.start(video_path, frame_size=frame_size, fps=7.0)
 
         # Cập nhật path thực tế nếu recorder đổi extension (mp4 -> avi)
         if recorder.file_path and recorder.file_path != video_path:
@@ -5204,6 +5204,81 @@ def _start_recording_internal(code: str, auto: bool = False) -> dict:
             app_state["recording_order_code"] = None
             app_state["recording_order_id"] = None
         return {"ok": False, "reason": str(e)}
+
+
+def _compress_recorded_video(source_path: str | None, order_code: str | None = None) -> str | None:
+    if not source_path or not os.path.exists(source_path):
+        return source_path
+
+    base_name, source_ext = os.path.splitext(source_path)
+    compressed_path = base_name + "_h264.mp4"
+
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        source_path,
+        "-an",
+        "-vf",
+        "fps=7",
+        "-c:v",
+        "libx264",
+        "-preset",
+        "veryfast",
+        "-crf",
+        "30",
+        "-pix_fmt",
+        "yuv420p",
+        "-movflags",
+        "+faststart",
+        compressed_path,
+    ]
+
+    try:
+        original_size = os.path.getsize(source_path)
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if not os.path.exists(compressed_path):
+            return source_path
+
+        compressed_size = os.path.getsize(compressed_path)
+        if compressed_size >= original_size:
+            os.remove(compressed_path)
+            print(
+                "[VIDEO COMPRESS] Keep original file because H.264 output is not smaller "
+                f"({compressed_size / (1024 * 1024):.1f} MB >= {original_size / (1024 * 1024):.1f} MB)"
+            )
+            return source_path
+
+        final_path = source_path
+        if source_ext.lower() != ".mp4":
+            final_path = base_name + ".mp4"
+            if os.path.exists(final_path):
+                os.remove(final_path)
+
+        os.replace(compressed_path, final_path)
+        if final_path != source_path and os.path.exists(source_path):
+            os.remove(source_path)
+
+        if order_code:
+            storage_service.update_recording_path(order_code, final_path)
+
+        print(
+            "[VIDEO COMPRESS] H.264 re-encode complete: "
+            f"{original_size / (1024 * 1024):.1f} MB -> {compressed_size / (1024 * 1024):.1f} MB"
+        )
+        return final_path
+    except FileNotFoundError:
+        print("[VIDEO COMPRESS] Skip H.264 re-encode because ffmpeg is not available")
+    except Exception as e:
+        print(f"[VIDEO COMPRESS] H.264 re-encode failed: {e}")
+    finally:
+        if os.path.exists(compressed_path):
+            try:
+                os.remove(compressed_path)
+            except Exception:
+                pass
+
+    return source_path
 
 
 def _stop_recording_internal(
@@ -5235,6 +5310,11 @@ def _stop_recording_internal(
     duration = recorder.stop()
     video_path = recorder.file_path  # Lưu path trước khi reset
     order_code = code or "unknown"
+    video_path = _compress_recorded_video(video_path, order_code=code)
+    if code:
+        finalized_path = storage_service.finish_recording_for_order(code, duration_seconds=duration)
+        if finalized_path:
+            video_path = finalized_path
 
     # Ghi metadata video (local) để phục vụ tính dung lượng / auto cleanup sau này.
     video_id = None
@@ -5256,8 +5336,6 @@ def _stop_recording_internal(
     except Exception as meta_e:
         print(f"[VIDEO META] Error inserting video metadata: {meta_e}")
 
-    if code:
-        storage_service.finish_recording_for_order(code, duration_seconds=duration)
 
     # Sau khi quay xong:
     # - reset trạng thái ghi

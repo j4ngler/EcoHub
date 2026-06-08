@@ -130,7 +130,7 @@ def _should_resume_with(base_path: str) -> bool:
     return (time.time() - mtime) <= RESUME_WINDOW_MINUTES * 60
 
 
-def finish_recording_for_order(order_code: str, duration_seconds: int):
+def finish_recording_for_order(order_code: str, duration_seconds: int) -> str | None:
     """
     Hoàn tất 1 lần quay cho order_code:
     - Nếu đã có video cũ và còn trong cửa sổ resume => dùng FFmpeg concat để append.
@@ -139,7 +139,7 @@ def finish_recording_for_order(order_code: str, duration_seconds: int):
     info = _order_index.get(order_code) or {}
     temp_path = info.get("temp_path")
     if not temp_path or not os.path.exists(temp_path):
-        return
+        return None
 
     base_path = info.get("base_path")
 
@@ -147,7 +147,7 @@ def finish_recording_for_order(order_code: str, duration_seconds: int):
     if not base_path or not _should_resume_with(base_path):
         _order_index[order_code]["base_path"] = temp_path
         _order_index[order_code]["last_record_end"] = time.time()
-        return
+        return temp_path
 
     # Có base_path và còn trong thời gian cho phép => concat bằng FFmpeg
     concat_list_path = os.path.join(os.path.dirname(base_path), f"{order_code}_concat.txt")
@@ -176,14 +176,17 @@ def finish_recording_for_order(order_code: str, duration_seconds: int):
         # Thay base_path bằng file mới
         os.replace(output_path, base_path)
         os.remove(temp_path)
+        final_path = base_path
     except Exception:
         # Nếu concat lỗi, vẫn giữ file temp như file độc lập
         _order_index[order_code]["base_path"] = temp_path
+        final_path = temp_path
     finally:
         if os.path.exists(concat_list_path):
             os.remove(concat_list_path)
 
     _order_index[order_code]["last_record_end"] = time.time()
+    return final_path
 
 
 def cancel_recording_for_order(order_code: str, file_path: str | None = None):

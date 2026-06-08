@@ -10,7 +10,7 @@ class VideoRecorder:
     """
     Async recorder backed by OpenCV VideoWriter.
     - Prefer mp4v when available, then fall back to XVID/MJPG
-    - Normalize unusual camera resolutions to common output sizes
+    - Normalize frames to a storage-friendly output size before post-compression
     - Sample frames to the target FPS so playback stays realtime
     """
 
@@ -26,8 +26,8 @@ class VideoRecorder:
         self._running = False
         self._overlay_callback = None
 
-        self._target_fps: float = 10.0
-        self._frame_interval: float = 1.0 / 10.0
+        self._target_fps: float = 7.0
+        self._frame_interval: float = 1.0 / 7.0
         self._next_frame_at: Optional[float] = None
         self._frames_skipped_sampling: int = 0
 
@@ -41,7 +41,19 @@ class VideoRecorder:
     def set_overlay_callback(self, callback):
         self._overlay_callback = callback
 
-    def start(self, file_path: str, frame_size: Tuple[int, int], fps: float = 10.0):
+    def _normalize_output_size(self, width: int, height: int) -> Tuple[int, int]:
+        aspect = width / height if height > 0 else 16 / 9
+
+        if abs(aspect - (4 / 3)) < 0.08:
+            target_w, target_h = 640, 480
+        else:
+            target_w, target_h = 854, 480
+
+        if width <= target_w and height <= target_h:
+            return width, height
+        return target_w, target_h
+
+    def start(self, file_path: str, frame_size: Tuple[int, int], fps: float = 7.0):
         if self.is_recording:
             return
 
@@ -53,23 +65,11 @@ class VideoRecorder:
             )
 
         original_size = (w, h)
-        standard_sizes = [
-            (1920, 1080),
-            (1280, 720),
-            (640, 480),
-        ]
-
         target_w, target_h = w, h
-        aspect = w / h if h > 0 else 16 / 9
-        if (w, h) not in standard_sizes:
-            for std_w, std_h in standard_sizes:
-                if abs(std_w / std_h - aspect) < 0.1:
-                    target_w, target_h = std_w, std_h
-                    print(f"[INFO] Resize video tu {w}x{h} ve {target_w}x{target_h} (chuan)")
-                    break
-            else:
-                target_w, target_h = (1920, 1080) if w > 1920 else (1280, 720)
-                print(f"[INFO] Resize video tu {w}x{h} ve {target_w}x{target_h} (chuan)")
+        normalized_size = self._normalize_output_size(w, h)
+        if normalized_size != (w, h):
+            target_w, target_h = normalized_size
+            print(f"[INFO] Resize video tu {w}x{h} ve {target_w}x{target_h} (target 480p)")
 
         base_name = file_path.rsplit(".", 1)[0]
         codecs_to_try = [
