@@ -297,7 +297,7 @@ def _read_pending_update_state() -> dict[str, Any]:
     if not os.path.isfile(UPDATE_STATE_FILE):
         return {}
     try:
-        with open(UPDATE_STATE_FILE, "r", encoding="utf-8") as f:
+        with open(UPDATE_STATE_FILE, "r", encoding="utf-8-sig") as f:
             data = json.load(f) or {}
         if not isinstance(data, dict):
             return {}
@@ -1131,7 +1131,7 @@ def load_config():
     if not os.path.exists(CONFIG_FILE):
         return ([_default_camera_config()], SENSITIVITY_NORMAL, 0.05, True, LOCAL_STORAGE_MODE, None, 5)
     try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        with open(CONFIG_FILE, "r", encoding="utf-8-sig") as f:
             data = json.load(f)
         configs = data.get("camera_configs", [_default_camera_config()])
         sensitivity = data.get("scan_sensitivity", SENSITIVITY_NORMAL)
@@ -1187,7 +1187,7 @@ def save_config(
         existing_recording_camera_slot = None
         if os.path.exists(CONFIG_FILE):
             try:
-                with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                with open(CONFIG_FILE, "r", encoding="utf-8-sig") as f:
                     existing_data = json.load(f)
                     if "s3_config" in existing_data:
                         existing_s3_config = existing_data["s3_config"]
@@ -1276,7 +1276,7 @@ def _read_json_config_safe() -> dict:
     if not os.path.exists(CONFIG_FILE):
         return {}
     try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+        with open(CONFIG_FILE, "r", encoding="utf-8-sig") as f:
             return json.load(f) or {}
     except Exception as e:
         print(f"[CONFIG] Error reading JSON config: {e}")

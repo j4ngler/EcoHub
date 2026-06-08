@@ -13,7 +13,7 @@ def _read_json_config_safe(config_file_path: str) -> Dict[str, Any]:
     if not config_file_path or not os.path.exists(config_file_path):
         return {}
     try:
-        with open(config_file_path, "r", encoding="utf-8") as f:
+        with open(config_file_path, "r", encoding="utf-8-sig") as f:
             return json.load(f) or {}
     except Exception:
         return {}
