@@ -20,6 +20,7 @@ type CurrentUser = {
 };
 
 const SHOP_VISIBLE_ROLES: RoleName[] = [RoleName.admin, RoleName.staff, RoleName.customer_service, RoleName.customer];
+const isShopVisibleRole = (roleName: RoleName) => SHOP_VISIBLE_ROLES.some((role) => role === roleName);
 
 export const getUsers = async (params: GetUsersParams, currentUser?: CurrentUser) => {
   const { page, limit, skip } = getPagination(params.page, params.limit);
@@ -65,7 +66,7 @@ export const getUsers = async (params: GetUsersParams, currentUser?: CurrentUser
     const validRoleNames = Object.values(RoleName) as string[];
     if (params.role && validRoleNames.includes(params.role)) {
       // Super Admin có thể filter theo bất kỳ role nào, Admin/Staff chỉ filter theo SHOP_VISIBLE_ROLES
-      if (activeShopId && !isSuperAdmin && !SHOP_VISIBLE_ROLES.includes(params.role as RoleName)) {
+      if (activeShopId && !isSuperAdmin && !isShopVisibleRole(params.role as RoleName)) {
         return { users: [], total: 0, page, limit };
       }
       // Nếu đã có filter shop ở trên, cần merge với filter role
@@ -161,7 +162,7 @@ export const getUserById = async (id: string, currentUser?: CurrentUser) => {
   // Super Admin luôn được xem mọi user (kể cả khi assume shop)
   if (activeShopId && !isSuperAdmin) {
     const belongsToShop = user.userRoles.some(
-      (ur) => ur.shopId === activeShopId && SHOP_VISIBLE_ROLES.includes(ur.role.name)
+      (ur) => ur.shopId === activeShopId && isShopVisibleRole(ur.role.name)
     );
     if (!belongsToShop) {
       throw forbidden('Bạn chỉ được xem người dùng thuộc shop đang quản lý');
@@ -253,8 +254,8 @@ export const createUser = async (data: CreateUserDto, createdBy: string, current
     if (!role) throw notFound('Không tìm thấy vai trò');
     
     // Chỉ cho phép tạo các role thuộc shop (không cho phép admin/super_admin)
-    const allowedRoles = [RoleName.staff, RoleName.customer_service, RoleName.customer];
-    if (!allowedRoles.includes(role.name)) {
+    const allowedRoles: RoleName[] = [RoleName.staff, RoleName.customer_service, RoleName.customer];
+    if (!allowedRoles.some((allowedRole) => allowedRole === role.name)) {
       throw badRequest('Trong shop chỉ được tạo tài khoản Nhân viên, Nhân viên chăm sóc khách hàng hoặc Khách hàng');
     }
   }
@@ -314,7 +315,7 @@ export const updateUser = async (id: string, data: UpdateUserDto, currentUser?: 
       where: { userId: id, shopId: activeShopId },
       include: { role: true },
     });
-    const ok = userRoles.some((ur) => SHOP_VISIBLE_ROLES.includes(ur.role.name));
+    const ok = userRoles.some((ur) => isShopVisibleRole(ur.role.name));
     if (!ok) throw forbidden('Bạn chỉ được cập nhật người dùng thuộc shop đang quản lý');
   }
 
@@ -463,7 +464,7 @@ export const assignRole = async (
   if (activeShopId) {
     // chỉ gán role trong đúng shop đang quản lý
     shopId = activeShopId;
-    if (!SHOP_VISIBLE_ROLES.includes(role.name)) {
+    if (!isShopVisibleRole(role.name)) {
       throw badRequest('Không được gán vai trò này trong phạm vi shop');
     }
   }

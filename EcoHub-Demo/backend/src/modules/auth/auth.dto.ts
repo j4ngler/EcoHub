@@ -11,12 +11,12 @@ export const registerSchema = z.object({
     password: z
       .string()
       .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        'Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ thường và 1 số'
-      ),
+      .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ thường và 1 số'),
     fullName: z.string().min(2, 'Họ tên phải có ít nhất 2 ký tự'),
     phone: z.string().optional(),
+    role: z.enum(['staff', 'customer_service', 'customer'], {
+      errorMap: () => ({ message: 'Vai trò đăng ký không hợp lệ' }),
+    }),
   }),
 });
 
@@ -35,7 +35,6 @@ export const refreshTokenSchema = z.object({
 
 export const assumeShopSchema = z.object({
   body: z.object({
-    // null/undefined => thoát chế độ quản lý shop
     shopId: z.string().uuid().nullable().optional(),
   }),
 });

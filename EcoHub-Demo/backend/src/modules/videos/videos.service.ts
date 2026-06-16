@@ -1,7 +1,11 @@
+import fs from 'fs/promises';
+import path from 'path';
 import prisma from '../../config/database';
 import { notFound, badRequest, forbidden } from '../../middlewares/error.middleware';
 import { RoleName } from '@prisma/client';
 import { getPagination, parseDateRange } from '../../utils/helpers';
+import { getS3ProxyUrl, uploadFileToS3 } from '../../services/s3.service';
+import { compressVideoFile } from './video-processing.service';
 
 interface GetVideosParams {
   page: number;
@@ -14,10 +18,98 @@ interface GetVideosParams {
   showDeleted?: boolean;
 }
 
+interface GetReceivingVideosParams {
+  page: number;
+  limit: number;
+  search?: string;
+  orderId?: string;
+  comparisonStatus?: string;
+}
+
 type CurrentUser = {
   userId: string;
   roles: RoleName[];
   shopId?: string | null;
+};
+
+type StoredVideoAsset = {
+  originalUrl: string;
+  originalSize: number;
+  processedUrl: string;
+  processedSize: number;
+  durationSec?: number | null;
+  processingError?: string | null;
+  localPaths: string[];
+};
+
+const sanitizeS3Segment = (value: string) =>
+  value
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'unknown';
+
+const buildStoredVideoKey = (params: {
+  module: 'packaging' | 'receiving';
+  orderId: string;
+  trackingCode: string;
+  kind: 'original' | 'processed';
+  extension: string;
+}) => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const random = Math.random().toString(36).slice(2, 8);
+
+  return [
+    'videos',
+    params.module,
+    sanitizeS3Segment(params.orderId),
+    sanitizeS3Segment(params.trackingCode),
+    params.kind,
+    `${timestamp}_${random}.${sanitizeS3Segment(params.extension)}`,
+  ].join('/');
+};
+
+const getFileExtension = (filePath: string, fallback = 'mp4') => {
+  const ext = path.extname(filePath).replace('.', '').toLowerCase();
+  return ext || fallback;
+};
+
+const uploadVideoAssetToS3 = async (params: {
+  file: Express.Multer.File;
+  module: 'packaging' | 'receiving';
+  orderId: string;
+  trackingCode: string;
+}): Promise<StoredVideoAsset> => {
+  const compressed = await compressVideoFile(params.file.path);
+  const processedKey = buildStoredVideoKey({
+    module: params.module,
+    orderId: params.orderId,
+    trackingCode: params.trackingCode,
+    kind: compressed.outputPath === params.file.path ? 'original' : 'processed',
+    extension: getFileExtension(compressed.outputPath, getFileExtension(params.file.originalname || params.file.path)),
+  });
+
+  await uploadFileToS3({
+    key: processedKey,
+    filePath: compressed.outputPath,
+    contentType: compressed.outputPath === params.file.path ? params.file.mimetype || 'application/octet-stream' : 'video/mp4',
+  });
+
+  const storedUrl = getS3ProxyUrl(processedKey);
+
+  return {
+    originalUrl: storedUrl,
+    originalSize: params.file.size,
+    processedUrl: storedUrl,
+    processedSize: compressed.sizeBytes,
+    durationSec: compressed.durationSec ?? null,
+    processingError: compressed.processingError ?? null,
+    localPaths: Array.from(new Set([params.file.path, compressed.outputPath])),
+  };
+};
+
+const cleanupLocalFiles = async (paths: string[]) => {
+  await Promise.all(paths.map((filePath) => fs.rm(filePath, { force: true }).catch(() => undefined)));
 };
 
 export const getVideos = async (params: GetVideosParams, currentUser?: CurrentUser) => {
@@ -96,6 +188,98 @@ export const getVideos = async (params: GetVideosParams, currentUser?: CurrentUs
       },
     }),
     prisma.packageVideo.count({ where }),
+  ]);
+
+  return {
+    videos,
+    total,
+    page,
+    limit,
+  };
+};
+
+export const getReceivingVideos = async (
+  params: GetReceivingVideosParams,
+  currentUser?: CurrentUser
+) => {
+  const { page, limit, skip } = getPagination(params.page, params.limit);
+
+  const where: any = {
+    deletedAt: null,
+  };
+
+  if (params.orderId) {
+    where.orderId = params.orderId;
+  }
+
+  if (params.comparisonStatus) {
+    where.comparisonStatus = params.comparisonStatus;
+  }
+
+  if (params.search) {
+    where.OR = [
+      { trackingCode: { contains: params.search, mode: 'insensitive' } },
+      { order: { orderCode: { contains: params.search, mode: 'insensitive' } } },
+      { customer: { fullName: { contains: params.search, mode: 'insensitive' } } },
+    ];
+  }
+
+  if (currentUser?.roles.includes(RoleName.customer)) {
+    where.customerId = currentUser.userId;
+  }
+
+  if (currentUser?.shopId) {
+    where.order = {
+      ...(where.order || {}),
+      shopId: currentUser.shopId,
+    };
+  }
+
+  const isAdminLike =
+    currentUser?.roles.includes(RoleName.admin) ||
+    currentUser?.roles.includes(RoleName.super_admin) ||
+    currentUser?.roles.includes(RoleName.customer_service);
+
+  if (!isAdminLike && currentUser?.roles.includes(RoleName.staff)) {
+    where.packageVideo = {
+      recordedBy: currentUser.userId,
+    };
+  }
+
+  const [videos, total] = await Promise.all([
+    prisma.receivingVideo.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: [{ recordedAt: 'desc' }, { createdAt: 'desc' }],
+      include: {
+        order: {
+          select: {
+            id: true,
+            orderCode: true,
+            customerName: true,
+            status: true,
+            trackingCode: true,
+          },
+        },
+        customer: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+          },
+        },
+        packageVideo: {
+          select: {
+            id: true,
+            trackingCode: true,
+            processedVideoUrl: true,
+            originalVideoUrl: true,
+          },
+        },
+      },
+    }),
+    prisma.receivingVideo.count({ where }),
   ]);
 
   return {
@@ -240,22 +424,33 @@ export const uploadPackageVideo = async (params: UploadPackageVideoParams) => {
     throw badRequest('Đơn hàng chưa có mã vận đơn');
   }
 
-  // Create video record - auto mark as completed & approved
+  const storedVideo = await uploadVideoAssetToS3({
+    file: params.file,
+    module: 'packaging',
+    orderId: params.orderId,
+    trackingCode,
+  });
+
   const video = await prisma.packageVideo.create({
     data: {
       orderId: params.orderId,
       trackingCode,
-      originalVideoUrl: `/uploads/${params.file.filename}`,
-      originalVideoSize: params.file.size,
-      // Video được xử lý xong ngay (demo) và coi như đã phê duyệt
+      originalVideoUrl: storedVideo.originalUrl,
+      originalVideoSize: BigInt(storedVideo.originalSize),
+      originalDuration: storedVideo.durationSec ?? null,
+      // Video được nén xong ngay sau khi upload và được duyệt bởi người ghi hình hiện tại.
       processingStatus: 'completed',
-      processedVideoUrl: `/uploads/${params.file.filename}`,
+      processedVideoUrl: storedVideo.processedUrl,
+      processedVideoSize: BigInt(storedVideo.processedSize),
+      processingError: storedVideo.processingError || null,
       trackingCodePosition: (params.trackingCodePosition as any) || 'bottom_right',
       recordedBy: params.recordedBy,
       approvedBy: params.recordedBy,
       approvedAt: new Date(),
     },
   });
+
+  await cleanupLocalFiles(storedVideo.localPaths);
 
   // Update order status to packed + packedAt khi đã có video
   if (order.status === 'confirmed' || order.status === 'packing') {
@@ -341,18 +536,30 @@ export const uploadReceivingVideo = async (params: UploadReceivingVideoParams) =
     orderBy: { createdAt: 'desc' },
   });
 
+  const trackingCode = params.trackingCode || order.trackingCode!;
+  const storedVideo = await uploadVideoAssetToS3({
+    file: params.file,
+    module: 'receiving',
+    orderId: params.orderId,
+    trackingCode,
+  });
+
   const receivingVideo = await prisma.receivingVideo.create({
     data: {
       orderId: params.orderId,
       customerId: params.customerId,
-      trackingCode: params.trackingCode || order.trackingCode!,
-      videoUrl: `/uploads/${params.file.filename}`,
-      videoSize: params.file.size,
+      trackingCode,
+      videoUrl: storedVideo.processedUrl,
+      videoSize: BigInt(storedVideo.processedSize),
+      duration: storedVideo.durationSec ?? null,
       packageVideoId: packageVideo?.id,
+      comparisonNotes: storedVideo.processingError || null,
       comparisonStatus: 'pending',
       recordedAt: new Date(),
     },
   });
+
+  await cleanupLocalFiles(storedVideo.localPaths);
 
   return receivingVideo;
 };

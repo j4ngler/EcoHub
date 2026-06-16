@@ -11,8 +11,6 @@ import {
   Mail,
   Video,
   Clock,
-  CheckCircle,
-  Play,
   Download,
 } from 'lucide-react';
 import { ordersApi } from '@/api/orders.api';
@@ -33,29 +31,26 @@ export default function OrderDetailPage() {
     enabled: !!id,
   });
 
-  // Tính URL phát video, bỏ qua các video demo không có file thật (/uploads/demo/...)
-  const rawPlayableUrl =
+  const playableUrl =
     (activeVideo?.processedVideoUrl as string | undefined) ||
     (activeVideo?.originalVideoUrl as string | undefined) ||
     (activeVideo?.videoUrl as string | undefined) ||
     '';
-  const isDemoVideo = rawPlayableUrl.includes('/uploads/demo/');
-  const playableUrl = isDemoVideo ? '' : rawPlayableUrl;
 
   if (isLoading) {
     return (
-      <div className="animate-pulse space-y-6">
-        <div className="h-8 bg-gray-200 rounded w-48" />
-        <div className="h-64 bg-gray-200 rounded-xl" />
+      <div className="space-y-6 animate-pulse">
+        <div className="h-8 w-48 rounded bg-gray-200" />
+        <div className="h-64 rounded-xl bg-gray-200" />
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="text-center py-12">
+      <div className="py-12 text-center">
         <p className="text-gray-500">Không tìm thấy đơn hàng</p>
-        <Link to="/orders" className="text-primary-600 hover:underline mt-2 inline-block">
+        <Link to="/orders" className="mt-2 inline-block text-primary-600 hover:underline">
           Quay lại danh sách
         </Link>
       </div>
@@ -66,18 +61,15 @@ export default function OrderDetailPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Link to="/orders" className="p-2 hover:bg-gray-100 rounded-lg">
-            <ArrowLeft className="w-5 h-5" />
+          <Link to="/orders" className="rounded-lg p-2 hover:bg-gray-100">
+            <ArrowLeft className="h-5 w-5" />
           </Link>
           <div>
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-bold text-gray-900">{order.orderCode}</h1>
-              <Badge variant={statusConfig?.variant || 'default'}>
-                {statusConfig?.label || order.status}
-              </Badge>
+              <Badge variant={statusConfig?.variant || 'default'}>{statusConfig?.label || order.status}</Badge>
             </div>
             <p className="text-gray-500">Tạo lúc {formatDateTime(order.createdAt)}</p>
           </div>
@@ -88,29 +80,25 @@ export default function OrderDetailPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Order info */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Products */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Package className="w-5 h-5" />
+                <Package className="h-5 w-5" />
                 Sản phẩm ({order.items?.length || 0})
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="divide-y">
                 {order.items?.map((item, index) => (
-                  <div key={index} className="py-4 flex items-center gap-4">
-                    <div className="w-16 h-16 bg-gray-100 rounded-lg flex items-center justify-center">
-                      <Package className="w-8 h-8 text-gray-400" />
+                  <div key={index} className="flex items-center gap-4 py-4">
+                    <div className="flex h-16 w-16 items-center justify-center rounded-lg bg-gray-100">
+                      <Package className="h-8 w-8 text-gray-400" />
                     </div>
                     <div className="flex-1">
                       <p className="font-medium text-gray-900">{item.productName}</p>
-                      {item.productSku && (
-                        <p className="text-sm text-gray-500">SKU: {item.productSku}</p>
-                      )}
+                      {item.productSku && <p className="text-sm text-gray-500">SKU: {item.productSku}</p>}
                     </div>
                     <div className="text-right">
                       <p className="font-medium">{formatCurrency(item.unitPrice)}</p>
@@ -122,9 +110,8 @@ export default function OrderDetailPage() {
                   </div>
                 ))}
               </div>
-              
-              {/* Totals */}
-              <div className="border-t pt-4 mt-4 space-y-2">
+
+              <div className="mt-4 space-y-2 border-t pt-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Tạm tính</span>
                   <span>{formatCurrency(order.subtotal)}</span>
@@ -139,7 +126,7 @@ export default function OrderDetailPage() {
                     <span>-{formatCurrency(order.discountAmount)}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-medium text-lg pt-2 border-t">
+                <div className="flex justify-between border-t pt-2 text-lg font-medium">
                   <span>Tổng cộng</span>
                   <span className="text-primary-600">{formatCurrency(order.totalAmount)}</span>
                 </div>
@@ -147,11 +134,10 @@ export default function OrderDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Videos */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Video className="w-5 h-5" />
+                <Video className="h-5 w-5" />
                 Video đóng gói
               </CardTitle>
             </CardHeader>
@@ -174,28 +160,19 @@ export default function OrderDetailPage() {
                           setActiveVideo(video);
                           setOpenVideo(true);
                         }}
-                        className="w-full border rounded-lg px-4 py-3 text-left hover:shadow-md hover:bg-gray-50 transition"
+                        className="w-full rounded-lg border px-4 py-3 text-left transition hover:bg-gray-50 hover:shadow-md"
                         title="Tải video"
                       >
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex-1">
                             <p className="font-medium text-gray-900">
-                              {video.trackingCode ||
-                                order.trackingCode ||
-                                order.orderCode ||
-                                'Video đóng gói'}
+                              {video.trackingCode || order.trackingCode || order.orderCode || 'Video đóng gói'}
                             </p>
-                            <p className="text-xs text-gray-500">
-                              {formatDateTime(video.createdAt)}
-                            </p>
-                            {fileName && (
-                              <p className="text-xs text-gray-400 break-all mt-1">
-                                {fileName}
-                              </p>
-                            )}
+                            <p className="text-xs text-gray-500">{formatDateTime(video.createdAt)}</p>
+                            {fileName && <p className="mt-1 break-all text-xs text-gray-400">{fileName}</p>}
                           </div>
                           <div className="flex items-center gap-1 text-primary-600">
-                            <Download className="w-4 h-4" />
+                            <Download className="h-4 w-4" />
                             <span className="text-sm font-medium">Tải về</span>
                           </div>
                         </div>
@@ -204,8 +181,8 @@ export default function OrderDetailPage() {
                   })}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
-                  <Video className="w-12 h-12 mx-auto mb-2 text-gray-300" />
+                <div className="py-8 text-center text-gray-500">
+                  <Video className="mx-auto mb-2 h-12 w-12 text-gray-300" />
                   <p>Chưa có video đóng gói</p>
                 </div>
               )}
@@ -213,45 +190,40 @@ export default function OrderDetailPage() {
           </Card>
         </div>
 
-        {/* Sidebar */}
         <div className="space-y-6">
-          {/* Customer info */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <User className="w-5 h-5" />
+                <User className="h-5 w-5" />
                 Khách hàng
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                  <span className="font-medium text-primary-600">
-                    {order.customerName.charAt(0)}
-                  </span>
+                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100">
+                  <span className="font-medium text-primary-600">{order.customerName.charAt(0)}</span>
                 </div>
                 <div>
                   <p className="font-medium">{order.customerName}</p>
                 </div>
               </div>
               <div className="flex items-center gap-2 text-sm text-gray-600">
-                <Phone className="w-4 h-4" />
+                <Phone className="h-4 w-4" />
                 {order.customerPhone}
               </div>
               {order.customerEmail && (
                 <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <Mail className="w-4 h-4" />
+                  <Mail className="h-4 w-4" />
                   {order.customerEmail}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          {/* Shipping info */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Truck className="w-5 h-5" />
+                <Truck className="h-5 w-5" />
                 Vận chuyển
               </CardTitle>
             </CardHeader>
@@ -270,19 +242,18 @@ export default function OrderDetailPage() {
               )}
               <div>
                 <p className="text-sm text-gray-500">Địa chỉ giao hàng</p>
-                <div className="flex items-start gap-2 mt-1">
-                  <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
+                <div className="mt-1 flex items-start gap-2">
+                  <MapPin className="mt-0.5 h-4 w-4 text-gray-400" />
                   <p className="text-sm">{order.shippingAddress}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Status history */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Clock className="w-5 h-5" />
+                <Clock className="h-5 w-5" />
                 Lịch sử trạng thái
               </CardTitle>
             </CardHeader>
@@ -293,21 +264,17 @@ export default function OrderDetailPage() {
                   return (
                     <div key={history.id} className="flex gap-3">
                       <div className="relative">
-                        <div className={`w-3 h-3 rounded-full ${index === 0 ? 'bg-primary-600' : 'bg-gray-300'}`} />
+                        <div className={`h-3 w-3 rounded-full ${index === 0 ? 'bg-primary-600' : 'bg-gray-300'}`} />
                         {order.statusHistory && index < order.statusHistory.length - 1 && (
-                          <div className="absolute top-3 left-1.5 w-0.5 h-full -translate-x-1/2 bg-gray-200" />
+                          <div className="absolute left-1.5 top-3 h-full w-0.5 -translate-x-1/2 bg-gray-200" />
                         )}
                       </div>
                       <div className="flex-1 pb-4">
                         <Badge variant={historyStatus?.variant || 'default'} className="mb-1">
                           {historyStatus?.label || history.status}
                         </Badge>
-                        <p className="text-xs text-gray-500">
-                          {formatDateTime(history.createdAt)}
-                        </p>
-                        {history.note && (
-                          <p className="text-sm text-gray-600 mt-1">{history.note}</p>
-                        )}
+                        <p className="text-xs text-gray-500">{formatDateTime(history.createdAt)}</p>
+                        {history.note && <p className="mt-1 text-sm text-gray-600">{history.note}</p>}
                       </div>
                     </div>
                   );
@@ -329,27 +296,24 @@ export default function OrderDetailPage() {
       >
         {playableUrl ? (
           <div className="space-y-4">
-            <p className="text-sm text-gray-600 break-all">
+            <p className="break-all text-sm text-gray-600">
               Đường dẫn file: <span className="font-mono">{playableUrl}</span>
             </p>
             <a
               href={playableUrl}
               download
-              className="inline-flex items-center px-4 py-2 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
+              className="inline-flex items-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
             >
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="mr-2 h-4 w-4" />
               Tải video (.mp4)
             </a>
             <p className="text-xs text-gray-400">
-              Nếu trình duyệt không tự tải, hãy chuột phải vào đường dẫn và chọn &quot;Save
-              link as...&quot;.
+              Nếu trình duyệt không tự tải, hãy chuột phải vào đường dẫn và chọn &quot;Save link as...&quot;.
             </p>
           </div>
         ) : (
           <div className="text-sm text-gray-600">
-            {isDemoVideo
-              ? 'Đây là dữ liệu demo, hệ thống không có file video thật để phát. Vui lòng upload video mới cho đơn hàng này nếu bạn muốn xem lại.'
-              : 'Video này chưa có đường dẫn phát (thiếu `originalVideoUrl/processedVideoUrl`).'}
+            Video này chưa có đường dẫn phát hợp lệ (`originalVideoUrl`, `processedVideoUrl` hoặc `videoUrl`).
           </div>
         )}
       </Modal>

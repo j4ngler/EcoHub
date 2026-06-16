@@ -187,7 +187,7 @@ export const getDashboard = async (params: ReportParams) => {
   let usedBytesBigInt = originalBytes + processedBytes + receivingBytes;
 
   // Nếu không filter theo shop / thời gian => lấy dung lượng thật trên ổ đĩa (thư mục uploads)
-  // (DB có thể thiếu size với dữ liệu cũ, hoặc bị "double count" do demo dùng chung 1 file cho original+processed)
+  // DB có thể thiếu size với dữ liệu cũ, hoặc bị đếm trùng giữa file gốc và file đã xử lý.
   if (!params.shopId && !dateFilter) {
     try {
       const uploadsDir = path.resolve(process.cwd(), 'uploads');
@@ -409,37 +409,6 @@ export const syncNow = async (userId: string, channels?: Array<'shopee' | 'tikto
     },
   });
 
-  // Nếu chưa có kết nối nào (môi trường demo mới), tự tạo kết nối demo để nút "Cập nhật dữ liệu" hoạt động ngay
-  if (connections.length === 0) {
-    const effectiveShopId =
-      shopId ||
-      (await prisma.shop.findFirst({ where: { code: 'ECOHUB_DEMO' }, select: { id: true } }))?.id;
-
-    if (effectiveShopId) {
-      const demoChannels = await prisma.salesChannel.findMany({
-        where: { code: { in: [...channelCodes] } },
-        select: { id: true, code: true },
-      });
-
-      for (const ch of demoChannels) {
-        await prisma.shopChannelConnection.upsert({
-          where: { shopId_channelId: { shopId: effectiveShopId, channelId: ch.id } },
-          update: { status: 'connected' },
-          create: { shopId: effectiveShopId, channelId: ch.id, status: 'connected' },
-        });
-      }
-
-      connections = await prisma.shopChannelConnection.findMany({
-        where: {
-          status: 'connected',
-          shopId: effectiveShopId,
-          channel: { code: { in: [...channelCodes] } },
-        },
-        include: { channel: true, shop: true },
-      });
-    }
-  }
-
   const results: Array<{
     shopId: string;
     shopName: string;
@@ -455,35 +424,19 @@ export const syncNow = async (userId: string, channels?: Array<'shopee' | 'tikto
 
   for (const c of connections) {
     try {
-      if (c.channel.code === 'shopee') {
-        const { syncDemoShopeeOrders } = await import('../../services/demo-channel-sync.service');
-        const r = await syncDemoShopeeOrders(c.shopId, c.channelId, userId);
-        results.push({
-          shopId: c.shopId,
-          shopName: c.shop.name,
-          channelCode: c.channel.code,
-          channelName: c.channel.name,
-          synced: r.synced,
-          created: r.created,
-          updated: r.updated,
-          failed: r.failed,
-          lastSyncAt: r.lastSyncAt,
-        });
-      } else if (c.channel.code === 'tiktok') {
-        const { syncDemoTikTokOrders } = await import('../../services/demo-channel-sync.service');
-        const r = await syncDemoTikTokOrders(c.shopId, c.channelId, userId);
-        results.push({
-          shopId: c.shopId,
-          shopName: c.shop.name,
-          channelCode: c.channel.code,
-          channelName: c.channel.name,
-          synced: r.synced,
-          created: r.created,
-          updated: r.updated,
-          failed: r.failed,
-          lastSyncAt: r.lastSyncAt,
-        });
-      }
+      void userId;
+      results.push({
+        shopId: c.shopId,
+        shopName: c.shop.name,
+        channelCode: c.channel.code,
+        channelName: c.channel.name,
+        synced: 0,
+        created: 0,
+        updated: 0,
+        failed: 1,
+        lastSyncAt: new Date(),
+        error: `Chưa hỗ trợ đồng bộ tự động cho kênh ${c.channel.name}`,
+      });
     } catch (e: any) {
       results.push({
         shopId: c.shopId,

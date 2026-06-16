@@ -16,10 +16,12 @@ import ReportsPage from '@/features/reports/pages/ReportsPage';
 import TrackingPage from '@/features/tracking/pages/TrackingPage';
 import InventoryPage from '@/features/products/pages/InventoryPage';
 import SettingsPage from '@/features/settings/pages/SettingsPage';
+import CameraSettingsPage from '@/features/settings/pages/CameraSettingsPage';
 import ReceivingVideosPage from '@/features/videos/pages/ReceivingVideosPage';
 import ShopsPage from '@/features/shops/pages/ShopsPage';
 import ReturnsPage from '@/features/returns/pages/ReturnsPage';
 import ShippingSettingsPage from '@/features/settings/pages/ShippingSettingsPage';
+import ApiManagementPage from '@/features/channels/pages/ApiManagementPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -38,6 +40,23 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/dashboard" replace />;
   }
   
+  return <>{children}</>;
+}
+
+function RoleRoute({
+  children,
+  disallowRoles = [],
+}: {
+  children: React.ReactNode;
+  disallowRoles?: string[];
+}) {
+  const user = useAuthStore((s) => s.user);
+  const roles = user?.roles || [];
+
+  if (disallowRoles.some((role) => roles.includes(role))) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -66,11 +85,28 @@ function App() {
           <Route path="products" element={<ProductsPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="videos" element={<VideosPage />} />
-          <Route path="videos/create" element={<CreateVideoPage />} />
+          <Route
+            path="videos/create"
+            element={
+              <RoleRoute disallowRoles={['super_admin']}>
+                <CreateVideoPage />
+              </RoleRoute>
+            }
+          />
           <Route path="videos/receiving" element={<ReceivingVideosPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route
+            path="camera-settings"
+            element={
+              <RoleRoute disallowRoles={['super_admin']}>
+                <CameraSettingsPage />
+              </RoleRoute>
+            }
+          />
+          <Route path="channel-management" element={<ApiManagementPage />} />
+          <Route path="api-management" element={<Navigate to="/channel-management" replace />} />
           <Route path="settings/shipping" element={<ShippingSettingsPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="returns" element={<ReturnsPage />} />

@@ -18,6 +18,7 @@ import returnRoutes from './modules/returns/returns.routes';
 import metaRoutes from './modules/meta/meta.routes';
 import settingsRoutes from './modules/settings/settings.routes';
 import shopRoutes from './modules/shops/shops.routes';
+import captureRoutes from './modules/capture/capture.routes';
 
 // Import middlewares
 import { errorHandler } from './middlewares/error.middleware';
@@ -93,6 +94,7 @@ app.use('/api/returns', returnRoutes);
 app.use('/api/meta', metaRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/shops', shopRoutes);
+app.use('/api/capture', captureRoutes);
 
 // API Documentation
 app.get('/api/docs', (req: Request, res: Response) => {
@@ -133,10 +135,21 @@ app.get('/api/docs', (req: Request, res: Response) => {
       },
       videos: {
         'GET /api/videos': 'Danh sách video',
+        'GET /api/videos/receiving': 'Danh sách video hoàn hàng',
         'GET /api/videos/:id': 'Chi tiết video',
         'POST /api/videos/upload': 'Upload video đóng gói',
+        'POST /api/videos/receiving/upload': 'Upload video hoàn hàng',
         'PUT /api/videos/:id/approve': 'Phê duyệt video',
         'GET /api/videos/tracking/:code': 'Video theo mã vận đơn',
+      },
+      capture: {
+        'GET /api/capture/health': 'Kiem tra kha nang runtime camera tren server hoac local runtime',
+        'GET /api/capture/camera-status': 'Trang thai camera tu backend runtime',
+        'GET /api/capture/upload-status': 'Trang thai upload queue tu backend runtime',
+        'POST /api/capture/start-cameras': 'Khoi dong camera tren server hoac local runtime',
+        'POST /api/capture/stop-cameras': 'Dung camera tren server hoac local runtime',
+        'POST /api/capture/start-recording': 'Bat dau quay tren runtime camera',
+        'POST /api/capture/stop-recording': 'Dung quay tren runtime camera',
       },
       shipping: {
         'GET /api/shipping/carriers': 'Danh sách hãng vận chuyển',

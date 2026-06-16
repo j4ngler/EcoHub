@@ -363,4 +363,61 @@ npx prisma db seed
 
 ---
 
-_Tài liệu này được sinh từ trạng thái code hiện tại, đã cập nhật các thay đổi mới nhất về quyền role, ngữ cảnh shop và email báo cáo._ 
+## 9. Phân Tích Dung Lượng Video, Dự Phóng Bộ Nhớ & Cấu Hình Triển Khai
+
+Để tối ưu chi phí hạ tầng và đảm bảo hệ thống vận hành ổn định, dưới đây là phân tích chi tiết về dung lượng video, dự phóng bộ nhớ theo chính sách lưu trữ và cấu hình máy chủ được phê duyệt.
+
+### 9.1. Thông Số Giả Định Vận Hành Tiêu Chuẩn
+
+| Thông số vận hành | Định mức tiêu chuẩn | Ý nghĩa / Ghi chú |
+| :--- | :--- | :--- |
+| **Ca làm việc tiêu chuẩn** | **8 tiếng (480 phút)** | Thời gian hoạt động thực tế của một ca kho. |
+| **Tần suất đóng gói** | **60 giây / đơn hàng** | Định mức hoàn thành trung bình cho một đơn hàng. |
+| **Số lượng video / ca** | **480 video** | Số lượng đơn hàng cần ghi hình trong mỗi ca làm việc. |
+| **Video Gốc Thô (MPEG-4)** | **18.00 MB – 25.00 MB** | Video thô chưa tối ưu (định dạng `mp4v` ghi gốc từ camera). |
+| **Video Nén Trước Đây (H.264 - CRF 30)** | **8.75 MB – 9.00 MB** | Thực tế đo được khi đóng gói các đơn hàng cụ thể của khách. |
+| **Video Nén Tối Ưu Mới (H.264 - CRF 33, Medium)** | **5.00 MB – 6.00 MB** | Dự kiến sau khi tối ưu giảm chất lượng dư thừa (tiết kiệm thêm ~35%). |
+
+---
+
+### 9.2. Bảng Dự Phóng Lưu Trữ Theo Thời Gian
+Dưới đây là so sánh bộ nhớ lưu trữ giữa **Video Nén Cũ (8.75 - 9MB)** và **Video Nén Tối Ưu Mới (5 - 6MB)** theo quy mô vận hành:
+
+| Chu kỳ thời gian | Số ca / ngày | Tổng số video | Video Nén Cũ (8.75 - 9MB) | Video Nén Tối Ưu Mới (5 - 6MB) | Tiết kiệm bộ nhớ |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| **1 ca (8 tiếng)** | 1 ca | 480 | **4.10 GB – 4.22 GB** | **2.34 GB - 2.81 GB** | ~35% |
+| **1 ngày (24 tiếng)** | 3 ca | 1,440 | **12.30 GB – 12.66 GB** | **7.03 GB - 8.44 GB** | ~35% |
+| **1 tuần (7 ngày)** | 1 ca/ngày | 3,360 | **28.71 GB – 29.53 GB** | **16.41 GB - 19.69 GB** | ~35% |
+| | 3 ca/ngày | 10,080 | **86.13 GB – 88.59 GB** | **49.22 GB - 59.06 GB** | ~35% |
+| **1 tháng (30 ngày)** | 1 ca/ngày | 14,400 | **123.05 GB – 126.56 GB** | **70.31 GB - 84.38 GB** | ~35% |
+| | 3 ca/ngày | 43,200 | **369.14 GB – 379.69 GB** | **210.94 GB - 253.13 GB** | ~35% |
+| **1 năm (365 ngày)** | 1 ca/ngày | 175,200 | **1.50 TB – 1.54 TB** | **855.47 GB - 1.00 TB** | ~35% |
+| | 3 ca/ngày | 525,600 | **4.49 TB – 4.61 TB** | **2.51 TB - 3.01 TB** | ~35% |
+
+*Lưu ý: Hệ thống tính toán dựa trên chuẩn hệ nhị phân (1 GB = 1024 MB, 1 TB = 1024 GB).*
+
+---
+
+### 9.3. Cấu Hình Máy Chủ & Hạ Tầng Lưu Trữ Được Phê Duyệt
+
+Hệ thống triển khai chính thức theo gói dịch vụ điện toán đám mây với các thông số sau:
+
+| Hạng mục cấu hình | Thông số chi tiết | Vai trò / Ghi chú vận hành |
+| :--- | :--- | :--- |
+| **Gói Elastic Compute (VPS)** | **4 vCPU, 8 GB RAM** | Chạy Backend Node.js, Web Frontend, DB PostgreSQL và Redis. |
+| **Hệ điều hành (OS)** | Ubuntu 22.04 LTS hoặc Windows Server 2022 | Hệ điều hành máy chủ. |
+| **Ổ cứng cài App & DB** | **100 GB SSD (EV SSD)** | Lưu trữ OS, mã nguồn ứng dụng và cơ sở dữ liệu PostgreSQL. |
+| **Hạ tầng lưu trữ video (S3)** | **100 GB S3 Object Storage** | Lưu trữ video đóng gói/nhận hàng (Wasabi / AWS S3 / MinIO). |
+
+### 9.4. Chính Sách Dọn Dẹp Bộ Nhớ (Retention Policy - CHÍNH THỨC)
+
+Hệ thống chạy tác vụ tự động (Cron job) dọn dẹp và xóa vĩnh viễn video cũ sau **30 ngày kể từ ngày tạo**.
+
+| Quy mô hoạt động | Số video tích lũy (30 ngày) | Dung lượng ước tính | Tỷ lệ sử dụng gói 100 GB S3 |
+| :--- | :---: | :---: | :---: |
+| **Chạy 1 ca/ngày** | 14,400 video | **70.31 GB - 84.38 GB** | Sử dụng ~70% - 84% (Đủ dùng trong gói 100 GB S3) |
+| **Chạy tối đa 3 ca/ngày** | 43,200 video | **210.94 GB - 253.13 GB** | Vượt quá giới hạn (Cần nâng cấp tối thiểu 250 GB - 300 GB S3) |
+
+---
+
+_Tài liệu này được sinh từ trạng thái code hiện tại, đã cập nhật các thay đổi mới nhất về quyền role, ngữ cảnh shop, email báo cáo, tối ưu hóa nén video và cấu hình máy chủ đám mây thực tế._

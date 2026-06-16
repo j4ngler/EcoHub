@@ -4,7 +4,6 @@ import { cleanupStaleUploads } from '../modules/videos/videos.s3.service';
 let uploadMonitorJob: ScheduledTask | null = null;
 
 export const startVideoUploadMonitor = () => {
-  // Chạy mỗi 5 phút để kiểm tra các video đang UPLOADING quá lâu
   uploadMonitorJob = cron.schedule(
     '*/5 * * * *',
     async () => {
@@ -33,4 +32,3 @@ export const stopVideoUploadMonitor = () => {
     console.log('⏹️ Video upload monitor stopped');
   }
 };
-

@@ -1,22 +1,55 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Response } from 'express';
 import * as videoService from './videos.service';
 import * as videoS3Service from './videos.s3.service';
-import { success, created, paginated, noContent } from '../../utils/response';
+import { decodeS3Key, getPresignedGetUrl } from '../../services/s3.service';
+import { created, noContent, paginated, success } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
+
+export const streamStoredVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const key = decodeS3Key(req.params.encodedKey);
+    const presigned = await getPresignedGetUrl({ key, expiresInSeconds: 900 });
+    res.redirect(presigned.url);
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getVideos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const result = await videoService.getVideos({
-      page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 10,
-      search: req.query.search as string,
-      orderId: req.query.orderId as string,
-      status: req.query.status as string,
-      startDate: req.query.startDate as string,
-      endDate: req.query.endDate as string,
-      showDeleted: req.query.showDeleted === 'true',
-    }, req.user);
-    
+    const result = await videoService.getVideos(
+      {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        search: req.query.search as string,
+        orderId: req.query.orderId as string,
+        status: req.query.status as string,
+        startDate: req.query.startDate as string,
+        endDate: req.query.endDate as string,
+        showDeleted: req.query.showDeleted === 'true',
+      },
+      req.user
+    );
+
+    paginated(res, result.videos, result.total, result.page, result.limit);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getReceivingVideos = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await videoService.getReceivingVideos(
+      {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        search: req.query.search as string,
+        orderId: req.query.orderId as string,
+        comparisonStatus: req.query.comparisonStatus as string,
+      },
+      req.user
+    );
+
     paginated(res, result.videos, result.total, result.page, result.limit);
   } catch (error) {
     next(error);
@@ -54,7 +87,7 @@ export const uploadPackageVideo = async (req: AuthRequest, res: Response, next: 
   try {
     const file = req.file;
     if (!file) {
-      return res.status(400).json({ success: false, message: 'Vui lòng upload video' });
+      return res.status(400).json({ success: false, message: 'Vui long upload video' });
     }
 
     const video = await videoService.uploadPackageVideo({
@@ -65,7 +98,7 @@ export const uploadPackageVideo = async (req: AuthRequest, res: Response, next: 
       trackingCodePosition: req.body.trackingCodePosition,
     });
 
-    created(res, video, 'Upload video thành công');
+    created(res, video, 'Upload video thanh cong');
   } catch (error) {
     next(error);
   }
@@ -74,7 +107,7 @@ export const uploadPackageVideo = async (req: AuthRequest, res: Response, next: 
 export const approveVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const video = await videoService.approveVideo(req.params.id, req.user!.userId);
-    success(res, video, 'Phê duyệt video thành công');
+    success(res, video, 'Phe duyet video thanh cong');
   } catch (error) {
     next(error);
   }
@@ -93,7 +126,7 @@ export const uploadReceivingVideo = async (req: AuthRequest, res: Response, next
   try {
     const file = req.file;
     if (!file) {
-      return res.status(400).json({ success: false, message: 'Vui lòng upload video' });
+      return res.status(400).json({ success: false, message: 'Vui long upload video' });
     }
 
     const video = await videoService.uploadReceivingVideo({
@@ -103,7 +136,7 @@ export const uploadReceivingVideo = async (req: AuthRequest, res: Response, next
       customerId: req.user!.userId,
     });
 
-    created(res, video, 'Upload video nhận hàng thành công');
+    created(res, video, 'Upload video nhan hang thanh cong');
   } catch (error) {
     next(error);
   }
@@ -130,13 +163,13 @@ export const initS3Upload = async (req: AuthRequest, res: Response, next: NextFu
       },
       req.user && {
         userId: req.user.userId,
-        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        // @ts-ignore JWT roles map to RoleName[] here.
         roles: req.user.roles,
         shopId: req.user.shopId ?? null,
       }
     );
 
-    created(res, result, 'Khởi tạo upload video S3 thành công');
+    created(res, result, 'Khoi tao upload video S3 thanh cong');
   } catch (error) {
     next(error);
   }
@@ -155,13 +188,13 @@ export const completeS3Upload = async (req: AuthRequest, res: Response, next: Ne
       },
       req.user && {
         userId: req.user.userId,
-        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        // @ts-ignore JWT roles map to RoleName[] here.
         roles: req.user.roles,
         shopId: req.user.shopId ?? null,
       }
     );
 
-    success(res, result, 'Xác nhận upload video S3 thành công');
+    success(res, result, 'Xac nhan upload video S3 thanh cong');
   } catch (error) {
     next(error);
   }
@@ -169,13 +202,10 @@ export const completeS3Upload = async (req: AuthRequest, res: Response, next: Ne
 
 export const listS3Videos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-
     const result = await videoS3Service.listVideos(
       {
-        page,
-        limit,
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
         shopId: (req.query.shopId as string) || undefined,
         uploaderUserId: (req.query.uploaderUserId as string) || undefined,
         orderId: (req.query.orderId as string) || undefined,
@@ -186,7 +216,7 @@ export const listS3Videos = async (req: AuthRequest, res: Response, next: NextFu
       },
       req.user && {
         userId: req.user.userId,
-        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        // @ts-ignore JWT roles map to RoleName[] here.
         roles: req.user.roles,
         shopId: req.user.shopId ?? null,
       }
@@ -204,7 +234,7 @@ export const getS3VideoViewUrl = async (req: AuthRequest, res: Response, next: N
       req.params.videoId,
       req.user && {
         userId: req.user.userId,
-        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        // @ts-ignore JWT roles map to RoleName[] here.
         roles: req.user.roles,
         shopId: req.user.shopId ?? null,
       }

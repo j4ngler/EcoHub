@@ -1,8 +1,8 @@
-import { VideoModule, VideoUploadStatus, RoleName } from '@prisma/client';
+import { RoleName, VideoModule, VideoUploadStatus } from '@prisma/client';
 import prisma from '../../config/database';
 import { badRequest, forbidden, notFound } from '../../middlewares/error.middleware';
 import { getPagination, parseDateRange } from '../../utils/helpers';
-import { getPresignedPutUrl, getPresignedGetUrl, headObject } from '../../services/s3.service';
+import { getPresignedGetUrl, getPresignedPutUrl, headObject } from '../../services/s3.service';
 
 type CurrentUser = {
   userId: string;
@@ -45,7 +45,6 @@ const inferExtension = (contentType?: string, fileName?: string) => {
   }
 
   if (!contentType) return 'mp4';
-
   if (contentType === 'video/mp4') return 'mp4';
   if (contentType === 'video/quicktime') return 'mov';
   if (contentType === 'video/x-matroska') return 'mkv';
@@ -88,12 +87,10 @@ const ensureCanAccessOrder = async (orderId: string, currentUser?: CurrentUser) 
   const isSuperAdmin = roles.includes(RoleName.super_admin);
   const isCustomer = roles.includes(RoleName.customer);
 
-  // Nếu đang ở ngữ cảnh shop thì chỉ thao tác với đơn thuộc shop đó (trừ Super Admin)
   if (currentUser.shopId && order.shopId !== currentUser.shopId && !isSuperAdmin) {
     throw forbidden('Bạn không được phép thao tác với đơn hàng của shop khác');
   }
 
-  // Nếu là khách hàng: chỉ được thao tác với đơn của chính mình
   if (isCustomer && order.customerId && order.customerId !== currentUser.userId) {
     throw forbidden('Bạn chỉ được thao tác với đơn hàng của chính mình');
   }
@@ -122,7 +119,6 @@ export const initUpload = async (params: InitUploadParams, currentUser?: Current
   }
 
   const order = await ensureCanAccessOrder(params.orderId, currentUser);
-
   const contentType = params.contentType || 'video/mp4';
   const extension = inferExtension(contentType, params.fileName);
 
@@ -213,7 +209,6 @@ export const completeUpload = async (params: CompleteUploadParams, currentUser?:
   }
 
   const isFailure = params.success === false || !!params.errorCode || !!params.errorMessage;
-
   if (isFailure) {
     const updated = await prisma.video.update({
       where: { id: video.id },
@@ -243,7 +238,6 @@ export const completeUpload = async (params: CompleteUploadParams, currentUser?:
     return updated;
   }
 
-  // Kiểm tra object trong S3 có tồn tại không
   const head = await headObject(video.s3Key);
   if (!head) {
     const updated = await prisma.video.update({
@@ -344,17 +338,14 @@ export const getVideoViewUrl = async (videoId: string, currentUser?: CurrentUser
   const isStaff = roles.includes(RoleName.staff);
   const isCustomer = roles.includes(RoleName.customer);
 
-  // Giới hạn theo shop
   if (currentUser.shopId && video.shopId !== currentUser.shopId && !isSuperAdmin) {
     throw forbidden('Bạn không được phép xem video của shop khác');
   }
 
-  // Khách hàng chỉ xem video của đơn hàng của chính mình
   if (isCustomer && video.order.customerId && video.order.customerId !== currentUser.userId) {
     throw forbidden('Bạn không được phép xem video của đơn hàng này');
   }
 
-  // Nhân viên đóng gói chỉ xem video do mình upload, trừ khi là Admin / CSKH / Super Admin
   const isAdminLike = isSuperAdmin || isAdmin || isCustomerService;
   if (!isAdminLike && isStaff && video.uploaderUserId !== currentUser.userId) {
     throw forbidden('Bạn chỉ được phép xem video do mình upload');
@@ -395,13 +386,10 @@ export const listVideos = async (params: ListVideosParams, currentUser?: Current
   }
 
   const { page, limit, skip } = getPagination(params.page, params.limit);
-
   const where: any = {};
-
   const roles = currentUser.roles || [];
   const isSuperAdmin = roles.includes(RoleName.super_admin);
 
-  // Giới hạn theo shop
   if (currentUser.shopId && !isSuperAdmin) {
     where.shopId = currentUser.shopId;
   } else if (params.shopId) {
@@ -417,15 +405,14 @@ export const listVideos = async (params: ListVideosParams, currentUser?: Current
   }
 
   if (params.module) {
-    const moduleValue = typeof params.module === 'string' ? params.module : params.module.toString();
+    const moduleValue = String(params.module);
     if (Object.values(VideoModule).includes(moduleValue as VideoModule)) {
       where.module = moduleValue;
     }
   }
 
   if (params.status) {
-    const statusValue =
-      typeof params.status === 'string' ? params.status.toUpperCase() : params.status.toString();
+    const statusValue = String(params.status).toUpperCase();
     if (Object.values(VideoUploadStatus).includes(statusValue as VideoUploadStatus)) {
       where.status = statusValue;
     }
@@ -436,11 +423,9 @@ export const listVideos = async (params: ListVideosParams, currentUser?: Current
     where.createdAt = dateFilter;
   }
 
-  // Nhân viên đóng gói chỉ xem video do mình upload (trong shop), Admin / CSKH / Super Admin xem tất cả
   const isAdmin = roles.includes(RoleName.admin);
   const isCustomerService = roles.includes(RoleName.customer_service);
   const isStaff = roles.includes(RoleName.staff);
-
   const isAdminLike = isSuperAdmin || isAdmin || isCustomerService;
 
   if (!isAdminLike && isStaff) {
@@ -501,12 +486,12 @@ export const cleanupStaleUploads = async (maxMinutesUploading = 30) => {
 
   let failedCount = 0;
 
-  for (const v of staleVideos) {
-    const head = await headObject(v.s3Key);
+  for (const video of staleVideos) {
+    const head = await headObject(video.s3Key);
 
     if (!head) {
       await prisma.video.update({
-        where: { id: v.id },
+        where: { id: video.id },
         data: {
           status: VideoUploadStatus.FAILED,
           errorCode: 'TIMEOUT',
@@ -516,7 +501,7 @@ export const cleanupStaleUploads = async (maxMinutesUploading = 30) => {
 
       await prisma.videoEvent.create({
         data: {
-          videoId: v.id,
+          videoId: video.id,
           type: 'UPLOAD_TIMEOUT',
           payload: {
             reason: 'NO_OBJECT',
@@ -534,4 +519,3 @@ export const cleanupStaleUploads = async (maxMinutesUploading = 30) => {
     markedFailed: failedCount,
   };
 };
-

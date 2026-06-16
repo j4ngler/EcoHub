@@ -5,6 +5,7 @@ import { authenticate, authorizePermission } from '../../middlewares/auth.middle
 import { uploadVideo } from '../../middlewares/upload.middleware';
 import {
   queryVideosSchema,
+  queryReceivingVideosSchema,
   uploadVideoSchema,
   initS3UploadSchema,
   completeS3UploadSchema,
@@ -13,17 +14,20 @@ import {
 
 const router = Router();
 
+router.get('/storage/:encodedKey', videoController.streamStoredVideo);
+
 router.use(authenticate);
 
 // List videos
 router.get('/', authorizePermission('videos.view'), validate(queryVideosSchema), videoController.getVideos);
 
-// List S3 videos (new pipeline)
+router.get('/s3', authorizePermission('videos.view'), validate(listS3VideosSchema), videoController.listS3Videos);
+
 router.get(
-  '/s3',
+  '/receiving',
   authorizePermission('videos.view'),
-  validate(listS3VideosSchema),
-  videoController.listS3Videos
+  validate(queryReceivingVideosSchema),
+  videoController.getReceivingVideos
 );
 
 // Get video by ID
@@ -44,7 +48,6 @@ router.post(
   videoController.uploadPackageVideo
 );
 
-// Init S3 upload (presigned URL)
 router.post(
   '/init-upload',
   authorizePermission('videos.upload'),
@@ -52,7 +55,6 @@ router.post(
   videoController.initS3Upload
 );
 
-// Complete S3 upload
 router.post(
   '/complete-upload',
   authorizePermission('videos.upload'),
@@ -72,11 +74,6 @@ router.post('/receiving/upload', uploadVideo, videoController.uploadReceivingVid
 // Compare videos
 router.get('/:id/compare', authorizePermission('videos.view'), videoController.compareVideos);
 
-// Get S3 view URL for a video
-router.get(
-  '/:videoId/view-url',
-  authorizePermission('videos.view'),
-  videoController.getS3VideoViewUrl
-);
+router.get('/:videoId/view-url', authorizePermission('videos.view'), videoController.getS3VideoViewUrl);
 
 export default router;

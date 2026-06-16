@@ -19,6 +19,7 @@
     "db:studio": "npm run db:studio --workspace=backend"
   },
   "devDependencies": {
+    "@mohtasham/md-to-docx": "^2.12.4",
     "concurrently": "^8.2.2"
   },
   "engines": {

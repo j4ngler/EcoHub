@@ -5,6 +5,25 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
 import { badRequest } from '../../middlewares/error.middleware';
 
+export const getCaptureSettings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const settings = await settingsService.buildCaptureSettingsOverview(req.user?.userId);
+    success(res, settings);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateCaptureSettings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await settingsService.updateCaptureSettings(req.body || {}, req.user?.userId);
+    const settings = await settingsService.buildCaptureSettingsOverview(req.user?.userId);
+    success(res, settings, 'Đã cập nhật cấu hình camera');
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getReportSubscriptions = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const queryShopId = typeof req.query?.shopId === 'string' && req.query.shopId.trim() ? req.query.shopId.trim() : null;

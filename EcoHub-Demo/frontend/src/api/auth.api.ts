@@ -11,6 +11,19 @@ export interface RegisterDto {
   password: string;
   fullName: string;
   phone?: string;
+  role: 'staff' | 'customer_service' | 'customer';
+}
+
+export interface RegisterOptionRole {
+  id: string;
+  name: 'staff' | 'customer_service' | 'customer';
+  description?: string | null;
+}
+
+export interface RegisterOptionShop {
+  id: string;
+  name: string;
+  code: string;
 }
 
 export interface AuthResponse {
@@ -36,6 +49,15 @@ export const authApi = {
   
   register: async (data: RegisterDto): Promise<AuthResponse> => {
     const response = await api.post('/auth/register', data);
+    return response.data.data;
+  },
+
+  getRegisterOptions: async (): Promise<{
+    roles: RegisterOptionRole[];
+    defaultShop: RegisterOptionShop | null;
+    shopMode: 'single' | 'multiple';
+  }> => {
+    const response = await api.get('/auth/register-options');
     return response.data.data;
   },
   
