@@ -5,6 +5,9 @@ $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 $Name = "EcoHub"
+$BuildDistRoot = Join-Path $PSScriptRoot "dist_build"
+$BuildDistDir = Join-Path $BuildDistRoot $Name
+$FinalDistDir = Join-Path $PSScriptRoot "dist\$Name"
 $VersionFile = Join-Path $PSScriptRoot "VERSION"
 $Version = if (Test-Path $VersionFile) { (Get-Content $VersionFile -Raw).Trim() } else { "0.0.0" }
 $DefaultReleaseDownloadUrl = "https://github.com/j4ngler/EcoHub/releases/latest/download/EcoHub-portable.zip"
@@ -18,6 +21,35 @@ Write-Host "============================================"
 Write-Host " EcoHub - build Windows exe (PyInstaller)"
 Write-Host "============================================"
 Write-Host "Thu muc: $(Get-Location)"
+Write-Host ""
+
+function Remove-BuildDirectory {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path,
+        [Parameter(Mandatory = $true)]
+        [string]$Label
+    )
+
+    if (-not (Test-Path $Path)) {
+        Write-Host "[BUILD] No previous $Label to clean"
+        return
+    }
+
+    attrib -R $Path /S /D *> $null
+    takeown /F $Path /R /D Y *> $null
+    icacls $Path /grant "${env:USERNAME}:F" /T /C *> $null
+    Remove-Item -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue
+
+    if (Test-Path $Path) {
+        Write-Host "[BUILD] Canh bao: khong xoa het duoc $Label`: $Path"
+    } else {
+        Write-Host "[BUILD] Cleaned previous $Label with proper permissions"
+    }
+}
+
+Remove-BuildDirectory -Path "build" -Label "build folder"
+Remove-BuildDirectory -Path $BuildDistDir -Label "staging dist output folder"
 Write-Host ""
 
 $venvActivate = Join-Path $PSScriptRoot ".venv\Scripts\Activate.ps1"
@@ -36,6 +68,7 @@ if ($LASTEXITCODE -ne 0) { throw "pip install requirements failed" }
 
 $pyiArgs = @(
     "--clean", "--noconfirm",
+    "--distpath", $BuildDistRoot,
     "--name", $Name,
     "--onedir",
     "--windowed",
@@ -66,7 +99,7 @@ $pyiArgs += "app.py"
 python -m PyInstaller @pyiArgs
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed" }
 
-$distDir = Join-Path $PSScriptRoot "dist\$Name"
+$distDir = $BuildDistDir
 if (-not (Test-Path $distDir)) {
     throw "Khong tim thay $distDir sau khi build"
 }
@@ -138,8 +171,23 @@ Write-Host "[BUILD] Cap nhat file dist.zip..."
 Compress-Archive -LiteralPath $distDir -DestinationPath $distZip -Force
 Write-Host "[BUILD]   + dist.zip"
 
+Write-Host "[BUILD] Dong bo staging output sang dist\$Name (best effort)..."
+if (Test-Path $FinalDistDir) {
+    Remove-BuildDirectory -Path $FinalDistDir -Label "final dist output folder"
+}
+if (-not (Test-Path (Join-Path $PSScriptRoot "dist"))) {
+    New-Item -ItemType Directory -Path (Join-Path $PSScriptRoot "dist") | Out-Null
+}
+& (Join-Path $env:SystemRoot "System32\robocopy.exe") $distDir $FinalDistDir /E /R:1 /W:1 /NFL /NDL /NJH /NJS /NC /NS | Out-Null
+if ($LASTEXITCODE -gt 7) {
+    Write-Host "[BUILD] Canh bao: khong dong bo duoc staging output sang dist\$Name. Ban release van nam o $distDir"
+} else {
+    Write-Host "[BUILD]   + dist\$Name"
+}
+
 Write-Host ""
 Write-Host "[BUILD] Thanh cong."
 Write-Host "[BUILD] Version: $Version"
-Write-Host "[BUILD] Chay thu: dist\$Name\$Name.exe"
-Write-Host "[BUILD] Du lieu portable: dist\$Name\data (canh EcoHub.exe)"
+Write-Host "[BUILD] Chay thu: $distDir\$Name.exe"
+Write-Host "[BUILD] Staging output: $distDir"
+Write-Host "[BUILD] Du lieu portable: $distDir\data (canh EcoHub.exe)"

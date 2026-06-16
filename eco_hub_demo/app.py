@@ -83,6 +83,17 @@ _single_instance_mutex_handle = None
 _shutdown_in_progress = False
 
 
+def _is_internal_bridge_request() -> bool:
+    remote_addr = (request.remote_addr or "").strip()
+    bridge_header = (request.headers.get("X-EcoHub-Bridge") or "").strip().lower()
+    trusted_remote = remote_addr in {"127.0.0.1", "::1", "::ffff:127.0.0.1"}
+    return trusted_remote and bridge_header in {"1", "true", "yes", "internal"}
+
+
+def _has_runtime_access() -> bool:
+    return "user" in session or _is_internal_bridge_request()
+
+
 def _read_http_bind_from_env() -> tuple[str, int]:
     host = (os.environ.get("ECOHUB_HTTP_HOST") or "127.0.0.1").strip() or "127.0.0.1"
     try:
@@ -2529,7 +2540,7 @@ def reset_password(token: str):
 
 @app.route("/dashboard")
 def dashboard():
-    if "user" not in session:
+    if not _has_runtime_access():
         return redirect(url_for("login"))
 
     recording_flow = _get_recording_flow()
@@ -2565,7 +2576,7 @@ def dashboard():
 
 @app.route("/api/update/status", methods=["GET"])
 def api_update_status():
-    if "user" not in session:
+    if not _has_runtime_access():
         return jsonify({"ok": False, "error": "Chua dang nhap"}), 401
     try:
         payload = _build_update_status()
@@ -4138,6 +4149,46 @@ def tiktok_auth_test_api():
     return redirect(url_for("tiktok_auth_page"))
 
 
+@app.route("/bridge/tiktok/current-credentials", methods=["GET"])
+def bridge_tiktok_current_credentials():
+    if not _is_internal_bridge_request():
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+
+    _load_local_env_file()
+    records = list_tiktok_authorizations(TIKTOK_AUTH_DB)
+    current_credentials = _build_current_tiktok_credentials(records)
+    seller_snapshot = _build_tiktok_seller_snapshot(current_credentials)
+
+    return jsonify(
+        {
+            "ok": True,
+            "credentials": {
+                "source": current_credentials.get("source") or "",
+                "app_key": current_credentials.get("app_key") or "",
+                "merchant_id": current_credentials.get("merchant_id") or "",
+                "shop_id": current_credentials.get("shop_id") or "",
+                "shop_cipher": current_credentials.get("shop_cipher") or "",
+                "access_token": current_credentials.get("access_token") or "",
+                "refresh_token": current_credentials.get("refresh_token") or "",
+            },
+            "seller_snapshot": seller_snapshot,
+            "console_url": url_for("tiktok_auth_page", _external=True),
+            "connect_url": url_for("tiktok_auth_connect", _external=True),
+            "callback_url": url_for("tiktok_auth_callback", _external=True),
+        }
+    )
+
+
+@app.route("/bridge/tiktok/test-api", methods=["GET"])
+def bridge_tiktok_test_api():
+    if not _is_internal_bridge_request():
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+
+    _load_local_env_file()
+    result = _run_tiktok_env_api_test()
+    return jsonify(result), (200 if result.get("ok") else 400)
+
+
 @app.route("/tiktok-auth/select-shop", methods=["POST"])
 def tiktok_auth_select_shop():
     if "user" not in session:
@@ -4866,6 +4917,25 @@ def test_camera():
         }), 400
 
 
+@app.route("/bridge/available-cameras", methods=["GET"])
+def bridge_available_cameras():
+    if not _is_internal_bridge_request():
+        return jsonify({"ok": False, "error": "forbidden"}), 403
+
+    try:
+        available = scan_available_cameras()
+        return jsonify({
+            "ok": True,
+            "available_cameras": available,
+        })
+    except Exception as e:
+        return jsonify({
+            "ok": False,
+            "error": str(e),
+            "available_cameras": [],
+        }), 500
+
+
 @app.route("/start_cameras", methods=["POST"])
 def start_cameras():
     """
@@ -5224,9 +5294,9 @@ def _compress_recorded_video(source_path: str | None, order_code: str | None = N
         "-c:v",
         "libx264",
         "-preset",
-        "veryfast",
+        "medium",
         "-crf",
-        "30",
+        "33",
         "-pix_fmt",
         "yuv420p",
         "-movflags",
@@ -5335,7 +5405,6 @@ def _stop_recording_internal(
         print(f"[VIDEO META] Inserted metadata for video_id={video_id}, path={video_path}, size={size_bytes}")
     except Exception as meta_e:
         print(f"[VIDEO META] Error inserting video metadata: {meta_e}")
-
 
     # Sau khi quay xong:
     # - reset trạng thái ghi
