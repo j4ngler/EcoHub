@@ -21,6 +21,8 @@ services:
       - ./nginx/ssl:/etc/nginx/ssl:ro
       - nginx_cache:/var/cache/nginx
     restart: always
+    depends_on:
+      - backend
     logging:
       driver: "json-file"
       options:
