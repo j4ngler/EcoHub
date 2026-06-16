@@ -63,6 +63,8 @@ services:
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
     command: npm start
     restart: always
+    volumes:
+      - ./uploads:/app/uploads
     logging:
       driver: "json-file"
       options:
