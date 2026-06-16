@@ -15,7 +15,6 @@ services:
       - nginx_cache:/var/cache/nginx
     depends_on:
       - backend
-      - frontend
     restart: unless-stopped
     networks:
       - ecohub-network
