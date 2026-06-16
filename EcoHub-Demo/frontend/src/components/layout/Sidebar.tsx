@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import {
   BarChart3,
   Camera,
@@ -35,6 +35,7 @@ interface NavigationItem {
 
 export default function Sidebar({ open, onClose }: SidebarProps) {
   const { user, hasRole } = useAuthStore();
+  const location = useLocation();
   const roles = user?.roles || [];
   const isSuperAdmin = roles.includes('super_admin');
   const isOperatorView = roles.some((role) => ['staff', 'customer_service', 'customer'].includes(role));
@@ -83,22 +84,24 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   });
 
   const renderNav = (closeOnClick: boolean) =>
-    filteredNav.map((item) => (
-      <NavLink
-        key={`${item.href}-${item.name}`}
-        to={item.href}
-        end={Boolean(item.end)}
-        onClick={closeOnClick ? onClose : undefined}
-        className={({ isActive }) =>
-          `flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-            isActive ? 'bg-emerald-50 text-emerald-700' : 'text-gray-700 hover:bg-gray-100'
-          }`
-        }
-      >
-        <item.icon className="h-5 w-5" />
-        {item.name}
-      </NavLink>
-    ));
+    filteredNav.map((item) => {
+      const isItemActive = item.end
+        ? location.pathname === item.href
+        : location.pathname.startsWith(item.href);
+      return (
+        <NavLink
+          key={`${item.href}-${item.name}`}
+          to={item.href}
+          onClick={closeOnClick ? onClose : undefined}
+          className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            isItemActive ? 'bg-emerald-50 text-emerald-700' : 'text-gray-700 hover:bg-gray-100'
+          }`}
+        >
+          <item.icon className="h-5 w-5" />
+          {item.name}
+        </NavLink>
+      );
+    });
 
   return (
     <>

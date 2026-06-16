@@ -7,9 +7,12 @@ import { getErrorMessage } from '@/api/axios';
 import { formatDateTime } from '@/utils/format';
 import toast from 'react-hot-toast';
 import Modal from '@/components/ui/Modal';
+import { useAuthStore } from '@/store/authStore';
 
 export default function VideosPage() {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
+  const isSuperAdmin = user?.roles?.includes('super_admin');
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<VideoQueryParams>({
     page: 1,
@@ -83,14 +86,16 @@ export default function VideosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Video đóng gói</h1>
           <p className="mt-1 text-gray-500">Quản lý video đóng gói có mã vận đơn</p>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/videos/create')}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-colors"
-        >
-          <Upload className="h-5 w-5" />
-          Tạo video mới
-        </button>
+        {!isSuperAdmin && (
+          <button
+            type="button"
+            onClick={() => navigate('/videos/create')}
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-colors"
+          >
+            <Upload className="h-5 w-5" />
+            Tạo video mới
+          </button>
+        )}
       </div>
 
       {/* Filters - EcoVision style */}
@@ -152,7 +157,7 @@ export default function VideosPage() {
               ? 'Không có video phù hợp bộ lọc.'
               : 'Tạo video đóng gói đầu tiên từ đơn hàng.'}
           </p>
-          {!filters.search && !filters.status && (
+          {!filters.search && !filters.status && !isSuperAdmin && (
             <button
               type="button"
               onClick={() => navigate('/videos/create')}
