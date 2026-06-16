@@ -96,4 +96,23 @@ export const settingsApi = {
   deleteReportSubscription: async (id: string): Promise<void> => {
     await api.delete(`/settings/report-subscriptions/${id}`);
   },
+
+  getS3Settings: async (): Promise<S3Settings> => {
+    const response = await api.get('/settings/s3');
+    return response.data.data;
+  },
+
+  updateS3Settings: async (data: Partial<S3Settings>): Promise<S3Settings> => {
+    const response = await api.put('/settings/s3', data);
+    return response.data.data;
+  },
 };
+
+export interface S3Settings {
+  endpoint: string;
+  accessKey: string;
+  secretKey: string;
+  bucket: string;
+  region: string;
+  prefix: string;
+}

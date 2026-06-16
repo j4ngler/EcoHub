@@ -32,7 +32,7 @@ type RuntimeState = {
   totalScannedCount: number;
 };
 
-const DEFAULT_STORAGE_LIMIT_GB = Number.parseInt(process.env.VIDEO_STORAGE_LIMIT_GB || '', 10) || 50;
+const DEFAULT_STORAGE_LIMIT_GB = Number.parseFloat(process.env.VIDEO_STORAGE_LIMIT_GB || '') || 50;
 const runtimeStates = new Map<string, RuntimeState>();
 
 const nowStamp = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -345,7 +345,7 @@ export const getUploadStatus = () => {
 };
 
 export const getVideoStorageUsage = async (shopId?: string | null) => {
-  const limitBytes = BigInt(DEFAULT_STORAGE_LIMIT_GB) * 1024n * 1024n * 1024n;
+  const limitBytes = BigInt(Math.round(DEFAULT_STORAGE_LIMIT_GB * 1024 * 1024 * 1024));
 
   let usedBytes = 0n;
   let videoCount = 0;

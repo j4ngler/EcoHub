@@ -12,8 +12,8 @@ interface ReportParams {
 }
 
 const DEFAULT_TOTAL_STORAGE_GB = 50;
-const TOTAL_STORAGE_GB = Number.parseInt(process.env.VIDEO_STORAGE_LIMIT_GB || '', 10) || DEFAULT_TOTAL_STORAGE_GB;
-const TOTAL_STORAGE_BYTES = BigInt(TOTAL_STORAGE_GB) * 1024n * 1024n * 1024n;
+const TOTAL_STORAGE_GB = Number.parseFloat(process.env.VIDEO_STORAGE_LIMIT_GB || '') || DEFAULT_TOTAL_STORAGE_GB;
+const TOTAL_STORAGE_BYTES = BigInt(Math.round(TOTAL_STORAGE_GB * 1024 * 1024 * 1024));
 
 const getDirectorySizeBytes = async (dirPath: string): Promise<bigint> => {
   try {

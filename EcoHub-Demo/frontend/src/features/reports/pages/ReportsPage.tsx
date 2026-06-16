@@ -114,10 +114,9 @@ export default function ReportsPage() {
   const formatVideoStorage = (usedBytes: number, totalBytes: number) => {
     const GB = 1024 ** 3;
     const MB = 1024 ** 2;
-    if (usedBytes < GB) {
-      return `${(usedBytes / MB).toFixed(1)} MB / ${(totalBytes / GB).toFixed(1)} GB`;
-    }
-    return `${(usedBytes / GB).toFixed(2)} / ${(totalBytes / GB).toFixed(1)} GB`;
+    const usedStr = usedBytes < GB ? `${(usedBytes / MB).toFixed(1)} MB` : `${(usedBytes / GB).toFixed(2)} GB`;
+    const totalStr = totalBytes < GB ? `${(totalBytes / MB).toFixed(0)} MB` : `${(totalBytes / GB).toFixed(1)} GB`;
+    return `${usedStr} / ${totalStr}`;
   };
 
   const operationalDailyData = (operationalReport?.daily || []).map((d) => ({

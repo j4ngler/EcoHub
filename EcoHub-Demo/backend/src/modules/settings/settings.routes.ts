@@ -3,7 +3,7 @@ import { RoleName } from '@prisma/client';
 import * as settingsController from './settings.controller';
 import { authenticate, authorize } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validation.middleware';
-import { updateCaptureSettingsSchema } from './settings.dto';
+import { updateCaptureSettingsSchema, updateS3SettingsSchema } from './settings.dto';
 
 const router = Router();
 
@@ -36,6 +36,19 @@ router.delete(
   '/report-subscriptions/:id',
   authorize(RoleName.super_admin, RoleName.admin),
   settingsController.deleteReportSubscription
+);
+
+router.get(
+  '/s3',
+  authorize(RoleName.super_admin),
+  settingsController.getS3Settings
+);
+
+router.put(
+  '/s3',
+  authorize(RoleName.super_admin),
+  validate(updateS3SettingsSchema),
+  settingsController.updateS3Settings
 );
 
 export default router;

@@ -86,16 +86,7 @@ export default function VideosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Video đóng gói</h1>
           <p className="mt-1 text-gray-500">Quản lý video đóng gói có mã vận đơn</p>
         </div>
-        {!isSuperAdmin && (
-          <button
-            type="button"
-            onClick={() => navigate('/videos/create')}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-colors"
-          >
-            <Upload className="h-5 w-5" />
-            Tạo video mới
-          </button>
-        )}
+
       </div>
 
       {/* Filters - EcoVision style */}
@@ -155,17 +146,8 @@ export default function VideosPage() {
           <p className="mt-1 text-gray-500">
             {filters.search || filters.status
               ? 'Không có video phù hợp bộ lọc.'
-              : 'Tạo video đóng gói đầu tiên từ đơn hàng.'}
+              : 'Hệ thống chưa ghi nhận video đóng gói nào.'}
           </p>
-          {!filters.search && !filters.status && !isSuperAdmin && (
-            <button
-              type="button"
-              onClick={() => navigate('/videos/create')}
-              className="mt-6 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-            >
-              Tạo video mới
-            </button>
-          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-x-auto">

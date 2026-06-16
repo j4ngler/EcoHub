@@ -2,6 +2,8 @@ import prisma from '../../config/database';
 import { badRequest, conflict, notFound } from '../../middlewares/error.middleware';
 import fs from 'fs/promises';
 import path from 'path';
+import crypto from 'crypto';
+import { decryptFernet, encryptFernet } from '../../utils/fernet';
 import * as captureService from '../capture/capture.service';
 import * as captureRuntimeService from '../capture/capture-runtime.service';
 import * as rtspRuntimeService from '../capture/rtsp-runtime.service';
@@ -466,4 +468,99 @@ export const deleteReportSubscription = async (id: string, shopId: string | null
   await prisma.reportSubscription.delete({
     where: { id },
   });
+};
+
+export const getS3Settings = async () => {
+  const filePath = await resolveFirstExistingPath(getConfigPathCandidates());
+  const keyFilePath = path.join(path.dirname(filePath), 'config.key');
+  
+  let key = '';
+  try {
+    key = await fs.readFile(keyFilePath, 'utf8');
+    key = key.trim();
+  } catch {
+    const randomKey = crypto.randomBytes(32).toString('base64url');
+    await fs.writeFile(keyFilePath, randomKey, 'utf8');
+    key = randomKey;
+  }
+
+  let configData: any = {};
+  try {
+    const raw = await fs.readFile(filePath, 'utf-8');
+    configData = JSON.parse(raw);
+  } catch {
+    configData = {};
+  }
+
+  const s3Data = configData.s3_config || {};
+  const decryptedAccessKey = s3Data.access_key ? decryptFernet(s3Data.access_key, key) : '';
+  const decryptedSecretKey = s3Data.secret_key ? decryptFernet(s3Data.secret_key, key) : '';
+
+  return {
+    endpoint: s3Data.endpoint || '',
+    accessKey: decryptedAccessKey,
+    secretKey: decryptedSecretKey,
+    bucket: s3Data.bucket || '',
+    region: s3Data.region || 'hn-2',
+    prefix: s3Data.prefix || '',
+  };
+};
+
+export const updateS3Settings = async (payload: {
+  endpoint: string;
+  accessKey?: string;
+  secretKey?: string;
+  bucket: string;
+  region?: string;
+  prefix?: string;
+}) => {
+  const filePath = await resolveFirstExistingPath(getConfigPathCandidates());
+  const keyFilePath = path.join(path.dirname(filePath), 'config.key');
+  
+  let key = '';
+  try {
+    key = await fs.readFile(keyFilePath, 'utf8');
+    key = key.trim();
+  } catch {
+    const randomKey = crypto.randomBytes(32).toString('base64url');
+    await fs.writeFile(keyFilePath, randomKey, 'utf8');
+    key = randomKey;
+  }
+
+  let configData: any = {};
+  try {
+    const raw = await fs.readFile(filePath, 'utf-8');
+    configData = JSON.parse(raw);
+  } catch {
+    configData = {};
+  }
+
+  const existingS3 = configData.s3_config || {};
+  
+  const finalAccessKey = payload.accessKey !== undefined ? payload.accessKey : (existingS3.access_key ? decryptFernet(existingS3.access_key, key) : '');
+  const finalSecretKey = payload.secretKey !== undefined ? payload.secretKey : (existingS3.secret_key ? decryptFernet(existingS3.secret_key, key) : '');
+
+  const encryptedAccessKey = encryptFernet(finalAccessKey, key);
+  const encryptedSecretKey = encryptFernet(finalSecretKey, key);
+
+  configData.s3_config = {
+    endpoint: payload.endpoint,
+    access_key: encryptedAccessKey,
+    secret_key: encryptedSecretKey,
+    bucket: payload.bucket,
+    region: payload.region || 'hn-2',
+    prefix: payload.prefix || '',
+  };
+
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, JSON.stringify(configData, null, 2), 'utf-8');
+
+  return {
+    endpoint: payload.endpoint,
+    accessKey: finalAccessKey,
+    secretKey: finalSecretKey,
+    bucket: payload.bucket,
+    region: payload.region || 'hn-2',
+    prefix: payload.prefix || '',
+  };
 };

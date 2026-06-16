@@ -11,6 +11,7 @@ import {
   Plus,
   Settings2,
   Truck,
+  Cloud,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
@@ -114,6 +115,48 @@ export default function SettingsPage() {
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
+
+  const [s3Form, setS3Form] = useState({
+    endpoint: '',
+    accessKey: '',
+    secretKey: '',
+    bucket: '',
+    region: 'hn-2',
+    prefix: '',
+  });
+
+  const { data: s3Settings, isLoading: loadingS3Settings } = useQuery({
+    queryKey: ['s3-settings'],
+    queryFn: settingsApi.getS3Settings,
+    enabled: isSuperAdmin,
+  });
+
+  const updateS3Mutation = useMutation({
+    mutationFn: settingsApi.updateS3Settings,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['s3-settings'] });
+      toast.success('Đã cập nhật cấu hình lưu trữ S3');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  useEffect(() => {
+    if (s3Settings) {
+      setS3Form({
+        endpoint: s3Settings.endpoint || '',
+        accessKey: s3Settings.accessKey || '',
+        secretKey: s3Settings.secretKey || '',
+        bucket: s3Settings.bucket || '',
+        region: s3Settings.region || 'hn-2',
+        prefix: s3Settings.prefix || '',
+      });
+    }
+  }, [s3Settings]);
+
+  const handleSubmitS3 = (event: React.FormEvent) => {
+    event.preventDefault();
+    updateS3Mutation.mutate(s3Form);
+  };
 
   const saveUiSettings = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
@@ -266,6 +309,75 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {isSuperAdmin && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Cloud className="h-5 w-5 text-emerald-600" />
+              Cấu hình lưu trữ S3
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loadingS3Settings ? (
+              <p className="text-sm text-gray-500">Đang tải cấu hình S3...</p>
+            ) : (
+              <form onSubmit={handleSubmitS3} className="space-y-4">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input
+                    label="S3 Endpoint"
+                    placeholder="https://s3.example.com"
+                    value={s3Form.endpoint}
+                    onChange={(e) => setS3Form({ ...s3Form, endpoint: e.target.value })}
+                    required
+                  />
+                  <Input
+                    label="S3 Bucket"
+                    placeholder="my-bucket"
+                    value={s3Form.bucket}
+                    onChange={(e) => setS3Form({ ...s3Form, bucket: e.target.value })}
+                    required
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input
+                    label="AWS Region"
+                    placeholder="ap-southeast-1"
+                    value={s3Form.region}
+                    onChange={(e) => setS3Form({ ...s3Form, region: e.target.value })}
+                  />
+                  <Input
+                    label="Path Prefix (Thư mục chứa)"
+                    placeholder="videos"
+                    value={s3Form.prefix}
+                    onChange={(e) => setS3Form({ ...s3Form, prefix: e.target.value })}
+                  />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Input
+                    label="Access Key ID"
+                    placeholder="AWS Access Key"
+                    value={s3Form.accessKey}
+                    onChange={(e) => setS3Form({ ...s3Form, accessKey: e.target.value })}
+                  />
+                  <Input
+                    label="Secret Access Key"
+                    placeholder="AWS Secret Key"
+                    type="password"
+                    value={s3Form.secretKey}
+                    onChange={(e) => setS3Form({ ...s3Form, secretKey: e.target.value })}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button type="submit" loading={updateS3Mutation.isPending}>
+                    Lưu cấu hình S3
+                  </Button>
+                </div>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>

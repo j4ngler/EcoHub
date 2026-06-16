@@ -121,3 +121,22 @@ export const deleteReportSubscription = async (req: AuthRequest, res: Response, 
     next(error);
   }
 };
+
+export const getS3Settings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const settings = await settingsService.getS3Settings();
+    success(res, settings);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateS3Settings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const payload = req.body || {};
+    const settings = await settingsService.updateS3Settings(payload);
+    success(res, settings, 'Đã cập nhật cấu hình lưu trữ S3');
+  } catch (error) {
+    next(error);
+  }
+};

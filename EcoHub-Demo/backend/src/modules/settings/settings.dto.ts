@@ -26,3 +26,14 @@ export const updateCaptureSettingsSchema = z.object({
       .optional(),
   }),
 });
+
+export const updateS3SettingsSchema = z.object({
+  body: z.object({
+    endpoint: z.string().url('Endpoint phải là một URL hợp lệ'),
+    accessKey: z.string().min(1, 'Access Key không được để trống').optional(),
+    secretKey: z.string().min(1, 'Secret Key không được để trống').optional(),
+    bucket: z.string().min(1, 'Bucket không được để trống'),
+    region: z.string().optional().default('hn-2'),
+    prefix: z.string().optional().default(''),
+  }),
+});

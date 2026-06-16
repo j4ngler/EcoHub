@@ -46,12 +46,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     { name: 'Sản phẩm', href: '/products', icon: Package },
     { name: 'Kho hàng', href: '/inventory', icon: Warehouse },
     { name: 'Video đóng gói', href: '/videos', icon: Video, end: true },
-    {
-      name: 'Tạo video',
-      href: '/videos/create',
-      icon: PlusCircle,
-      hiddenForRoles: ['super_admin'],
-    },
+
     {
       name: isOperatorView ? 'Kết nối API' : 'Quản lý API',
       href: '/channel-management',

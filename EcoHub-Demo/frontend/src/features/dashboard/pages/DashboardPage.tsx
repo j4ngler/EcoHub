@@ -36,10 +36,9 @@ export default function DashboardPage() {
   const formatVideoStorage = (usedBytes: number, totalBytes: number) => {
     const gb = 1024 ** 3;
     const mb = 1024 ** 2;
-    if (usedBytes < gb) {
-      return `${(usedBytes / mb).toFixed(1)} MB / ${(totalBytes / gb).toFixed(1)} GB`;
-    }
-    return `${(usedBytes / gb).toFixed(2)} / ${(totalBytes / gb).toFixed(1)} GB`;
+    const usedStr = usedBytes < gb ? `${(usedBytes / mb).toFixed(1)} MB` : `${(usedBytes / gb).toFixed(2)} GB`;
+    const totalStr = totalBytes < gb ? `${(totalBytes / mb).toFixed(0)} MB` : `${(totalBytes / gb).toFixed(1)} GB`;
+    return `${usedStr} / ${totalStr}`;
   };
 
   const pieData = ordersByStatus.map((item: { status: string; count: number }, index: number) => ({
