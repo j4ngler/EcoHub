@@ -32,7 +32,7 @@ type RuntimeState = {
   totalScannedCount: number;
 };
 
-const DEFAULT_STORAGE_LIMIT_GB = Number.parseFloat(process.env.VIDEO_STORAGE_LIMIT_GB || '') || 50;
+const DEFAULT_STORAGE_LIMIT_GB = Number.parseFloat(process.env.VIDEO_STORAGE_LIMIT_GB || '') || 95;
 const runtimeStates = new Map<string, RuntimeState>();
 
 const nowStamp = () => new Date().toISOString().slice(0, 19).replace('T', ' ');

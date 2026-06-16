@@ -66,6 +66,7 @@ services:
       - TIKTOK_SERVICE_ID=${TIKTOK_SERVICE_ID:-7604636951182493460}
       - TIKTOK_APP_KEY=${TIKTOK_APP_KEY}
       - TIKTOK_APP_SECRET=${TIKTOK_APP_SECRET}
+      - VIDEO_STORAGE_LIMIT_GB=${VIDEO_STORAGE_LIMIT_GB:-95}
     command: npm start
     restart: always
     volumes:

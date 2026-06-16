@@ -67,14 +67,6 @@ export default function DashboardPage() {
                 : 'Tổng quan hoạt động đóng gói và video trong hệ thống.'}
             </p>
           </div>
-          {isAdminLike ? (
-            <div className="mt-4 flex-shrink-0 md:mt-0">
-              <div className="rounded-lg bg-white/10 p-4 text-center backdrop-blur-sm">
-                <div className="text-2xl font-bold">{formatCurrency(summary?.revenue?.total || 0)}</div>
-                <div className="text-sm text-emerald-100">Doanh thu</div>
-              </div>
-            </div>
-          ) : null}
         </div>
       </div>
 
@@ -107,13 +99,10 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard title="Tổng đơn hàng" value={summary?.orders?.total ?? 0} icon={ShoppingCart} color="emerald" trend="" />
         <StatCard title="Đơn chờ xử lý" value={summary?.orders?.pending ?? 0} icon={Clock} color="amber" trend="" />
         <StatCard title="Video đã xử lý" value={summary?.videos?.processed ?? 0} icon={Video} color="blue" trend="" />
-        {isAdminLike ? (
-          <StatCard title="Doanh thu" value={formatCurrency(summary?.revenue?.total ?? 0)} icon={DollarSign} color="purple" trend="" />
-        ) : null}
         <StatCard
           title="Dung lượng video"
           value={storageSummary ? formatVideoStorage(storageSummary.usedBytes, storageSummary.totalBytes) : '0 / 0 GB'}
@@ -121,7 +110,6 @@ export default function DashboardPage() {
           color={storageSummary?.status === 'critical' ? 'rose' : storageSummary?.status === 'warning' ? 'amber' : 'indigo'}
           trend={`${storageSummary?.usedPercent?.toFixed(1) || 0}%`}
         />
-        <StatCard title="Sắp hết hàng" value={summary?.products?.lowStock ?? 0} icon={TrendingUp} color="rose" trend="" />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

@@ -11,7 +11,7 @@ interface ReportParams {
   groupBy?: string;
 }
 
-const DEFAULT_TOTAL_STORAGE_GB = 50;
+const DEFAULT_TOTAL_STORAGE_GB = 95;
 const TOTAL_STORAGE_GB = Number.parseFloat(process.env.VIDEO_STORAGE_LIMIT_GB || '') || DEFAULT_TOTAL_STORAGE_GB;
 const TOTAL_STORAGE_BYTES = BigInt(Math.round(TOTAL_STORAGE_GB * 1024 * 1024 * 1024));
 
