@@ -1023,7 +1023,8 @@ export default function ApiManagementPage() {
   const user = useAuthStore((s) => s.user);
   const activeShopId = user?.activeShop?.id ?? (user as any)?.shopId ?? '';
   const isSuperAdmin = user?.roles?.includes('super_admin') ?? false;
-  const canEdit = user?.roles?.some((role) => ['admin', 'staff', 'customer_service'].includes(role)) ?? false;
+  const showAdminDashboard = isSuperAdmin && !activeShopId;
+  const canEdit = user?.roles?.some((role) => ['super_admin', 'admin', 'staff'].includes(role)) ?? false;
 
   const queryClient = useQueryClient();
   const { data: channels = [] } = useQuery({
@@ -1035,7 +1036,7 @@ export default function ApiManagementPage() {
   const { data: adminOverview, isFetching: adminFetching, refetch: refetchAdminOverview } = useQuery({
     queryKey: ['admin-channel-overview'],
     queryFn: channelsApi.getAdminOverview,
-    enabled: isSuperAdmin,
+    enabled: showAdminDashboard,
   });
 
   const refreshAdminData = async () => {
@@ -1073,7 +1074,7 @@ export default function ApiManagementPage() {
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  if (isSuperAdmin) {
+  if (showAdminDashboard) {
     if (!adminOverview) {
       return (
         <div className="mx-auto max-w-7xl">
