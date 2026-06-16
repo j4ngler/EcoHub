@@ -85,15 +85,12 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./backend:/app
-      - /app/node_modules
       - ./uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: npm run dev
     restart: unless-stopped
     networks:
       - ecohub-network
@@ -110,12 +107,8 @@ services:
       - VITE_PROXY_TARGET=http://backend:3000
     ports:
       - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
-    command: npm run dev -- --host
     restart: unless-stopped
     networks:
       - ecohub-network
