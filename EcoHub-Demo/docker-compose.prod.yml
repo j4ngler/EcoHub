@@ -61,6 +61,11 @@ services:
       - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - FRONTEND_URL=${FRONTEND_URL:-http://ecohub.vn}
+      - BACKEND_PUBLIC_URL=${BACKEND_PUBLIC_URL:-http://ecohub.vn}
+      - TIKTOK_SERVICE_ID=${TIKTOK_SERVICE_ID:-7604636951182493460}
+      - TIKTOK_APP_KEY=${TIKTOK_APP_KEY}
+      - TIKTOK_APP_SECRET=${TIKTOK_APP_SECRET}
     command: npm start
     restart: always
     volumes:
