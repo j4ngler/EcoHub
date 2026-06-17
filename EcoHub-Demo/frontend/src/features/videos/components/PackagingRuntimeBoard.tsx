@@ -10,6 +10,13 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { useAuthStore } from '@/store/authStore';
+import {
+  getBrowserCameraStream,
+  isBrowserCameraRunning,
+  startSharedBrowserCamera,
+  stopSharedBrowserCamera,
+  subscribeBrowserCamera,
+} from '@/features/videos/browserCameraRuntime';
 
 const formatSeconds = (totalSeconds: number) => {
   const minutes = Math.floor(totalSeconds / 60);
@@ -37,10 +44,9 @@ export default function PackagingRuntimeBoard() {
   const [captureBusy, setCaptureBusy] = useState(false);
   const [recordingFlow, setRecordingFlow] = useState<'outbound' | 'return'>('outbound');
   const [clock, setClock] = useState(() => new Date());
-  const [browserCameraRunning, setBrowserCameraRunning] = useState(false);
+  const [browserCameraRunning, setBrowserCameraRunning] = useState(() => isBrowserCameraRunning());
   const [browserRecording, setBrowserRecording] = useState(false);
   const [browserUploadBusy, setBrowserUploadBusy] = useState(false);
-  const streamRef = useRef<MediaStream | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
@@ -51,10 +57,10 @@ export default function PackagingRuntimeBoard() {
   }, []);
 
   useEffect(() => {
-    return () => {
-      streamRef.current?.getTracks().forEach((track) => track.stop());
-      streamRef.current = null;
-    };
+    return subscribeBrowserCamera((stream) => {
+      setBrowserCameraRunning(Boolean(stream));
+      attachStreamToPreview(stream);
+    });
   }, []);
 
   const { data: serviceInfo } = useQuery({
@@ -156,6 +162,10 @@ export default function PackagingRuntimeBoard() {
     }
   };
 
+  useEffect(() => {
+    attachStreamToPreview(getBrowserCameraStream());
+  }, [browserCameraRunning]);
+
   const startBrowserCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
       throw new Error('Trinh duyet khong ho tro webcam API');
@@ -174,9 +184,7 @@ export default function PackagingRuntimeBoard() {
       audio: false,
     };
 
-    const stream = await navigator.mediaDevices.getUserMedia(constraints);
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = stream;
+    const stream = await startSharedBrowserCamera(constraints);
     attachStreamToPreview(stream);
     setBrowserCameraRunning(true);
   };
@@ -184,8 +192,7 @@ export default function PackagingRuntimeBoard() {
   const stopBrowserCamera = () => {
     recorderRef.current?.stop();
     recorderRef.current = null;
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    streamRef.current = null;
+    stopSharedBrowserCamera();
     attachStreamToPreview(null);
     setBrowserCameraRunning(false);
     setBrowserRecording(false);
@@ -210,8 +217,14 @@ export default function PackagingRuntimeBoard() {
   };
 
   const startBrowserRecording = async () => {
-    if (!browserCameraRunning || !streamRef.current) {
+    let stream = getBrowserCameraStream();
+    if (!browserCameraRunning || !stream) {
       await startBrowserCamera();
+      stream = getBrowserCameraStream();
+    }
+
+    if (!stream) {
+      throw new Error('Khong mo duoc webcam de ghi hinh');
     }
 
     await ensureUploadSession();
@@ -220,7 +233,7 @@ export default function PackagingRuntimeBoard() {
     const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
       ? 'video/webm;codecs=vp9'
       : 'video/webm;codecs=vp8';
-    const recorder = new MediaRecorder(streamRef.current!, { mimeType, videoBitsPerSecond: 1_200_000 });
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 1_200_000 });
     recorderRef.current = recorder;
 
     recorder.ondataavailable = (event) => {
@@ -674,7 +687,7 @@ export default function PackagingRuntimeBoard() {
                   <div>
                     <p className="text-2xl font-bold text-slate-900">{formatStorage(Number(storage.used_bytes || 0))}</p>
                     <p className="text-sm text-slate-500">
-                      / {storage.storage_limit_gb ? `${Number(storage.storage_limit_gb).toFixed(2)} GB` : 'khong gioi han'}
+                      / {storage.storage_limit_gb ? `${Number(storage.storage_limit_gb).toFixed(0)} GB` : '90 GB'}
                     </p>
                   </div>
                   <div className="text-sm text-slate-600">

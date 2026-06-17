@@ -37,7 +37,8 @@ export default function DashboardPage() {
     const gb = 1024 ** 3;
     const mb = 1024 ** 2;
     const usedStr = usedBytes < gb ? `${(usedBytes / mb).toFixed(1)} MB` : `${(usedBytes / gb).toFixed(2)} GB`;
-    const totalStr = totalBytes < gb ? `${(totalBytes / mb).toFixed(0)} MB` : `${(totalBytes / gb).toFixed(1)} GB`;
+    const limitBytes = totalBytes || (90 * gb);
+    const totalStr = limitBytes < gb ? `${(limitBytes / mb).toFixed(0)} MB` : `${(limitBytes / gb).toFixed(1)} GB`;
     return `${usedStr} / ${totalStr}`;
   };
 
@@ -105,7 +106,7 @@ export default function DashboardPage() {
         <StatCard title="Video đã xử lý" value={summary?.videos?.processed ?? 0} icon={Video} color="blue" trend="" />
         <StatCard
           title="Dung lượng video"
-          value={storageSummary ? formatVideoStorage(storageSummary.usedBytes, storageSummary.totalBytes) : '0 / 0 GB'}
+          value={storageSummary ? formatVideoStorage(storageSummary.usedBytes, storageSummary.totalBytes) : '0.0 MB / 90.0 GB'}
           icon={HardDrive}
           color={storageSummary?.status === 'critical' ? 'rose' : storageSummary?.status === 'warning' ? 'amber' : 'indigo'}
           trend={`${storageSummary?.usedPercent?.toFixed(1) || 0}%`}

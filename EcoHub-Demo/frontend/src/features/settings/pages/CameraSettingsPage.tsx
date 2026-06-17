@@ -16,6 +16,13 @@ import Badge from '@/components/ui/Badge';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
 import { useAuthStore } from '@/store/authStore';
+import {
+  getBrowserCameraStream,
+  isBrowserCameraRunning,
+  startSharedBrowserCamera,
+  stopSharedBrowserCamera,
+  subscribeBrowserCamera,
+} from '@/features/videos/browserCameraRuntime';
 
 const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
   cameraConfigs: [
@@ -92,13 +99,13 @@ const getBrowserCameraErrorMessage = (error: unknown) => {
 export default function CameraSettingsPage() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.accessToken);
   const canEditCapture = user?.roles?.some((role) => ['super_admin', 'admin', 'staff'].includes(role)) ?? false;
   const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(DEFAULT_CAPTURE_SETTINGS);
   const [captureActionBusy, setCaptureActionBusy] = useState(false);
   const [cameraTestResult, setCameraTestResult] = useState<CaptureTestCameraResponse | null>(null);
-  const [browserCameraRunning, setBrowserCameraRunning] = useState(false);
+  const [browserCameraRunning, setBrowserCameraRunning] = useState(() => isBrowserCameraRunning());
   const browserVideoRef = useRef<HTMLVideoElement | null>(null);
-  const browserStreamRef = useRef<MediaStream | null>(null);
 
   const {
     data: captureOverview,
@@ -117,11 +124,25 @@ export default function CameraSettingsPage() {
   }, [captureOverview]);
 
   useEffect(() => {
-    return () => {
-      browserStreamRef.current?.getTracks().forEach((track) => track.stop());
-      browserStreamRef.current = null;
-    };
+    return subscribeBrowserCamera((stream) => {
+      setBrowserCameraRunning(Boolean(stream));
+      if (browserVideoRef.current) {
+        browserVideoRef.current.srcObject = stream;
+        if (stream) {
+          browserVideoRef.current.play().catch(() => undefined);
+        }
+      }
+    });
   }, []);
+
+  useEffect(() => {
+    if (!browserVideoRef.current) return;
+    const stream = getBrowserCameraStream();
+    browserVideoRef.current.srcObject = stream;
+    if (stream) {
+      browserVideoRef.current.play().catch(() => undefined);
+    }
+  }, [browserCameraRunning]);
 
   const captureMutation = useMutation({
     mutationFn: settingsApi.updateCaptureSettings,
@@ -239,7 +260,7 @@ export default function CameraSettingsPage() {
         'Trình duyệt hoặc địa chỉ hiện tại không hỗ trợ truy cập webcam. Hãy mở bằng HTTPS, localhost hoặc 127.0.0.1.'
       );
     }
-    const stream = await navigator.mediaDevices.getUserMedia({
+    const stream = await startSharedBrowserCamera({
       video: {
         width: { ideal: activeRecordingCamera?.width || 1280 },
         height: { ideal: activeRecordingCamera?.height || 720 },
@@ -247,8 +268,6 @@ export default function CameraSettingsPage() {
       },
       audio: false,
     });
-    browserStreamRef.current?.getTracks().forEach((track) => track.stop());
-    browserStreamRef.current = stream;
     if (browserVideoRef.current) {
       browserVideoRef.current.srcObject = stream;
       browserVideoRef.current.play().catch(() => undefined);
@@ -258,8 +277,7 @@ export default function CameraSettingsPage() {
   };
 
   const stopBrowserCamera = () => {
-    browserStreamRef.current?.getTracks().forEach((track) => track.stop());
-    browserStreamRef.current = null;
+    stopSharedBrowserCamera();
     if (browserVideoRef.current) {
       browserVideoRef.current.srcObject = null;
     }
@@ -600,6 +618,23 @@ export default function CameraSettingsPage() {
                   activeCameraMode === 'usb' && !captureAgentAvailable ? (
                     <div className="overflow-hidden rounded-xl border border-gray-200 bg-slate-950">
                       <video ref={browserVideoRef} className="aspect-video w-full object-cover" muted playsInline />
+                    </div>
+                  ) : activeCameraMode === 'rtsp' ? (
+                    <div className="overflow-hidden rounded-xl border border-gray-200 bg-slate-950">
+                      <div className="border-b border-slate-800 px-4 py-2 text-sm font-medium text-slate-200">
+                        Camera RTSP (Ghi hình)
+                      </div>
+                      {accessToken ? (
+                        <img
+                          src={captureApi.getRtspPreviewUrl(accessToken)}
+                          alt="RTSP preview"
+                          className="aspect-video w-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex aspect-video items-center justify-center text-slate-400">
+                          Không có quyền truy cập stream
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className={`grid gap-4 ${previewCameraCount > 1 ? 'lg:grid-cols-2' : ''}`}>

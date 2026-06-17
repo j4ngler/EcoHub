@@ -85,6 +85,14 @@ function App() {
           <Route path="products" element={<ProductsPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="videos" element={<VideosPage />} />
+          <Route
+            path="videos/create"
+            element={
+              <RoleRoute disallowRoles={['super_admin']}>
+                <CreateVideoPage />
+              </RoleRoute>
+            }
+          />
 
           <Route path="videos/receiving" element={<ReceivingVideosPage />} />
           <Route path="users" element={<UsersPage />} />
