@@ -115,7 +115,7 @@ export default function ReportsPage() {
     const GB = 1024 ** 3;
     const MB = 1024 ** 2;
     const usedStr = usedBytes < GB ? `${(usedBytes / MB).toFixed(1)} MB` : `${(usedBytes / GB).toFixed(2)} GB`;
-    const limitBytes = totalBytes || (90 * GB);
+    const limitBytes = totalBytes || (100 * GB);
     const totalStr = limitBytes < GB ? `${(limitBytes / MB).toFixed(0)} MB` : `${(limitBytes / GB).toFixed(1)} GB`;
     return `${usedStr} / ${totalStr}`;
   };
@@ -370,7 +370,7 @@ export default function ReportsPage() {
                         <p className="text-2xl font-bold text-gray-900">
                           {storageSummary
                             ? formatVideoStorage(storageSummary.usedBytes, storageSummary.totalBytes)
-                            : '0.0 MB / 90.0 GB'}
+                            : '0.0 MB / 100.0 GB'}
                         </p>
                         <p className="mt-1 text-xs text-gray-500">
                           Đã dùng: {storageSummary ? storageSummary.usedPercent.toFixed(1) : '0'}%

@@ -41,8 +41,8 @@ export default defineConfig(({ mode }) => {
       hmr: {
         host: env.VITE_PUBLIC_HOST || 'ecohub',
         port: Number(env.VITE_PORT || 5173),
-        clientPort: Number(env.VITE_PORT || 5173),
-        protocol: httpsOptions ? 'wss' : 'ws',
+        clientPort: Number(env.VITE_HMR_CLIENT_PORT || env.VITE_PORT || 5173),
+        protocol: env.VITE_HMR_PROTOCOL || (httpsOptions ? 'wss' : 'ws'),
       },
       proxy: {
         '^/api(?:/|$)': {

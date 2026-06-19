@@ -687,7 +687,7 @@ export default function PackagingRuntimeBoard() {
                   <div>
                     <p className="text-2xl font-bold text-slate-900">{formatStorage(Number(storage.used_bytes || 0))}</p>
                     <p className="text-sm text-slate-500">
-                      / {storage.storage_limit_gb ? `${Number(storage.storage_limit_gb).toFixed(0)} GB` : '90 GB'}
+                      / {storage.storage_limit_gb ? `${Number(storage.storage_limit_gb).toFixed(0)} GB` : '100 GB'}
                     </p>
                   </div>
                   <div className="text-sm text-slate-600">

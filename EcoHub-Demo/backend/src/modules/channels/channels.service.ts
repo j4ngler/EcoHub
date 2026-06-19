@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../../config/database';
 import { badRequest, notFound } from '../../middlewares/error.middleware';
+import { syncOrdersForConnection, syncProductsForConnection } from './tiktok-sync.service';
 
 type ConnectionHealth = 'invalid' | 'partial' | 'ready';
 
@@ -1379,13 +1380,18 @@ export const syncOrders = async (channelId: string, shopId: string, userId: stri
     throw badRequest('Kenh chua duoc ket noi');
   }
 
-  void channelId;
-  void shopId;
-  void userId;
-  throw badRequest(`Chưa hỗ trợ đồng bộ đơn hàng tự động cho kênh ${connection.channel.name}`);
+  if (connection.channel.code !== 'tiktok') {
+    throw badRequest(`Chua ho tro dong bo don hang tu dong cho kenh ${connection.channel.name}`);
+  }
+
+  const result = await syncOrdersForConnection(connection, userId);
+  return {
+    channel: connection.channel.name,
+    ...result,
+  };
 };
 
-export const syncProducts = async (channelId: string, shopId: string, _userId: string) => {
+export const syncProducts = async (channelId: string, shopId: string, userId: string) => {
   const connection = await prisma.shopChannelConnection.findUnique({
     where: {
       shopId_channelId: {
@@ -1400,17 +1406,14 @@ export const syncProducts = async (channelId: string, shopId: string, _userId: s
     throw badRequest('Kenh chua duoc ket noi');
   }
 
-  await prisma.shopChannelConnection.update({
-    where: { id: connection.id },
-    data: { lastSyncAt: new Date() },
-  });
+  if (connection.channel.code !== 'tiktok') {
+    throw badRequest(`Chua ho tro dong bo san pham tu dong cho kenh ${connection.channel.name}`);
+  }
+
+  const result = await syncProductsForConnection(connection, userId);
 
   return {
     channel: connection.channel.name,
-    synced: 0,
-    created: 0,
-    updated: 0,
-    failed: 0,
-    lastSyncAt: new Date(),
+    ...result,
   };
 };

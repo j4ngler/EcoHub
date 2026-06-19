@@ -52,6 +52,7 @@ export default function SettingsPage() {
 
   const activeShopId = user?.activeShop?.id ?? (user as any)?.shopId ?? null;
   const isSuperAdmin = user?.roles?.includes('super_admin') ?? false;
+  const canManageS3 = user?.roles?.includes('super_admin') ?? false;
   const [selectedShopIdForSettings, setSelectedShopIdForSettings] = useState<string>(activeShopId ?? '');
   const effectiveShopId = activeShopId || selectedShopIdForSettings || null;
 
@@ -128,7 +129,7 @@ export default function SettingsPage() {
   const { data: s3Settings, isLoading: loadingS3Settings } = useQuery({
     queryKey: ['s3-settings'],
     queryFn: settingsApi.getS3Settings,
-    enabled: isSuperAdmin,
+    enabled: canManageS3,
   });
 
   const updateS3Mutation = useMutation({
@@ -306,12 +307,25 @@ export default function SettingsPage() {
                 <p className="text-xs text-gray-500">Cấu hình hãng vận chuyển và tracking.</p>
               </div>
             </Link>
+
+            {canManageS3 ? (
+              <Link
+                to="/settings/s3"
+                className="flex items-center gap-3 rounded-lg border px-4 py-3 text-gray-700 transition hover:border-emerald-300 hover:bg-emerald-50"
+              >
+                <Cloud className="h-5 w-5 text-emerald-600" />
+                <div>
+                  <p className="font-medium">Lưu trữ S3</p>
+                  <p className="text-xs text-gray-500">Endpoint, bucket, region và khóa truy cập.</p>
+                </div>
+              </Link>
+            ) : null}
           </CardContent>
         </Card>
       </div>
 
-      {isSuperAdmin && (
-        <Card>
+      {canManageS3 && (
+        <Card id="s3-storage">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Cloud className="h-5 w-5 text-emerald-600" />

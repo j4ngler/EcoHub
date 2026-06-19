@@ -44,6 +44,10 @@ const syncSessionToAgent = async (session: captureSessionService.CaptureUploadSe
   return { flowResult, orderResult };
 };
 
+const legacyAgentOwnsScan = () => {
+  return String(process.env.CAPTURE_AGENT_OWNS_SCAN || '').toLowerCase() === 'true';
+};
+
 const requireCaptureAgent = async () => {
   const available = await captureService.isCaptureServiceReachable();
   if (!available) {
@@ -290,7 +294,7 @@ export const setRecordingFlow = async (req: AuthRequest, res: Response, next: Ne
 
 export const manualScan = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const available = await captureService.isCaptureServiceReachable();
+    const available = legacyAgentOwnsScan() && (await captureService.isCaptureServiceReachable());
     const useServerRtsp = await shouldUseServerRtspRuntime();
 
     if (available && !useServerRtsp) {
@@ -313,7 +317,7 @@ export const manualOrder = async (req: AuthRequest, res: Response, next: NextFun
   try {
     const orderCode = String(req.body?.orderCode || '').trim();
     const local = await captureRuntimeService.setCurrentOrderFromCode(req.user!.userId, orderCode);
-    const available = await captureService.isCaptureServiceReachable();
+    const available = legacyAgentOwnsScan() && (await captureService.isCaptureServiceReachable());
 
     if (available) {
       await relay(

@@ -11,6 +11,7 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
       - ./uploads:/var/www/uploads
       - nginx_cache:/var/cache/nginx
     depends_on:
@@ -70,7 +71,7 @@ services:
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
       - JWT_REFRESH_SECRET=your-refresh-secret-key-change-in-production
       # Video storage (GB) used for dashboard percentage
-      - VIDEO_STORAGE_LIMIT_GB=50
+      - VIDEO_STORAGE_LIMIT_GB=100
       # Email Configuration
       - MAIL_MAILER=smtp
       - MAIL_HOST=e2.vinahost.vn
@@ -102,9 +103,12 @@ services:
       dockerfile: Dockerfile
     container_name: ecohub-frontend
     environment:
-      - VITE_API_URL=http://localhost:3000/api
+      - VITE_API_URL=/api
       # Proxy /api và /uploads tới backend khi chạy trong Docker
       - VITE_PROXY_TARGET=http://backend:3000
+      - VITE_PUBLIC_HOST=${VITE_PUBLIC_HOST:-101.99.38.74}
+      - VITE_HMR_PROTOCOL=${VITE_HMR_PROTOCOL:-wss}
+      - VITE_HMR_CLIENT_PORT=${VITE_HMR_CLIENT_PORT:-443}
     ports:
       - "5173:5173"
     depends_on:

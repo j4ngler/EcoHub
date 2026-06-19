@@ -1,7 +1,7 @@
 # --- Base Stage ---
 FROM node:20-alpine AS base
 WORKDIR /app
-RUN apk add --no-cache openssl libc6-compat
+RUN apk add --no-cache openssl libc6-compat ffmpeg
 COPY package*.json ./
 RUN npm install
 # Ensure nodemailer and node-cron are installed

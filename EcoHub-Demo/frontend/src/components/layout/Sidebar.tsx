@@ -2,6 +2,7 @@ import { NavLink, useLocation } from 'react-router-dom';
 import {
   BarChart3,
   Camera,
+  Cloud,
   LayoutDashboard,
   Link2,
   Package,
@@ -42,9 +43,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
 
   const navigation: NavigationItem[] = [
     { name: 'Trang chủ', href: '/dashboard', icon: LayoutDashboard },
-    { name: 'Đơn hàng', href: '/orders', icon: ShoppingCart },
-    { name: 'Sản phẩm', href: '/products', icon: Package },
-    { name: 'Kho hàng', href: '/inventory', icon: Warehouse },
+    { name: 'Đơn hàng', href: '/orders', icon: ShoppingCart, end: true },
+    { name: 'Sản phẩm', href: '/products', icon: Package, end: true },
+    { name: 'Kho hàng', href: '/inventory', icon: Warehouse, end: true },
     { name: 'Video đóng gói', href: '/videos', icon: Video, end: true },
     {
       name: 'Tạo video đóng gói',
@@ -73,8 +74,9 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     { name: 'Người dùng', href: '/users', icon: Users, roles: ['super_admin', 'admin'] },
     { name: 'Hoàn trả', href: '/returns', icon: RotateCcw, roles: ['super_admin', 'admin', 'staff', 'customer_service'] },
     { name: 'Shop', href: '/shops', icon: Store, roles: ['super_admin'] },
-    { name: 'Cài đặt', href: '/settings', icon: Settings, roles: ['super_admin', 'admin'] },
+    { name: 'Cài đặt', href: '/settings', icon: Settings, roles: ['super_admin', 'admin'], end: true },
     { name: 'Vận chuyển', href: '/settings/shipping', icon: Truck, roles: ['super_admin', 'admin'] },
+    { name: 'Lưu trữ S3', href: '/settings/s3', icon: Cloud, roles: ['super_admin'] },
     { name: 'Báo cáo', href: '/reports', icon: BarChart3, roles: ['super_admin', 'admin'] },
   ];
 

@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import prisma from '../../config/database';
 import * as uploadQueueService from './upload-queue.service';
+import { lookupAndPersistOrder } from '../channels/tiktok-sync.service';
 
 type RecordingFlow = 'outbound' | 'return';
 
@@ -29,10 +30,11 @@ type RuntimeState = {
   lastTest: string | null;
   notifications: Array<{ level: 'info' | 'warning' | 'error'; message: string }>;
   scannedCodes: string[];
+  scannedCodeSet: Set<string>;
   totalScannedCount: number;
 };
 
-const DEFAULT_STORAGE_LIMIT_GB = Number.parseFloat(process.env.VIDEO_STORAGE_LIMIT_GB || '') || 90;
+const DEFAULT_STORAGE_LIMIT_GB = Number.parseFloat(process.env.VIDEO_STORAGE_LIMIT_GB || '') || 100;
 const runtimeStates = new Map<string, RuntimeState>();
 
 const nowStamp = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
@@ -54,6 +56,7 @@ const getState = (userId: string): RuntimeState => {
     lastTest: null,
     notifications: [],
     scannedCodes: [],
+    scannedCodeSet: new Set<string>(),
     totalScannedCount: 0,
   };
   runtimeStates.set(userId, created);
@@ -87,7 +90,16 @@ const clampPercent = (usedBytes: bigint, limitBytes: bigint) => {
   return Number(((usedBytes * 10000n) / limitBytes).toString()) / 100;
 };
 
-const buildOrderInfo = async (orderCode: string) => {
+const resolveUserShopId = async (userId: string) => {
+  const role = await prisma.userRole.findFirst({
+    where: { userId, shopId: { not: null } },
+    select: { shopId: true },
+    orderBy: { assignedAt: 'desc' },
+  });
+  return role?.shopId || null;
+};
+
+const buildOrderInfoFromDb = async (orderCode: string) => {
   const normalized = orderCode.trim();
   if (!normalized) return null;
 
@@ -122,6 +134,17 @@ const buildOrderInfo = async (orderCode: string) => {
       sku_id: item.productSku || undefined,
     })),
   } satisfies RuntimeOrderInfo;
+};
+
+const buildOrderInfo = async (orderCode: string, userId: string) => {
+  const local = await buildOrderInfoFromDb(orderCode);
+  if (local) return local;
+
+  const shopId = await resolveUserShopId(userId);
+  const remote = await lookupAndPersistOrder({ code: orderCode, shopId, userId });
+  if (!remote) return null;
+
+  return buildOrderInfoFromDb(remote.orderCode);
 };
 
 const computePackingItems = (state: RuntimeState) => {
@@ -175,6 +198,10 @@ export const syncPreparedOrder = async (
     shop_id: payload.shopId || undefined,
     items: payload.items || [],
   };
+  state.scannedCodes = [];
+  state.scannedCodeSet = new Set<string>();
+  state.totalScannedCount = 0;
+  state.notifications = [];
 };
 
 export const setRecordingFlow = (userId: string, flow: RecordingFlow) => {
@@ -185,10 +212,11 @@ export const setRecordingFlow = (userId: string, flow: RecordingFlow) => {
 
 export const setCurrentOrderFromCode = async (userId: string, orderCode: string) => {
   const state = getState(userId);
-  const orderInfo = await buildOrderInfo(orderCode);
+  const orderInfo = await buildOrderInfo(orderCode, userId);
   state.currentOrderCode = orderCode.trim() || null;
   state.orderInfo = orderInfo;
   state.scannedCodes = [];
+  state.scannedCodeSet = new Set<string>();
   state.totalScannedCount = 0;
   state.notifications = [];
   return {
@@ -206,6 +234,7 @@ export const clearCurrentOrder = (userId: string) => {
   state.isPaused = false;
   state.recordingStartMs = null;
   state.scannedCodes = [];
+  state.scannedCodeSet = new Set<string>();
   state.totalScannedCount = 0;
 };
 
@@ -274,6 +303,28 @@ export const processManualScan = async (userId: string, code: string) => {
     };
   }
 
+  if (state.scannedCodeSet.has(normalized)) {
+    state.notifications = [
+      {
+        level: 'warning',
+        message: `Ma ${normalized} da duoc quet trong don nay.`,
+      },
+    ];
+    return {
+      ok: false,
+      action: 'duplicate-serial',
+      scanned_code: normalized,
+      total_scanned_count: state.totalScannedCount,
+      packing_state: {
+        items: computePackingItems(state),
+        has_missing: computePackingItems(state).some((item) => item.status === 'missing'),
+        has_excess: computePackingItems(state).some((item) => item.status === 'excess'),
+      },
+      message: 'Ma nay da duoc quet trong don hien tai',
+    };
+  }
+
+  state.scannedCodeSet.add(normalized);
   state.scannedCodes.push(normalized);
   state.totalScannedCount += 1;
   const packingItems = computePackingItems(state);

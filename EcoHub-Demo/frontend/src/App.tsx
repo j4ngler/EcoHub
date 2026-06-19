@@ -21,6 +21,7 @@ import ReceivingVideosPage from '@/features/videos/pages/ReceivingVideosPage';
 import ShopsPage from '@/features/shops/pages/ShopsPage';
 import ReturnsPage from '@/features/returns/pages/ReturnsPage';
 import ShippingSettingsPage from '@/features/settings/pages/ShippingSettingsPage';
+import S3StoragePage from '@/features/settings/pages/S3StoragePage';
 import ApiManagementPage from '@/features/channels/pages/ApiManagementPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -45,13 +46,19 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 
 function RoleRoute({
   children,
+  allowedRoles,
   disallowRoles = [],
 }: {
   children: React.ReactNode;
+  allowedRoles?: string[];
   disallowRoles?: string[];
 }) {
   const user = useAuthStore((s) => s.user);
   const roles = user?.roles || [];
+
+  if (allowedRoles && !allowedRoles.some((role) => roles.includes(role))) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   if (disallowRoles.some((role) => roles.includes(role))) {
     return <Navigate to="/dashboard" replace />;
@@ -109,6 +116,14 @@ function App() {
           <Route path="channel-management" element={<ApiManagementPage />} />
           <Route path="api-management" element={<Navigate to="/channel-management" replace />} />
           <Route path="settings/shipping" element={<ShippingSettingsPage />} />
+          <Route
+            path="settings/s3"
+            element={
+              <RoleRoute allowedRoles={['super_admin']}>
+                <S3StoragePage />
+              </RoleRoute>
+            }
+          />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="returns" element={<ReturnsPage />} />
           <Route path="shops" element={<ShopsPage />} />

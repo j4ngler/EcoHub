@@ -1,4 +1,5 @@
 import prisma from '../../config/database';
+import { syncOrdersForConnection } from '../channels/tiktok-sync.service';
 import { parseDateRange } from '../../utils/helpers';
 import fs from 'fs/promises';
 import path from 'path';
@@ -11,7 +12,7 @@ interface ReportParams {
   groupBy?: string;
 }
 
-const DEFAULT_TOTAL_STORAGE_GB = 90;
+const DEFAULT_TOTAL_STORAGE_GB = 100;
 const TOTAL_STORAGE_GB = Number.parseFloat(process.env.VIDEO_STORAGE_LIMIT_GB || '') || DEFAULT_TOTAL_STORAGE_GB;
 const TOTAL_STORAGE_BYTES = BigInt(Math.round(TOTAL_STORAGE_GB * 1024 * 1024 * 1024));
 
@@ -424,18 +425,20 @@ export const syncNow = async (userId: string, channels?: Array<'shopee' | 'tikto
 
   for (const c of connections) {
     try {
-      void userId;
+      if (c.channel.code !== 'tiktok') {
+        throw new Error(`Chua ho tro dong bo tu dong cho kenh ${c.channel.name}`);
+      }
+      const result = await syncOrdersForConnection(c, userId);
       results.push({
         shopId: c.shopId,
         shopName: c.shop.name,
         channelCode: c.channel.code,
         channelName: c.channel.name,
-        synced: 0,
-        created: 0,
-        updated: 0,
-        failed: 1,
-        lastSyncAt: new Date(),
-        error: `Chưa hỗ trợ đồng bộ tự động cho kênh ${c.channel.name}`,
+        synced: result.synced,
+        created: result.created,
+        updated: result.updated,
+        failed: result.failed,
+        lastSyncAt: result.lastSyncAt,
       });
     } catch (e: any) {
       results.push({
