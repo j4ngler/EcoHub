@@ -13,17 +13,17 @@ export default function CreateVideoPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <UploadCloud className="h-5 w-5 text-emerald-600" />
-              Luong upload thu cong
+              Luồng upload thủ công
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm text-gray-600">
             <p>
-              Neu can giu luong upload video co san tu may thay vi quay truc tiep bang runtime, buoc tiep
-              theo la tach no thanh mot trang rieng de khong tron voi dashboard van hanh.
+              Nếu cần giữ luồng upload video có sẵn từ máy thay vì quay trực tiếp bằng runtime, bước tiếp
+              theo là tách nó thành một trang riêng để không trộn với dashboard vận hành.
             </p>
             <p>
-              Hien tai phan runtime da duoc dua ve dung trang nay, con dashboard trang chu quay lai vai tro
-              tong quan he thong.
+              Hiện tại phần runtime đã được đưa về đúng trang này, còn dashboard trang chủ quay lại vai trò
+              tổng quan hệ thống.
             </p>
           </CardContent>
         </Card>
@@ -32,7 +32,7 @@ export default function CreateVideoPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <HardDrive className="h-5 w-5 text-cyan-600" />
-              Dieu huong nhanh
+              Điều hướng nhanh
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3 text-sm">
@@ -41,14 +41,14 @@ export default function CreateVideoPage() {
               className="flex items-center gap-2 rounded-lg border px-4 py-3 text-gray-700 transition hover:border-emerald-300 hover:bg-emerald-50"
             >
               <ListVideo className="h-4 w-4 text-emerald-600" />
-              Di toi danh sach video da luu
+              Đi tới danh sách video đã lưu
             </Link>
             <Link
               to="/settings"
               className="flex items-center gap-2 rounded-lg border px-4 py-3 text-gray-700 transition hover:border-emerald-300 hover:bg-emerald-50"
             >
               <HardDrive className="h-4 w-4 text-emerald-600" />
-              Mo cai dat camera va phien nhan vien
+              Mở cài đặt camera và phiên nhân viên
             </Link>
           </CardContent>
         </Card>

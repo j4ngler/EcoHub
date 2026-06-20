@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Video, Search, Upload, Filter, Eye, Trash2, HardDrive, Clock, CheckCircle, GitCompare } from 'lucide-react';
-import { videosApi, VideoQueryParams } from '@/api/videos.api';
+import { Video, Search, Upload, Filter, Eye, Trash2, HardDrive, Clock, CheckCircle, GitCompare, Play, Download } from 'lucide-react';
+import { videosApi, VideoQueryParams, PackageVideo } from '@/api/videos.api';
 import { getErrorMessage } from '@/api/axios';
 import { formatDateTime } from '@/utils/format';
 import toast from 'react-hot-toast';
@@ -43,7 +43,21 @@ export default function VideosPage() {
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
+  const [viewVideo, setViewVideo] = useState<PackageVideo | null>(null);
   const [compareVideoId, setCompareVideoId] = useState<string | null>(null);
+
+  // URL phát trực tiếp (proxy backend -> redirect presigned S3)
+  const getPlayableUrl = (video: PackageVideo): string =>
+    video.processedVideoUrl || video.originalVideoUrl || (video as any).videoUrl || '';
+
+  // URL tải về: thêm download=1 để backend đặt Content-Disposition: attachment
+  const getDownloadUrl = (video: PackageVideo): string => {
+    const url = getPlayableUrl(video);
+    if (!url) return '';
+    const name = `${video.trackingCode || video.order?.orderCode || 'video'}.mp4`;
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}download=1&filename=${encodeURIComponent(name)}`;
+  };
   const { data: compareData, isLoading: compareLoading } = useQuery({
     queryKey: ['videos', 'compare', compareVideoId],
     queryFn: () => (compareVideoId ? videosApi.compareVideos(compareVideoId) : Promise.resolve(null)),
@@ -265,6 +279,26 @@ export default function VideosPage() {
                         >
                           <Eye className="h-5 w-5" />
                         </button>
+                        {getPlayableUrl(video) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setViewVideo(video)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Xem video"
+                            >
+                              <Play className="h-5 w-5" />
+                            </button>
+                            <a
+                              href={getDownloadUrl(video)}
+                              download
+                              className="text-gray-600 hover:text-gray-900"
+                              title="Tải video"
+                            >
+                              <Download className="h-5 w-5" />
+                            </a>
+                          </>
+                        )}
                         {!video.deletedAt && (
                           <>
                             {!video.approvedAt && (video.processingStatus === 'completed' || video.processingStatus === 'uploaded') && (
@@ -330,6 +364,35 @@ export default function VideosPage() {
           </button>
         </div>
       )}
+
+      {/* Modal xem video đóng gói */}
+      <Modal
+        open={!!viewVideo}
+        onClose={() => setViewVideo(null)}
+        title={viewVideo ? `Video - ${viewVideo.trackingCode || viewVideo.order?.orderCode || ''}` : 'Xem video'}
+        size="xl"
+      >
+        {viewVideo && getPlayableUrl(viewVideo) ? (
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-lg bg-black">
+              <video src={getPlayableUrl(viewVideo)} controls autoPlay className="max-h-[70vh] w-full" />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="break-all font-mono text-xs text-gray-400">{getPlayableUrl(viewVideo)}</p>
+              <a
+                href={getDownloadUrl(viewVideo)}
+                download
+                className="inline-flex flex-shrink-0 items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Tải video (.mp4)
+              </a>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">Video này chưa có đường dẫn phát hợp lệ.</p>
+        )}
+      </Modal>
 
       {/* Modal so sánh video đóng gói vs nhận hàng */}
       <Modal

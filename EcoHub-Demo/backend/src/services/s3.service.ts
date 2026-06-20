@@ -90,13 +90,22 @@ export const getPresignedPutUrl = async (params: {
   return { url, bucket, key: params.key };
 };
 
-export const getPresignedGetUrl = async (params: { key: string; expiresInSeconds?: number }) => {
+export const getPresignedGetUrl = async (params: {
+  key: string;
+  expiresInSeconds?: number;
+  responseContentDisposition?: string;
+  responseContentType?: string;
+}) => {
   const client = await getS3Client();
   const bucket = getS3Bucket();
 
   const command = new AwsGetObjectCommandClass({
     Bucket: bucket,
     Key: params.key,
+    ...(params.responseContentDisposition
+      ? { ResponseContentDisposition: params.responseContentDisposition }
+      : {}),
+    ...(params.responseContentType ? { ResponseContentType: params.responseContentType } : {}),
   });
 
   const url = await awsGetSignedUrlFn(client, command, {

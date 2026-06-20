@@ -8,7 +8,17 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 export const streamStoredVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const key = decodeS3Key(req.params.encodedKey);
-    const presigned = await getPresignedGetUrl({ key, expiresInSeconds: 900 });
+    const wantsDownload = req.query.download === '1' || req.query.download === 'true';
+
+    // Tên file tải về: ưu tiên ?filename=, fallback theo tên object; loại bỏ ký tự nguy hiểm cho header
+    const rawName = (req.query.filename as string) || key.split('/').pop() || 'video.mp4';
+    const safeName = rawName.replace(/[\r\n"\\]/g, '').slice(0, 200);
+
+    const presigned = await getPresignedGetUrl({
+      key,
+      expiresInSeconds: 900,
+      responseContentDisposition: wantsDownload ? `attachment; filename="${safeName}"` : undefined,
+    });
     res.redirect(presigned.url);
   } catch (error) {
     next(error);

@@ -445,10 +445,10 @@ export default function CameraSettingsPage() {
               <div className="space-y-4 rounded-xl border border-gray-200 p-4">
                 <div className="flex items-center gap-2">
                   <UserCircle2 className="h-5 w-5 text-emerald-600" />
-                  <p className="font-medium text-gray-900">Phien lam viec nhan vien</p>
+                  <p className="font-medium text-gray-900">Phiên làm việc nhân viên</p>
                 </div>
                 <Input
-                  label="Ten nhan vien"
+                  label="Tên nhân viên"
                   value={captureSettings.employeeSession.employeeName}
                   disabled={!canEditCapture || recordingLocked}
                   onChange={(e) =>
@@ -459,7 +459,7 @@ export default function CameraSettingsPage() {
                   }
                 />
                 <Input
-                  label="Ma nhan vien"
+                  label="Mã nhân viên"
                   value={captureSettings.employeeSession.employeeCode}
                   disabled={!canEditCapture || recordingLocked}
                   onChange={(e) =>
@@ -470,7 +470,7 @@ export default function CameraSettingsPage() {
                   }
                 />
                 <Input
-                  label="Ca lam / nhan phien"
+                  label="Ca làm / nhận phiên"
                   value={captureSettings.employeeSession.workSessionLabel}
                   disabled={!canEditCapture || recordingLocked}
                   onChange={(e) =>
@@ -488,7 +488,7 @@ export default function CameraSettingsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-gray-900">Camera {camera.slotIndex + 1}</p>
-                        <p className="text-sm text-gray-500">Chon USB hoac RTSP cho tung camera.</p>
+                        <p className="text-sm text-gray-500">Chọn USB hoặc RTSP cho từng camera.</p>
                       </div>
                       <label className="flex items-center gap-2 text-sm text-gray-700">
                         <input
@@ -502,13 +502,13 @@ export default function CameraSettingsPage() {
                             }))
                           }
                         />
-                        Bat
+                        Bật
                       </label>
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-2">
                       <Select
-                        label="Nguon camera"
+                        label="Nguồn camera"
                         value={camera.sourceType}
                         disabled={!canEditCapture || recordingLocked}
                         onChange={(e) =>
@@ -538,7 +538,7 @@ export default function CameraSettingsPage() {
 
                     {camera.sourceType === 'usb' ? (
                       <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
-                        USB camera goi y: {availableCameraIndices.map((value) => `Camera ${value}`).join(', ')}
+                        USB camera gợi ý: {availableCameraIndices.map((value) => `Camera ${value}`).join(', ')}
                       </div>
                     ) : (
                       <div
@@ -549,8 +549,8 @@ export default function CameraSettingsPage() {
                         }`}
                       >
                         {rtspServerAvailable
-                          ? 'RTSP co the duoc test tu backend server.'
-                          : 'RTSP hien chua test server-side duoc vi server thieu ffprobe/ffmpeg.'}
+                          ? 'RTSP có thể được test từ backend server.'
+                          : 'RTSP hiện chưa test server-side được vì server thiếu ffprobe/ffmpeg.'}
                       </div>
                     )}
 
@@ -612,7 +612,7 @@ export default function CameraSettingsPage() {
               <div className="rounded-2xl border border-gray-200 bg-white p-5">
                 <div className="mb-4 flex items-center gap-2">
                   <Info className="h-5 w-5 text-emerald-600" />
-                  <p className="text-lg font-semibold text-gray-900">Xem truoc</p>
+                  <p className="text-lg font-semibold text-gray-900">Xem trước</p>
                 </div>
                 {cameraRunning ? (
                   activeCameraMode === 'usb' && !captureAgentAvailable ? (
@@ -665,11 +665,11 @@ export default function CameraSettingsPage() {
                   <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-center text-gray-500">
                     <div>
                       <Camera className="mx-auto mb-3 h-12 w-12 opacity-40" />
-                      <p className="font-medium">Camera chua khoi dong</p>
+                      <p className="font-medium">Camera chưa khởi động</p>
                       <p className="mt-1 text-sm">
                         {activeCameraMode === 'rtsp'
-                          ? 'RTSP hien dang test/start tren server. Live preview server-side se duoc bo sung tiep theo.'
-                          : 'USB camera can local runtime de xem preview truc tiep.'}
+                          ? 'RTSP hiện đang test/start trên server. Live preview server-side sẽ được bổ sung tiếp theo.'
+                          : 'USB camera cần local runtime để xem preview trực tiếp.'}
                       </p>
                     </div>
                   </div>
@@ -682,7 +682,7 @@ export default function CameraSettingsPage() {
                   disabled={!canEditCapture || recordingLocked}
                   loading={captureMutation.isPending}
                 >
-                  Luu cau hinh camera
+                  Lưu cấu hình camera
                 </Button>
               </div>
             </>

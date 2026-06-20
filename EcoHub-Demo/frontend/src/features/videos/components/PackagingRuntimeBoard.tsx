@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Camera, Clock3, HardDrive, Package2, Pause, Play, RotateCcw, ScanLine, Square, Truck } from 'lucide-react';
+import { Camera, Clock3, HardDrive, Package2, Pause, Play, RotateCcw, ScanLine, Square, Truck, UploadCloud } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { captureApi } from '@/api/capture.api';
 import { getErrorMessage } from '@/api/axios';
@@ -31,6 +31,10 @@ const formatStorage = (bytes: number) => {
   return `${mb.toFixed(1)} MB`;
 };
 
+// Phải khớp với multer fileFilter + limits ở backend (upload.middleware.ts)
+const ALLOWED_VIDEO_MIME = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-msvideo'];
+const MAX_VIDEO_BYTES = 100 * 1024 * 1024; // 100MB
+
 const selectVideoDeviceId = async (cameraIndex: number) => {
   const devices = await navigator.mediaDevices.enumerateDevices();
   const videoInputs = devices.filter((device) => device.kind === 'videoinput');
@@ -47,9 +51,11 @@ export default function PackagingRuntimeBoard() {
   const [browserCameraRunning, setBrowserCameraRunning] = useState(() => isBrowserCameraRunning());
   const [browserRecording, setBrowserRecording] = useState(false);
   const [browserUploadBusy, setBrowserUploadBusy] = useState(false);
+  const [manualUploadBusy, setManualUploadBusy] = useState(false);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const liveVideoRef = useRef<HTMLVideoElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const timer = window.setInterval(() => setClock(new Date()), 1000);
@@ -168,7 +174,7 @@ export default function PackagingRuntimeBoard() {
 
   const startBrowserCamera = async () => {
     if (!navigator.mediaDevices?.getUserMedia) {
-      throw new Error('Trinh duyet khong ho tro webcam API');
+      throw new Error('Trình duyệt không hỗ trợ webcam API');
     }
 
     const deviceId = await selectVideoDeviceId(selectedRecordingCamera?.cameraIndex || 0);
@@ -216,6 +222,53 @@ export default function PackagingRuntimeBoard() {
     await captureApi.resetOrder();
   };
 
+  // Upload video có sẵn từ máy cho đơn hiện tại (thay vì quay trực tiếp)
+  const uploadSelectedVideo = async (file: File) => {
+    if (file.size > MAX_VIDEO_BYTES) {
+      throw new Error('Video vượt quá 100MB. Vui lòng chọn file nhỏ hơn.');
+    }
+    if (file.type && !ALLOWED_VIDEO_MIME.includes(file.type)) {
+      throw new Error('Định dạng không hợp lệ. Chỉ chấp nhận MP4, WebM, MOV hoặc AVI.');
+    }
+
+    const session = await ensureUploadSession();
+
+    const formData = new FormData();
+    formData.append('video', file);
+    formData.append('orderId', session.orderId);
+    formData.append('trackingCode', session.trackingCode);
+    formData.append('trackingCodePosition', 'bottom_right');
+
+    await videosApi.uploadVideo(formData);
+    await captureApi.clearActiveSession();
+    await captureApi.resetOrder();
+  };
+
+  const handlePickVideoFile = () => {
+    if (!currentOrderCode) {
+      toast.error('Hãy chọn/nhập mã đơn trước khi upload video.');
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleVideoFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = ''; // reset để có thể chọn lại cùng 1 file
+    if (!file) return;
+
+    setManualUploadBusy(true);
+    try {
+      await uploadSelectedVideo(file);
+      toast.success('Đã upload video đóng gói thành công');
+      await refreshAll();
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    } finally {
+      setManualUploadBusy(false);
+    }
+  };
+
   const startBrowserRecording = async () => {
     let stream = getBrowserCameraStream();
     if (!browserCameraRunning || !stream) {
@@ -224,7 +277,7 @@ export default function PackagingRuntimeBoard() {
     }
 
     if (!stream) {
-      throw new Error('Khong mo duoc webcam de ghi hinh');
+      throw new Error('Không mở được webcam để ghi hình');
     }
 
     await ensureUploadSession();
@@ -319,20 +372,20 @@ export default function PackagingRuntimeBoard() {
 
   const handleStartCamera = async () => {
     if (cameraMode === 'usb' && !captureAgentAvailable) {
-      await runAction(startBrowserCamera, 'Da mo webcam tren trinh duyet');
+      await runAction(startBrowserCamera, 'Đã mở webcam trên trình duyệt');
       return;
     }
-    await runAction(() => captureApi.startCameras(), 'Da khoi dong camera');
+    await runAction(() => captureApi.startCameras(), 'Đã khởi động camera');
   };
 
   const handleStopCamera = async () => {
     if (cameraMode === 'usb' && !captureAgentAvailable) {
       stopBrowserCamera();
-      toast.success('Da dung webcam tren trinh duyet');
+      toast.success('Đã dừng webcam trên trình duyệt');
       await refreshAll();
       return;
     }
-    await runAction(() => captureApi.stopCameras(), 'Da dung camera');
+    await runAction(() => captureApi.stopCameras(), 'Đã dừng camera');
   };
 
   const handleStartRecording = async () => {
@@ -340,7 +393,7 @@ export default function PackagingRuntimeBoard() {
       setCaptureBusy(true);
       try {
         await startBrowserRecording();
-        toast.success('Da bat dau quay tren trinh duyet');
+        toast.success('Đã bắt đầu quay trên trình duyệt');
         await refreshAll();
       } catch (error) {
         toast.error(getErrorMessage(error));
@@ -350,7 +403,7 @@ export default function PackagingRuntimeBoard() {
       return;
     }
 
-    await runAction(() => captureApi.startRecording(), 'Da bat dau quay');
+    await runAction(() => captureApi.startRecording(), 'Đã bắt đầu quay');
   };
 
   const handleStopRecording = async () => {
@@ -366,7 +419,7 @@ export default function PackagingRuntimeBoard() {
       return;
     }
 
-    await runAction(() => captureApi.stopRecording(), 'Da ket thuc quay');
+    await runAction(() => captureApi.stopRecording(), 'Đã kết thúc quay');
   };
 
   return (
@@ -442,7 +495,7 @@ export default function PackagingRuntimeBoard() {
         <div className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Ma don hien tai</CardTitle>
+              <CardTitle>Mã đơn hiện tại</CardTitle>
             </CardHeader>
             <CardContent>
               <p className="mb-3 text-3xl font-bold text-blue-600">{currentOrderCode || 'Chưa chọn đơn'}</p>
@@ -450,7 +503,7 @@ export default function PackagingRuntimeBoard() {
                 variant="outline"
                 size="sm"
                 loading={captureBusy}
-                onClick={() => runAction(() => captureApi.resetOrder(), 'Da reset ma hien tai')}
+                onClick={() => runAction(() => captureApi.resetOrder(), 'Đã reset mã hiện tại')}
               >
                 Reset mã
               </Button>
@@ -627,12 +680,40 @@ export default function PackagingRuntimeBoard() {
                 <Button variant="outline" loading={captureBusy} onClick={handleStopCamera}>
                   Stop Camera
                 </Button>
-                <Button variant="outline" loading={captureBusy} onClick={() => runAction(() => captureApi.resetOrder(), 'Da reset ma hien tai')}>
+                <Button variant="outline" loading={captureBusy} onClick={() => runAction(() => captureApi.resetOrder(), 'Đã reset mã hiện tại')}>
                   <RotateCcw className="mr-2 h-4 w-4" />
                   Reset mã
                 </Button>
                 <Button variant="secondary" loading={captureBusy || browserUploadBusy} onClick={refreshAll}>
                   Làm mới
+                </Button>
+              </div>
+
+              <div className="rounded-xl border border-dashed border-emerald-300 bg-emerald-50/40 p-4">
+                <div className="mb-2 flex items-center gap-2 text-sm font-medium text-emerald-900">
+                  <UploadCloud className="h-4 w-4 text-emerald-700" />
+                  Upload video có sẵn lên S3
+                </div>
+                <p className="mb-3 text-sm text-slate-600">
+                  Chọn file video từ máy cho <b>đơn hiện tại</b> ({currentOrderCode || 'chưa chọn đơn'}). Video sẽ
+                  được nén và lưu lên S3 giống như khi quay trực tiếp. Hỗ trợ MP4, WebM, MOV, AVI (tối đa 100MB).
+                </p>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="video/mp4,video/webm,video/quicktime,video/x-msvideo"
+                  className="hidden"
+                  onChange={handleVideoFileSelected}
+                />
+                <Button
+                  variant="success"
+                  size="sm"
+                  loading={manualUploadBusy}
+                  disabled={!currentOrderCode || isRecording || captureBusy || browserUploadBusy}
+                  onClick={handlePickVideoFile}
+                >
+                  <UploadCloud className="mr-2 h-4 w-4" />
+                  Chọn video để upload
                 </Button>
               </div>
 
@@ -678,7 +759,7 @@ export default function PackagingRuntimeBoard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <HardDrive className="h-5 w-5 text-cyan-600" />
-                Dung luong video local
+                Dung lượng video local
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -691,7 +772,7 @@ export default function PackagingRuntimeBoard() {
                     </p>
                   </div>
                   <div className="text-sm text-slate-600">
-                    {storage.video_count || 0} video • {(storage.total_duration_min || 0).toFixed?.(1) ?? storage.total_duration_min} phut
+                    {storage.video_count || 0} video • {(storage.total_duration_min || 0).toFixed?.(1) ?? storage.total_duration_min} phút
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-slate-200">
                     <div

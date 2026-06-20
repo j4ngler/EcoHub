@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft,
   Package,
@@ -13,23 +13,80 @@ import {
   Clock,
   Download,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { ordersApi } from '@/api/orders.api';
+import { getErrorMessage } from '@/api/axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge, { ORDER_STATUS_BADGES } from '@/components/ui/Badge';
 import Modal from '@/components/ui/Modal';
+import Select from '@/components/ui/Select';
 import { formatCurrency, formatDateTime } from '@/utils/format';
+
+// Luồng chuyển trạng thái hợp lệ — phải khớp với validTransitions ở backend
+// (orders.service.ts -> updateOrderStatus)
+const VALID_TRANSITIONS: Record<string, string[]> = {
+  pending: ['confirmed', 'cancelled'],
+  confirmed: ['packing', 'cancelled'],
+  packing: ['packed', 'cancelled'],
+  packed: ['shipping', 'cancelled'],
+  shipping: ['delivered', 'returned'],
+  delivered: ['completed', 'returned'],
+  completed: [],
+  cancelled: [],
+  returned: [],
+};
+
+const statusOption = (value: string) => ({
+  value,
+  label: ORDER_STATUS_BADGES[value]?.label || value,
+});
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const queryClient = useQueryClient();
   const [openVideo, setOpenVideo] = useState(false);
   const [activeVideo, setActiveVideo] = useState<any | null>(null);
+  const [openStatus, setOpenStatus] = useState(false);
+  const [statusForm, setStatusForm] = useState({ status: '', note: '' });
 
   const { data: order, isLoading } = useQuery({
     queryKey: ['order', id],
     queryFn: () => ordersApi.getOrderById(id!),
     enabled: !!id,
   });
+
+  const allowedNextStatuses = order ? VALID_TRANSITIONS[order.status] ?? [] : [];
+  const statusOptions = allowedNextStatuses.map(statusOption);
+
+  // Mỗi lần mở modal: mặc định chọn trạng thái hợp lệ đầu tiên và xóa ghi chú cũ
+  useEffect(() => {
+    if (openStatus) {
+      setStatusForm({ status: allowedNextStatuses[0] ?? '', note: '' });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openStatus, order?.status]);
+
+  const updateStatusMutation = useMutation({
+    mutationFn: () => ordersApi.updateOrderStatus(id!, statusForm.status, statusForm.note || undefined),
+    onSuccess: () => {
+      toast.success('Cập nhật trạng thái đơn hàng thành công');
+      setOpenStatus(false);
+      queryClient.invalidateQueries({ queryKey: ['order', id] });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    },
+    onError: (error: any) => {
+      toast.error(getErrorMessage(error) || error?.message || 'Cập nhật trạng thái thất bại');
+    },
+  });
+
+  const handleSubmitStatus = () => {
+    if (!statusForm.status) {
+      toast.error('Vui lòng chọn trạng thái');
+      return;
+    }
+    updateStatusMutation.mutate();
+  };
 
   const playableUrl =
     (activeVideo?.processedVideoUrl as string | undefined) ||
@@ -76,7 +133,7 @@ export default function OrderDetailPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="outline">In đơn hàng</Button>
-          <Button>Cập nhật trạng thái</Button>
+          <Button onClick={() => setOpenStatus(true)}>Cập nhật trạng thái</Button>
         </div>
       </div>
 
@@ -284,6 +341,64 @@ export default function OrderDetailPage() {
           </Card>
         </div>
       </div>
+
+      <Modal
+        open={openStatus}
+        onClose={() => setOpenStatus(false)}
+        title="Cập nhật trạng thái đơn hàng"
+        size="md"
+      >
+        <div className="space-y-4">
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>Trạng thái hiện tại:</span>
+            <Badge variant={statusConfig?.variant || 'default'}>
+              {statusConfig?.label || order.status}
+            </Badge>
+          </div>
+
+          {statusOptions.length === 0 ? (
+            <p className="rounded-lg bg-gray-50 px-4 py-3 text-sm text-gray-600">
+              Đơn hàng đang ở trạng thái cuối, không thể chuyển tiếp.
+            </p>
+          ) : (
+            <>
+              <Select
+                label="Trạng thái mới"
+                options={statusOptions}
+                value={statusForm.status}
+                onChange={(e) => setStatusForm((prev) => ({ ...prev, status: e.target.value }))}
+              />
+
+              <div className="w-full">
+                <label htmlFor="status-note" className="mb-1 block text-sm font-medium text-gray-700">
+                  Ghi chú (tùy chọn)
+                </label>
+                <textarea
+                  id="status-note"
+                  rows={3}
+                  value={statusForm.note}
+                  onChange={(e) => setStatusForm((prev) => ({ ...prev, note: e.target.value }))}
+                  placeholder="Lý do / ghi chú cho lần đổi trạng thái này"
+                  className="block w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+            </>
+          )}
+
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setOpenStatus(false)}>
+              Hủy
+            </Button>
+            <Button
+              onClick={handleSubmitStatus}
+              loading={updateStatusMutation.isPending}
+              disabled={statusOptions.length === 0}
+            >
+              Lưu thay đổi
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={openVideo}

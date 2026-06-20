@@ -59,11 +59,15 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 60 * 1000, // 1 minute
+  max: 600, // Limit each IP to 600 requests per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip high-frequency capture status polling (FE polls these every 1-10s)
+  skip: (req) => req.method === 'GET' && /\/capture\//.test(req.originalUrl),
   message: {
     success: false,
-    message: 'Quá nhiều yêu cầu, vui lòng thử lại sau 15 phút',
+    message: 'Quá nhiều yêu cầu, vui lòng thử lại sau ít phút',
   },
 });
 app.use('/api', limiter);
