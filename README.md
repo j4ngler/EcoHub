@@ -81,8 +81,6 @@ docker compose run --rm backend npm run db:seed
 http://localhost
 ```
 
-Nếu chạy trên server public, thay `FRONTEND_URL`, `BACKEND_PUBLIC_URL`, callback TikTok/Shopee và cấu hình Nginx theo IP/domain thật.
-
 ## Chạy local để phát triển
 
 1. Cài dependencies:
@@ -151,36 +149,6 @@ npm run build --workspace=backend
 npm run build --workspace=frontend
 ```
 
-## Deploy lên server bằng Docker Compose
-
-Trên server:
-
-```bash
-cd /path/to/EcoHub
-git pull origin main
-cd EcoHub-Demo
-
-docker compose build --no-cache backend frontend nginx
-docker compose run --rm backend npx prisma migrate deploy
-docker compose up -d
-docker compose logs backend --tail=100
-```
-
-Nếu Nginx đang serve static từ `frontend/dist`, build frontend và copy dist vào đúng container/static root:
-
-```bash
-docker compose exec frontend npm run build
-docker cp ecohub-frontend:/app/dist/. ./frontend/dist/
-docker cp ./frontend/dist/. ecohub-nginx:/usr/share/nginx/html/
-docker compose exec nginx nginx -s reload
-```
-
-Kiểm tra bundle public:
-
-```bash
-curl -s http://127.0.0.1/login | grep -o 'assets/index-[^"]*\.js'
-```
-
 ## Lệnh kiểm tra thường dùng
 
 ```bash
@@ -197,4 +165,4 @@ docker compose exec postgres psql -U postgres -d ecohub -c '\dt'
 - Không commit `.env`, private key, video, log, `node_modules`, `dist`, `uploads`.
 - Sau khi thay đổi `schema.prisma`, phải rebuild backend hoặc chạy `npx prisma generate`.
 - Callback TikTok/Shopee phải khớp tuyệt đối URL đã khai báo trong console của sàn.
-- Camera USB dùng trực tiếp từ browser/local machine; RTSP camera nên đặt edge/capture service cùng LAN với camera trong môi trường production.
+- Camera USB dùng trực tiếp từ browser/local machine; RTSP camera nên đặt edge/capture service cùng LAN với camera.
