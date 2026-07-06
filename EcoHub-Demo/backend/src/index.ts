@@ -3,6 +3,7 @@ import app from './app';
 import { initEmailService } from './services/email.service';
 import { startReportScheduler } from './services/report-scheduler.service';
 import { startVideoUploadMonitor } from './services/video-upload-monitor.service';
+import { startShopeeTokenRefresh } from './services/shopee-token-refresh.service';
 
 const PORT = process.env.PORT || 3000;
 
@@ -14,6 +15,9 @@ startReportScheduler();
 
 // Start background job to monitor stale video uploads on S3
 startVideoUploadMonitor();
+
+// Refresh Shopee access tokens before their four-hour lifetime expires.
+startShopeeTokenRefresh();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);

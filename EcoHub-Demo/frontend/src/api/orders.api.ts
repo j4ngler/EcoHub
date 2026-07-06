@@ -39,7 +39,16 @@ export interface Order {
   channel?: { id: string; name: string; code: string };
   carrier?: { id: string; name: string; code: string };
   hasVideo?: boolean;
-  packageVideos?: Array<{ id: string; trackingCode: string; [key: string]: unknown }>;
+  packageVideos?: Array<{
+    id: string;
+    trackingCode: string;
+    processingStatus?: string;
+    thumbnailUrl?: string | null;
+    recordedBy?: string;
+    createdAt?: string;
+    recorder?: { id: string; fullName: string; email?: string };
+    [key: string]: unknown;
+  }>;
   statusHistory?: Array<{ id: string; status: string; createdAt: string; [key: string]: unknown }>;
   packedAt?: string | null;
   shippedAt?: string | null;
@@ -62,8 +71,14 @@ export interface OrderQueryParams {
   search?: string;
   status?: string;
   shopId?: string;
+  channelId?: string;
+  carrierId?: string;
   startDate?: string;
   endDate?: string;
+  packingStatus?: string;
+  shippingReturnStatus?: string;
+  videoStatus?: string;
+  recordedBy?: string;
 }
 
 export const ordersApi = {
@@ -87,6 +102,11 @@ export const ordersApi = {
   
   getOrderByTrackingCode: async (trackingCode: string): Promise<Order> => {
     const response = await api.get(`/orders/tracking/${trackingCode}`);
+    return response.data.data;
+  },
+
+  lookupByCode: async (code: string): Promise<Order> => {
+    const response = await api.get(`/orders/lookup/${encodeURIComponent(code)}`);
     return response.data.data;
   },
   

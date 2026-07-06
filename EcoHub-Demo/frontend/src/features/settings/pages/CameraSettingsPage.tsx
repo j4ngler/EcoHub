@@ -1,0 +1,944 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Camera, FolderOpen, Info, RefreshCw, Search, UserCircle2 } from 'lucide-react';
+import toast from 'react-hot-toast';
+import {
+  CaptureCameraConfig,
+  CaptureSettings,
+  CaptureSettingsOverview,
+  settingsApi,
+} from '@/api/settings.api';
+import { captureApi, CaptureTestCameraResponse } from '@/api/capture.api';
+import { getErrorMessage } from '@/api/axios';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import Badge from '@/components/ui/Badge';
+import Input from '@/components/ui/Input';
+import Select from '@/components/ui/Select';
+import { useAuthStore } from '@/store/authStore';
+import { usersApi, UsersUser } from '@/api/users.api';
+import {
+  getBrowserCameraStream,
+  isBrowserCameraRunning,
+  startSharedBrowserCamera,
+  stopSharedBrowserCamera,
+  subscribeBrowserCamera,
+} from '@/features/videos/browserCameraRuntime';
+
+const DEFAULT_CAPTURE_SETTINGS: CaptureSettings = {
+  cameraConfigs: [
+    { slotIndex: 0, enabled: true, sourceType: 'usb', cameraIndex: 0, rtspUrl: '', width: 1280, height: 720, fps: 20 },
+    { slotIndex: 1, enabled: false, sourceType: 'usb', cameraIndex: 1, rtspUrl: '', width: 1280, height: 720, fps: 20 },
+  ],
+  scanSensitivity: 'normal',
+  qrCooldownSeconds: 5,
+  recordingCameraSlot: 0,
+  employeeSession: { employeeName: '', workSessionLabel: '' },
+};
+
+type ShiftKey = 'morning' | 'afternoon' | 'evening' | 'office' | 'custom';
+
+const SHIFT_OPTIONS: Array<{ value: ShiftKey; label: string; start: string; end: string; slug: string }> = [
+  { value: 'morning', label: 'Ca sáng', start: '08:00', end: '12:00', slug: 'ca_sang' },
+  { value: 'afternoon', label: 'Ca chiều', start: '13:00', end: '17:30', slug: 'ca_chieu' },
+  { value: 'evening', label: 'Ca tối', start: '18:00', end: '22:00', slug: 'ca_toi' },
+  { value: 'office', label: 'Ca hành chính', start: '08:00', end: '17:30', slug: 'ca_hanh_chinh' },
+  { value: 'custom', label: 'Tùy chỉnh', start: '08:00', end: '17:30', slug: 'ca_tuy_chinh' },
+];
+
+const getTodayInputValue = () => {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+const formatSessionDate = (dateValue: string) => {
+  const [year, month, day] = dateValue.split('-');
+  if (!year || !month || !day) return '';
+  return `${day}${month}${year}`;
+};
+
+const formatSessionTime = (value: string) => value.replace(':', 'h');
+
+const sanitizeS3Segment = (value: string, fallback: string) => {
+  const safe = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+  return safe || fallback;
+};
+
+const buildWorkSessionLabel = (shift: ShiftKey, startTime: string, endTime: string, dateValue: string) => {
+  const shiftConfig = SHIFT_OPTIONS.find((option) => option.value === shift) || SHIFT_OPTIONS[0];
+  const datePart = formatSessionDate(dateValue) || formatSessionDate(getTodayInputValue());
+  return `${shiftConfig.slug}_${formatSessionTime(startTime)}_${formatSessionTime(endTime)}_${datePart}`;
+};
+
+const parseWorkSessionLabel = (label: string) => {
+  const match = label.match(/^(ca_sang|ca_chieu|ca_toi|ca_hanh_chinh|ca_tuy_chinh)_(\d{2})h(\d{2})_(\d{2})h(\d{2})_(\d{2})(\d{2})(\d{4})$/);
+  if (!match) return null;
+
+  const shift = SHIFT_OPTIONS.find((option) => option.slug === match[1]);
+  if (!shift) return null;
+
+  return {
+    shiftKey: shift.value,
+    startTime: `${match[2]}:${match[3]}`,
+    endTime: `${match[4]}:${match[5]}`,
+    dateValue: `${match[8]}-${match[7]}-${match[6]}`,
+  };
+};
+
+const normalizeCaptureSettings = (value?: Partial<CaptureSettings> | null): CaptureSettings => ({
+  ...DEFAULT_CAPTURE_SETTINGS,
+  ...value,
+  cameraConfigs: Array.from({ length: 2 }, (_, slotIndex) => {
+    const existing = value?.cameraConfigs?.find((item) => item.slotIndex === slotIndex);
+    return existing
+      ? { ...DEFAULT_CAPTURE_SETTINGS.cameraConfigs[slotIndex], ...existing }
+      : DEFAULT_CAPTURE_SETTINGS.cameraConfigs[slotIndex];
+  }),
+  employeeSession: {
+    ...DEFAULT_CAPTURE_SETTINGS.employeeSession,
+    ...(value?.employeeSession || {}),
+  },
+});
+
+const getBrowserCameraErrorMessageLegacy = (error: unknown) => {
+  if (
+    typeof navigator === 'undefined' ||
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.getUserMedia !== 'function'
+  ) {
+    return 'Trình duyệt hoặc địa chỉ hiện tại không hỗ trợ truy cập webcam. Hãy mở bằng HTTPS, localhost hoặc 127.0.0.1.';
+  }
+
+  const rawMessage = getErrorMessage(error);
+  if (/NotAllowedError|Permission denied|Permission dismissed/i.test(rawMessage)) {
+    return 'Trình duyệt đang chặn quyền truy cập camera. Hãy cho phép camera rồi thử lại.';
+  }
+  if (/NotFoundError|Requested device not found/i.test(rawMessage)) {
+    return 'Không tìm thấy webcam trên máy này.';
+  }
+  if (/NotReadableError|Could not start video source/i.test(rawMessage)) {
+    return 'Webcam đang bị ứng dụng khác chiếm dụng hoặc không thể mở.';
+  }
+
+  return rawMessage;
+};
+
+const getBrowserCameraErrorMessage = (error: unknown) => {
+  if (
+    typeof navigator === 'undefined' ||
+    !navigator.mediaDevices ||
+    typeof navigator.mediaDevices.getUserMedia !== 'function'
+  ) {
+    return 'Trình duyệt hoặc ngữ cảnh hiện tại không hỗ trợ truy cập webcam. Hãy mở bằng HTTPS hoặc localhost/127.0.0.1.';
+  }
+
+  const rawMessage = getErrorMessage(error);
+  if (/NotAllowedError|Permission denied|Permission dismissed/i.test(rawMessage)) {
+    return 'Trình duyệt đang chặn quyền truy cập camera. Hãy cho phép camera rồi thử lại.';
+  }
+  if (/NotFoundError|Requested device not found/i.test(rawMessage)) {
+    return 'Không tìm thấy webcam trên máy này.';
+  }
+  if (/NotReadableError|Could not start video source/i.test(rawMessage)) {
+    return 'Webcam đang bị ứng dụng khác chiếm dụng hoặc không thể mở.';
+  }
+
+  return rawMessage;
+};
+
+export default function CameraSettingsPage() {
+  const queryClient = useQueryClient();
+  const user = useAuthStore((s) => s.user);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const canEditCapture = user?.roles?.some((role) => ['super_admin', 'admin', 'staff'].includes(role)) ?? false;
+  const canListStaffUsers = user?.roles?.some((role) => ['super_admin', 'admin'].includes(role)) ?? false;
+  const canViewS3Settings = user?.roles?.includes('super_admin') ?? false;
+  const [captureSettings, setCaptureSettings] = useState<CaptureSettings>(DEFAULT_CAPTURE_SETTINGS);
+  const [captureActionBusy, setCaptureActionBusy] = useState(false);
+  const [cameraTestResult, setCameraTestResult] = useState<CaptureTestCameraResponse | null>(null);
+  const [browserCameraRunning, setBrowserCameraRunning] = useState(() => isBrowserCameraRunning());
+  const [employeeSearch, setEmployeeSearch] = useState('');
+  const [employeeDropdownOpen, setEmployeeDropdownOpen] = useState(false);
+  const [shiftKey, setShiftKey] = useState<ShiftKey>('afternoon');
+  const [workDate, setWorkDate] = useState(getTodayInputValue());
+  const [shiftStartTime, setShiftStartTime] = useState('13:00');
+  const [shiftEndTime, setShiftEndTime] = useState('17:30');
+  const browserVideoRef = useRef<HTMLVideoElement | null>(null);
+
+  const {
+    data: captureOverview,
+    isLoading: loadingCaptureSettings,
+    refetch: refetchCaptureOverview,
+    isFetching: refreshingOverview,
+  } = useQuery({
+    queryKey: ['capture-settings'],
+    queryFn: settingsApi.getCaptureSettings,
+  });
+
+  const { data: staffUsersData } = useQuery({
+    queryKey: ['users', 'staff-for-capture'],
+    queryFn: () => usersApi.list({ role: 'staff', status: 'active', limit: 100 }),
+    enabled: canListStaffUsers,
+  });
+
+  const { data: s3Settings } = useQuery({
+    queryKey: ['s3-settings', 'capture-fallback'],
+    queryFn: settingsApi.getS3Settings,
+    enabled: canViewS3Settings,
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (captureOverview) {
+      const normalized = normalizeCaptureSettings(captureOverview);
+      const parsedSession = parseWorkSessionLabel(normalized.employeeSession.workSessionLabel);
+      if (parsedSession) {
+        setShiftKey(parsedSession.shiftKey);
+        setShiftStartTime(parsedSession.startTime);
+        setShiftEndTime(parsedSession.endTime);
+        setWorkDate(parsedSession.dateValue);
+      }
+      setCaptureSettings(normalized);
+    }
+  }, [captureOverview]);
+
+  useEffect(() => {
+    if (!captureOverview || captureSettings.employeeSession.workSessionLabel) return;
+    updateEmployeeSession({
+      workSessionLabel: buildWorkSessionLabel(shiftKey, shiftStartTime, shiftEndTime, workDate),
+    });
+  }, [captureOverview, captureSettings.employeeSession.workSessionLabel, shiftEndTime, shiftKey, shiftStartTime, workDate]);
+
+  useEffect(() => {
+    if (!captureOverview || !user?.roles?.includes('staff')) return;
+    if (captureSettings.employeeSession.employeeName) return;
+    updateEmployeeSession({
+      employeeName: user.fullName,
+    });
+  }, [
+    captureOverview,
+    captureSettings.employeeSession.employeeName,
+    user?.fullName,
+    user?.roles,
+  ]);
+
+  useEffect(() => {
+    const session = captureSettings.employeeSession;
+    if (session.employeeName) {
+      setEmployeeSearch(session.employeeName);
+    }
+  }, [captureSettings.employeeSession.employeeName]);
+
+  useEffect(() => {
+    return subscribeBrowserCamera((stream) => {
+      setBrowserCameraRunning(Boolean(stream));
+      if (browserVideoRef.current) {
+        browserVideoRef.current.srcObject = stream;
+        if (stream) {
+          browserVideoRef.current.play().catch(() => undefined);
+        }
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!browserVideoRef.current) return;
+    const stream = getBrowserCameraStream();
+    browserVideoRef.current.srcObject = stream;
+    if (stream) {
+      browserVideoRef.current.play().catch(() => undefined);
+    }
+  }, [browserCameraRunning]);
+
+  const captureMutation = useMutation({
+    mutationFn: settingsApi.updateCaptureSettings,
+    onSuccess: (data) => {
+      const normalized = normalizeCaptureSettings(data);
+      setCaptureSettings(normalized);
+      queryClient.setQueryData(['capture-settings'], data);
+      toast.success('Đã lưu cấu hình camera');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+
+  const updateCameraConfig = (slotIndex: number, updater: (current: CaptureCameraConfig) => CaptureCameraConfig) => {
+    setCaptureSettings((current) => ({
+      ...current,
+      cameraConfigs: current.cameraConfigs.map((camera) =>
+        camera.slotIndex === slotIndex ? updater(camera) : camera
+      ),
+    }));
+  };
+
+  const runCameraAction = async (
+    action: () => Promise<unknown>,
+    successMessage?: string,
+    options?: { suppressErrorToast?: boolean }
+  ) => {
+    setCaptureActionBusy(true);
+    try {
+      const result = await action();
+      if (successMessage) toast.success(successMessage);
+      const refreshed = await refetchCaptureOverview();
+      if (refreshed.data) {
+        queryClient.setQueryData(['capture-settings'], refreshed.data);
+      }
+      return result;
+    } catch (err) {
+      if (!options?.suppressErrorToast) {
+        toast.error(getErrorMessage(err));
+      }
+      return null;
+    } finally {
+      setCaptureActionBusy(false);
+    }
+  };
+
+  const overview = (captureOverview || null) as CaptureSettingsOverview | null;
+  const captureAgentAvailable = Boolean(overview?.serviceInfo?.captureAgentAvailable);
+  const rtspServerAvailable = Boolean(overview?.serviceInfo?.rtspServerAvailable);
+  const preferredRuntime = overview?.serviceInfo?.preferredRuntime || 'server-local';
+  const enabledCameraConfigs = captureSettings.cameraConfigs.filter((camera) => camera.enabled);
+  const previewCameraCount = Math.max(enabledCameraConfigs.length, 1);
+  const availableCameraIndices = overview?.availableCameraIndices?.length ? overview.availableCameraIndices : [0, 1];
+  const recordingLocked = Boolean(overview?.recordingLocked);
+  const activeRecordingCamera =
+    captureSettings.cameraConfigs.find((camera) => camera.slotIndex === captureSettings.recordingCameraSlot) ||
+    captureSettings.cameraConfigs[0];
+  const activeCameraMode = activeRecordingCamera?.sourceType || 'usb';
+  const cameraRunning =
+    activeCameraMode === 'usb' && !captureAgentAvailable
+      ? browserCameraRunning
+      : Boolean(overview?.cameraStatus?.running);
+  const cameraStatusError = typeof overview?.cameraStatus?.error === 'string' ? overview.cameraStatus.error : '';
+  const captureBaseUrl = overview?.serviceInfo?.baseUrl || 'http://127.0.0.1:5000';
+  const staffUsers = staffUsersData?.data || [];
+  const fallbackEmployeePrefix = s3Settings?.prefix?.trim() || '';
+  const effectiveEmployeeName = captureSettings.employeeSession.employeeName || fallbackEmployeePrefix;
+  const employeeFolderPreview = sanitizeS3Segment(effectiveEmployeeName, 'unknown_employee');
+  const sessionLabelPreview = sanitizeS3Segment(captureSettings.employeeSession.workSessionLabel, 'ca');
+  const expectedS3Path = `videos/${employeeFolderPreview}/${sessionLabelPreview}/packaging/processed/...`;
+  const sessionReady = Boolean(effectiveEmployeeName && captureSettings.employeeSession.workSessionLabel);
+
+  const filteredStaffUsers = useMemo(() => {
+    const term = employeeSearch.toLowerCase().trim();
+    if (!term) return staffUsers.slice(0, 8);
+    return staffUsers
+      .filter((staff) =>
+        [staff.fullName, staff.username, staff.email].some((value) => value.toLowerCase().includes(term))
+      )
+      .slice(0, 8);
+  }, [employeeSearch, staffUsers]);
+
+  const updateEmployeeSession = (patch: Partial<CaptureSettings['employeeSession']>) => {
+    setCaptureSettings((current) => ({
+      ...current,
+      employeeSession: {
+        ...current.employeeSession,
+        ...patch,
+      },
+    }));
+  };
+
+  const applyGeneratedWorkSessionLabel = (
+    nextShift: ShiftKey = shiftKey,
+    nextStart = shiftStartTime,
+    nextEnd = shiftEndTime,
+    nextDate = workDate
+  ) => {
+    updateEmployeeSession({
+      workSessionLabel: buildWorkSessionLabel(nextShift, nextStart, nextEnd, nextDate),
+    });
+  };
+
+  const handleSelectEmployee = (staff: UsersUser) => {
+    setEmployeeSearch(staff.fullName);
+    setEmployeeDropdownOpen(false);
+    updateEmployeeSession({
+      employeeName: staff.fullName,
+    });
+  };
+
+  const handleShiftChange = (value: ShiftKey) => {
+    const shift = SHIFT_OPTIONS.find((option) => option.value === value) || SHIFT_OPTIONS[0];
+    setShiftKey(value);
+    setShiftStartTime(shift.start);
+    setShiftEndTime(shift.end);
+    updateEmployeeSession({
+      workSessionLabel: buildWorkSessionLabel(value, shift.start, shift.end, workDate),
+    });
+  };
+
+  const handleWorkDateChange = (value: string) => {
+    setWorkDate(value);
+    applyGeneratedWorkSessionLabel(shiftKey, shiftStartTime, shiftEndTime, value);
+  };
+
+  const handleStartTimeChange = (value: string) => {
+    setShiftStartTime(value);
+    applyGeneratedWorkSessionLabel(shiftKey, value, shiftEndTime, workDate);
+  };
+
+  const handleEndTimeChange = (value: string) => {
+    setShiftEndTime(value);
+    applyGeneratedWorkSessionLabel(shiftKey, shiftStartTime, value, workDate);
+  };
+
+  const handleTestCamera = async () => {
+    if (activeCameraMode === 'usb' && !captureAgentAvailable) {
+      setCaptureActionBusy(true);
+      try {
+        if (
+          typeof navigator === 'undefined' ||
+          !navigator.mediaDevices ||
+          typeof navigator.mediaDevices.getUserMedia !== 'function'
+        ) {
+          throw new Error('getUserMedia_unavailable');
+        }
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: activeRecordingCamera?.width || 1280 },
+            height: { ideal: activeRecordingCamera?.height || 720 },
+            frameRate: { ideal: activeRecordingCamera?.fps || 20 },
+          },
+          audio: false,
+        });
+        stream.getTracks().forEach((track) => track.stop());
+        setCameraTestResult({
+          success: true,
+          message: 'Webcam test thành công trên trình duyệt',
+          source_type: 'usb',
+          recording_camera_slot: activeRecordingCamera?.slotIndex,
+        });
+      } catch (err) {
+        setCameraTestResult({
+          success: false,
+          error: getBrowserCameraErrorMessage(err),
+          source_type: 'usb',
+          recording_camera_slot: activeRecordingCamera?.slotIndex,
+        });
+      } finally {
+        setCaptureActionBusy(false);
+      }
+      return;
+    }
+
+    const result = await runCameraAction(() => captureApi.testCamera());
+    if (result) setCameraTestResult(result as CaptureTestCameraResponse);
+  };
+
+  const startBrowserCamera = async () => {
+    if (
+      typeof navigator === 'undefined' ||
+      !navigator.mediaDevices ||
+      typeof navigator.mediaDevices.getUserMedia !== 'function'
+    ) {
+      throw new Error(
+        'Trình duyệt hoặc địa chỉ hiện tại không hỗ trợ truy cập webcam. Hãy mở bằng HTTPS, localhost hoặc 127.0.0.1.'
+      );
+    }
+    const stream = await startSharedBrowserCamera({
+      video: {
+        width: { ideal: activeRecordingCamera?.width || 1280 },
+        height: { ideal: activeRecordingCamera?.height || 720 },
+        frameRate: { ideal: activeRecordingCamera?.fps || 20 },
+      },
+      audio: false,
+    });
+    if (browserVideoRef.current) {
+      browserVideoRef.current.srcObject = stream;
+      browserVideoRef.current.play().catch(() => undefined);
+    }
+    setBrowserCameraRunning(true);
+    setCameraTestResult(null);
+  };
+
+  const stopBrowserCamera = () => {
+    stopSharedBrowserCamera();
+    if (browserVideoRef.current) {
+      browserVideoRef.current.srcObject = null;
+    }
+    setBrowserCameraRunning(false);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-xl bg-gradient-to-r from-teal-700 to-emerald-600 p-6 text-white">
+        <h1 className="text-2xl font-bold">Cài đặt camera</h1>
+        <p className="mt-2 text-sm text-emerald-50">
+          Quản lý camera, thông số quét mã, ca làm việc và chọn chế độ vận hành RTSP trên web server.
+        </p>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Camera className="h-5 w-5" />
+            Điều khiển camera
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {activeCameraMode === 'rtsp' ? (
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                rtspServerAvailable
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                  : 'border-amber-200 bg-amber-50 text-amber-800'
+              }`}
+            >
+              {rtspServerAvailable
+                ? 'RTSP đang được xử lý trên backend server. Bạn có thể test, start và stop camera mà không cần runtime Python cục bộ.'
+                : 'RTSP đang được chọn, nhưng server chưa có ffprobe/ffmpeg. Cài ffprobe/ffmpeg để web server tự test camera.'}
+            </div>
+          ) : null}
+
+          {activeCameraMode === 'usb' && activeRecordingCamera?.rtspUrl?.trim() ? (
+            <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+              Bạn đã nhập RTSP URL cho camera đang quay, nhưng nguồn camera hiện vẫn để ở USB / Webcam. Nếu muốn web server tự test và điều khiển camera, hãy đổi nguồn sang RTSP.
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <Badge variant={cameraRunning ? 'success' : cameraStatusError ? 'danger' : 'default'}>
+                  {cameraRunning ? 'Đang chạy' : cameraStatusError ? 'Lỗi camera' : 'Chưa khởi động'}
+                </Badge>
+              </div>
+              <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+                {cameraRunning
+                  ? 'Camera đang hoạt động bình thường.'
+                  : cameraStatusError ||
+                    (activeCameraMode === 'rtsp'
+                      ? 'Camera RTSP chưa khởi động. Nhấn Test Camera để backend kiểm tra stream, sau đó Start Camera.'
+                      : 'Camera USB chưa khởi động. Nếu không dùng local runtime, hãy đổi sang RTSP để chạy trực tiếp từ server.')}
+              </div>
+              <div className="text-xs text-gray-500">Runtime ưu tiên: {preferredRuntime}</div>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-500"
+              onClick={() => refetchCaptureOverview()}
+              loading={refreshingOverview}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Làm mới
+            </Button>
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              onClick={handleTestCamera}
+              disabled={!canEditCapture || recordingLocked}
+              loading={captureActionBusy}
+            >
+              Test Camera
+            </Button>
+            <Button
+              variant="success"
+              onClick={() =>
+                activeCameraMode === 'usb' && !captureAgentAvailable
+                  ? runCameraAction(
+                      async () => {
+                        try {
+                          await startBrowserCamera();
+                        } catch (err) {
+                          setCameraTestResult({
+                            success: false,
+                            error: getBrowserCameraErrorMessage(err),
+                            source_type: 'usb',
+                            recording_camera_slot: activeRecordingCamera?.slotIndex,
+                          });
+                          throw err;
+                        }
+                      },
+                      'Đã mở webcam trên trình duyệt',
+                      {
+                        suppressErrorToast: true,
+                      }
+                    )
+                  : runCameraAction(() => captureApi.startCameras(), 'Đã khởi động camera')
+              }
+              disabled={!canEditCapture || cameraRunning || recordingLocked}
+              loading={captureActionBusy}
+            >
+              Start Camera
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() =>
+                activeCameraMode === 'usb' && !captureAgentAvailable
+                  ? runCameraAction(async () => stopBrowserCamera(), 'Đã dừng webcam trên trình duyệt', {
+                      suppressErrorToast: true,
+                    })
+                  : runCameraAction(() => captureApi.stopCameras(), 'Đã dừng camera')
+              }
+              disabled={!canEditCapture || !cameraRunning}
+              loading={captureActionBusy}
+            >
+              Stop Camera
+            </Button>
+          </div>
+
+          {recordingLocked ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              Đang có phiên quay video. Tạm khóa thay đổi cấu hình camera đến khi kết thúc quay.
+            </div>
+          ) : null}
+
+          {cameraTestResult ? (
+            <div
+              className={`rounded-xl border px-4 py-3 text-sm ${
+                cameraTestResult.success
+                  ? 'border-green-200 bg-green-50 text-green-800'
+                  : 'border-red-200 bg-red-50 text-red-800'
+              }`}
+            >
+              <div className="font-medium">
+                {cameraTestResult.success
+                  ? cameraTestResult.message || 'Camera test thành công'
+                  : cameraTestResult.error || 'Test camera thất bại'}
+              </div>
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Cấu hình camera và AI quét mã</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {loadingCaptureSettings ? (
+            <div className="py-6 text-center text-gray-500">Đang tải cấu hình camera...</div>
+          ) : (
+            <>
+              <div className="space-y-4 rounded-xl border border-gray-200 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <UserCircle2 className="h-5 w-5 text-emerald-600" />
+                    <p className="font-medium text-gray-900">Phiên làm việc nhân viên</p>
+                  </div>
+                  <Badge variant={sessionReady ? 'success' : 'warning'}>
+                    {sessionReady ? 'Đang hoạt động' : 'Chưa hoàn tất'}
+                  </Badge>
+                </div>
+
+                <div className="relative">
+                  <label htmlFor="employee-search" className="mb-1 block text-sm font-medium text-gray-700">
+                    Chọn nhân viên
+                  </label>
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+                    <input
+                      id="employee-search"
+                      type="search"
+                      value={employeeSearch}
+                      disabled={!canEditCapture || recordingLocked}
+                      placeholder={
+                        fallbackEmployeePrefix
+                          ? `Mặc định: ${fallbackEmployeePrefix} (từ cấu hình S3)`
+                          : 'Tìm theo tên hoặc email nhân viên'
+                      }
+                      onFocus={() => setEmployeeDropdownOpen(true)}
+                      onBlur={() => window.setTimeout(() => setEmployeeDropdownOpen(false), 120)}
+                      onChange={(e) => {
+                        setEmployeeSearch(e.target.value);
+                        setEmployeeDropdownOpen(true);
+                        updateEmployeeSession({ employeeName: e.target.value });
+                      }}
+                      className="block w-full rounded-lg border border-gray-300 py-2.5 pl-10 pr-4 text-sm transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:cursor-not-allowed disabled:bg-gray-100"
+                    />
+                  </div>
+
+                  {employeeDropdownOpen && canEditCapture && !recordingLocked ? (
+                    <div className="absolute z-20 mt-1 max-h-64 w-full overflow-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+                      {filteredStaffUsers.length ? (
+                        filteredStaffUsers.map((staff) => (
+                          <button
+                            key={staff.id}
+                            type="button"
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => handleSelectEmployee(staff)}
+                            className="block w-full px-4 py-3 text-left text-sm transition-colors hover:bg-emerald-50"
+                          >
+                            <span className="block font-medium text-gray-900">{staff.fullName}</span>
+                            <span className="block text-xs text-gray-500">{staff.email}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="px-4 py-3 text-sm text-gray-500">Không tìm thấy nhân viên phù hợp.</div>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+
+                <div className="grid gap-4 lg:grid-cols-4">
+                  <Input
+                    label="Ngày làm việc"
+                    type="date"
+                    value={workDate}
+                    disabled={!canEditCapture || recordingLocked}
+                    onChange={(e) => handleWorkDateChange(e.target.value)}
+                  />
+                  <Select
+                    label="Ca làm"
+                    value={shiftKey}
+                    disabled={!canEditCapture || recordingLocked}
+                    onChange={(e) => handleShiftChange(e.target.value as ShiftKey)}
+                    options={SHIFT_OPTIONS.map((shift) => ({ value: shift.value, label: shift.label }))}
+                  />
+                  <Input
+                    label="Giờ bắt đầu"
+                    type="time"
+                    value={shiftStartTime}
+                    disabled={!canEditCapture || recordingLocked}
+                    onChange={(e) => handleStartTimeChange(e.target.value)}
+                  />
+                  <Input
+                    label="Giờ kết thúc"
+                    type="time"
+                    value={shiftEndTime}
+                    disabled={!canEditCapture || recordingLocked}
+                    onChange={(e) => handleEndTimeChange(e.target.value)}
+                  />
+                </div>
+
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                  <div className="flex items-start gap-3">
+                    <FolderOpen className="mt-0.5 h-5 w-5 flex-shrink-0 text-emerald-600" />
+                    <div className="min-w-0 space-y-1">
+                      <p>
+                        Nhãn phiên S3 Folder:{' '}
+                        <span className="break-all font-mono font-semibold">
+                          {captureSettings.employeeSession.workSessionLabel || 'ca'}
+                        </span>
+                      </p>
+                      <p>
+                        Đường dẫn dự kiến:{' '}
+                        <span className="break-all font-mono font-semibold">{expectedS3Path}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                {captureSettings.cameraConfigs.map((camera) => (
+                  <div key={camera.slotIndex} className="space-y-4 rounded-xl border border-gray-200 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-gray-900">Camera {camera.slotIndex + 1}</p>
+                        <p className="text-sm text-gray-500">Chọn USB hoặc RTSP cho từng camera.</p>
+                      </div>
+                      <label className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={camera.enabled}
+                          disabled={!canEditCapture || recordingLocked}
+                          onChange={(e) =>
+                            updateCameraConfig(camera.slotIndex, (current) => ({
+                              ...current,
+                              enabled: e.target.checked,
+                            }))
+                          }
+                        />
+                        Bật
+                      </label>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Select
+                        label="Nguồn camera"
+                        value={camera.sourceType}
+                        disabled={!canEditCapture || recordingLocked}
+                        onChange={(e) =>
+                          updateCameraConfig(camera.slotIndex, (current) => ({
+                            ...current,
+                            sourceType: e.target.value as CaptureCameraConfig['sourceType'],
+                          }))
+                        }
+                        options={[
+                          { value: 'usb', label: 'USB / Webcam' },
+                          { value: 'rtsp', label: 'RTSP / IP Camera' },
+                        ]}
+                      />
+                      <Input
+                        label="Camera index"
+                        type="number"
+                        value={camera.cameraIndex}
+                        disabled={!canEditCapture || recordingLocked || camera.sourceType !== 'usb'}
+                        onChange={(e) =>
+                          updateCameraConfig(camera.slotIndex, (current) => ({
+                            ...current,
+                            cameraIndex: Number(e.target.value || 0),
+                          }))
+                        }
+                      />
+                    </div>
+
+                    {camera.sourceType === 'usb' ? (
+                      <div className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                        USB camera gợi ý: {availableCameraIndices.map((value) => `Camera ${value}`).join(', ')}
+                      </div>
+                    ) : (
+                      <div
+                        className={`rounded-lg border px-3 py-2 text-xs ${
+                          rtspServerAvailable
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-amber-200 bg-amber-50 text-amber-700'
+                        }`}
+                      >
+                        {rtspServerAvailable
+                          ? 'RTSP có thể được test từ backend server.'
+                          : 'RTSP hiện chưa test server-side được vì server thiếu ffprobe/ffmpeg.'}
+                      </div>
+                    )}
+
+                    <Input
+                      label="RTSP URL"
+                      value={camera.rtspUrl}
+                      disabled={!canEditCapture || recordingLocked || camera.sourceType !== 'rtsp'}
+                      onChange={(e) =>
+                        updateCameraConfig(camera.slotIndex, (current) => ({
+                          ...current,
+                          rtspUrl: e.target.value,
+                        }))
+                      }
+                      placeholder="rtsp://user:pass@ip:554/Streaming/Channels/101"
+                    />
+
+                    <div className="grid gap-4 md:grid-cols-3">
+                      <Input
+                        label="Width"
+                        type="number"
+                        value={camera.width}
+                        disabled={!canEditCapture || recordingLocked}
+                        onChange={(e) =>
+                          updateCameraConfig(camera.slotIndex, (current) => ({
+                            ...current,
+                            width: Number(e.target.value || 1280),
+                          }))
+                        }
+                      />
+                      <Input
+                        label="Height"
+                        type="number"
+                        value={camera.height}
+                        disabled={!canEditCapture || recordingLocked}
+                        onChange={(e) =>
+                          updateCameraConfig(camera.slotIndex, (current) => ({
+                            ...current,
+                            height: Number(e.target.value || 720),
+                          }))
+                        }
+                      />
+                      <Input
+                        label="FPS"
+                        type="number"
+                        value={camera.fps}
+                        disabled={!canEditCapture || recordingLocked}
+                        onChange={(e) =>
+                          updateCameraConfig(camera.slotIndex, (current) => ({
+                            ...current,
+                            fps: Number(e.target.value || 20),
+                          }))
+                        }
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-2xl border border-gray-200 bg-white p-5">
+                <div className="mb-4 flex items-center gap-2">
+                  <Info className="h-5 w-5 text-emerald-600" />
+                  <p className="text-lg font-semibold text-gray-900">Xem trước</p>
+                </div>
+                {cameraRunning ? (
+                  activeCameraMode === 'usb' && !captureAgentAvailable ? (
+                    <div className="overflow-hidden rounded-xl border border-gray-200 bg-slate-950">
+                      <video ref={browserVideoRef} className="aspect-video w-full object-cover" muted playsInline />
+                    </div>
+                  ) : activeCameraMode === 'rtsp' ? (
+                    <div className="overflow-hidden rounded-xl border border-gray-200 bg-slate-950">
+                      <div className="border-b border-slate-800 px-4 py-2 text-sm font-medium text-slate-200">
+                        Camera RTSP (Ghi hình)
+                      </div>
+                      {accessToken ? (
+                        <img
+                          src={captureApi.getRtspPreviewUrl(accessToken)}
+                          alt="RTSP preview"
+                          className="aspect-video w-full object-contain"
+                        />
+                      ) : (
+                        <div className="flex aspect-video items-center justify-center text-slate-400">
+                          Không có quyền truy cập stream
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className={`grid gap-4 ${previewCameraCount > 1 ? 'lg:grid-cols-2' : ''}`}>
+                      {Array.from({ length: previewCameraCount }, (_, index) => {
+                        const previewUrl =
+                          previewCameraCount > 1
+                            ? `${captureBaseUrl}/video_feed/${index}`
+                            : `${captureBaseUrl}/video_feed`;
+                        return (
+                          <div
+                            key={previewUrl}
+                            className="overflow-hidden rounded-xl border border-gray-200 bg-slate-950"
+                          >
+                            <div className="border-b border-slate-800 px-4 py-2 text-sm font-medium text-slate-200">
+                              Camera {index + 1}
+                            </div>
+                            <img
+                              src={previewUrl}
+                              alt={`Camera ${index + 1}`}
+                              className="aspect-video w-full object-contain"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
+                ) : (
+                  <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 text-center text-gray-500">
+                    <div>
+                      <Camera className="mx-auto mb-3 h-12 w-12 opacity-40" />
+                      <p className="font-medium">Camera chưa khởi động</p>
+                      <p className="mt-1 text-sm">
+                        {activeCameraMode === 'rtsp'
+                          ? 'RTSP hiện đang test/start trên server. Live preview server-side sẽ được bổ sung tiếp theo.'
+                          : 'USB camera cần local runtime để xem preview trực tiếp.'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Button
+                  onClick={() => captureMutation.mutate(captureSettings)}
+                  disabled={!canEditCapture || recordingLocked}
+                  loading={captureMutation.isPending}
+                >
+                  Lưu cấu hình camera
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

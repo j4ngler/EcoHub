@@ -14,6 +14,8 @@ export interface DashboardData {
       total: number;
       processed: number;
       pending: number;
+      packed?: number;
+      unpacked?: number;
     };
     products: {
       total: number;
@@ -42,6 +44,16 @@ export interface DashboardData {
     status: string;
     count: number;
   }>;
+  shippingReturnSummary?: Array<{
+    status: string;
+    count: number;
+  }>;
+  packingByStaff?: Array<{
+    staffId: string;
+    staffName: string;
+    email?: string | null;
+    count: number;
+  }>;
   storage?: {
     largestVideos: Array<{
       id: string;
@@ -59,17 +71,24 @@ export interface ReportParams {
   startDate?: string;
   endDate?: string;
   groupBy?: string;
+  staffId?: string;
+  orderStatus?: string;
+  packingStatus?: string;
 }
 
 export interface OperationalDailyRow {
   date: string; // YYYY-MM-DD
-  orders: {
-    total: number;
-    pending: number;
-    packing: number;
-    shipping: number;
-    completed: number;
-    cancelled: number;
+    orders: {
+      total: number;
+      pending: number;
+      packing: number;
+      packed?: number;
+      unpacked?: number;
+      shipping: number;
+      delivered?: number;
+      returned?: number;
+      completed: number;
+      cancelled: number;
   };
   videos: {
     total: number;

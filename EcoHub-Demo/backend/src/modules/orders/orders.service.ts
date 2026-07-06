@@ -14,6 +14,10 @@ interface GetOrdersParams {
   carrierId?: string;
   startDate?: string;
   endDate?: string;
+  packingStatus?: string;
+  shippingReturnStatus?: string;
+  videoStatus?: string;
+  recordedBy?: string;
 }
 
 type CurrentUser = {
@@ -22,10 +26,24 @@ type CurrentUser = {
   shopId?: string | null;
 };
 
+const canManageOrdersAcrossShops = (currentUser?: CurrentUser) =>
+  Boolean(
+    currentUser?.roles.includes(RoleName.super_admin) ||
+      currentUser?.roles.includes(RoleName.admin) ||
+      currentUser?.roles.includes(RoleName.customer_service)
+  );
+
+// Shipper cần tra cứu đơn của nhiều khách hàng khác nhau (đơn đang giao), không có khái niệm
+// "sở hữu đơn" hay "thuộc 1 shop cố định" như customer/admin thông thường.
+const canViewAnyOrderRegardlessOfOwnership = (currentUser?: CurrentUser) =>
+  Boolean(canManageOrdersAcrossShops(currentUser) || currentUser?.roles.includes(RoleName.shipper));
+
 export const getOrders = async (params: GetOrdersParams, currentUser?: CurrentUser) => {
   const { page, limit, skip } = getPagination(params.page, params.limit);
 
   const where: any = {};
+  const andFilters: any[] = [];
+  const isGlobalUser = canManageOrdersAcrossShops(currentUser);
 
   if (params.search) {
     where.OR = [
@@ -41,9 +59,9 @@ export const getOrders = async (params: GetOrdersParams, currentUser?: CurrentUs
   }
 
   // Scope theo shop
-  // Nếu user đang quản lý 1 shop (impersonate) => luôn lọc theo shop đó
-  // Nếu không, cho phép filter theo shopId query (super admin xem nhiều shop)
-  if (currentUser?.shopId) {
+  // Nếu user có shopId (như Admin/Staff) => giới hạn trong shop đó
+  // Nếu là tài khoản toàn cục (Super Admin/CSKH) => có thể xem mọi shop hoặc lọc theo shopId cụ thể
+  if (!isGlobalUser && currentUser?.shopId) {
     where.shopId = currentUser.shopId;
   } else if (params.shopId) {
     where.shopId = params.shopId;
@@ -62,9 +80,50 @@ export const getOrders = async (params: GetOrdersParams, currentUser?: CurrentUs
     where.createdAt = dateFilter;
   }
 
+  if (params.packingStatus === 'unpacked') {
+    andFilters.push({ packageVideos: { none: { deletedAt: null } } });
+  } else if (params.packingStatus === 'packing') {
+    andFilters.push({ status: 'packing' });
+  } else if (params.packingStatus === 'packed') {
+    andFilters.push({
+      OR: [
+        { status: { in: ['packed', 'shipping', 'delivered', 'completed', 'returned'] } },
+        { packageVideos: { some: { deletedAt: null } } },
+      ],
+    });
+  }
+
+  if (params.shippingReturnStatus === 'not_shipped') {
+    andFilters.push({ status: { in: ['pending', 'confirmed', 'packing', 'packed'] } });
+  } else if (params.shippingReturnStatus === 'shipping') {
+    andFilters.push({ status: 'shipping' });
+  } else if (params.shippingReturnStatus === 'delivered') {
+    andFilters.push({ status: { in: ['delivered', 'completed'] } });
+  } else if (params.shippingReturnStatus === 'returned') {
+    andFilters.push({ status: 'returned' });
+  }
+
+  if (params.videoStatus === 'with_video') {
+    andFilters.push({ packageVideos: { some: { deletedAt: null } } });
+  } else if (params.videoStatus === 'without_video') {
+    andFilters.push({ packageVideos: { none: { deletedAt: null } } });
+  } else if (params.videoStatus === 'processing') {
+    andFilters.push({ packageVideos: { some: { deletedAt: null, processingStatus: { in: ['uploaded', 'processing'] } } } });
+  } else if (params.videoStatus === 'completed') {
+    andFilters.push({ packageVideos: { some: { deletedAt: null, processingStatus: 'completed' } } });
+  }
+
+  if (params.recordedBy) {
+    andFilters.push({ packageVideos: { some: { deletedAt: null, recordedBy: params.recordedBy } } });
+  }
+
   // Nếu là customer, chỉ cho xem các đơn hàng của chính họ
   if (currentUser?.roles.includes(RoleName.customer)) {
     where.customerId = currentUser.userId;
+  }
+
+  if (andFilters.length > 0) {
+    where.AND = andFilters;
   }
 
   const [orders, total] = await Promise.all([
@@ -83,7 +142,17 @@ export const getOrders = async (params: GetOrdersParams, currentUser?: CurrentUs
           },
         },
         packageVideos: {
-          select: { id: true, processingStatus: true, thumbnailUrl: true },
+          where: { deletedAt: null },
+          select: {
+            id: true,
+            trackingCode: true,
+            processingStatus: true,
+            thumbnailUrl: true,
+            recordedBy: true,
+            createdAt: true,
+            recorder: { select: { id: true, fullName: true, email: true } },
+          },
+          orderBy: { createdAt: 'desc' },
         },
         _count: {
           select: { packageVideos: true },
@@ -96,7 +165,7 @@ export const getOrders = async (params: GetOrdersParams, currentUser?: CurrentUs
   return {
     orders: orders.map(order => ({
       ...order,
-      hasVideo: order._count.packageVideos > 0,
+      hasVideo: order.packageVideos.length > 0,
     })),
     total,
     page,
@@ -105,6 +174,8 @@ export const getOrders = async (params: GetOrdersParams, currentUser?: CurrentUs
 };
 
 export const getOrderById = async (id: string, currentUser?: CurrentUser) => {
+  const isGlobalUser = canViewAnyOrderRegardlessOfOwnership(currentUser);
+
   const order = await prisma.order.findUnique({
     where: { id },
     include: {
@@ -133,7 +204,7 @@ export const getOrderById = async (id: string, currentUser?: CurrentUser) => {
   }
 
   // Nếu user đang ở trong ngữ cảnh 1 shop thì chỉ xem được đơn của shop đó
-  if (currentUser?.shopId && order.shopId !== currentUser.shopId) {
+  if (!isGlobalUser && currentUser?.shopId && order.shopId !== currentUser.shopId) {
     throw forbidden('Bạn không được phép xem đơn hàng của shop khác');
   }
 
@@ -144,7 +215,33 @@ export const getOrderById = async (id: string, currentUser?: CurrentUser) => {
   return order;
 };
 
-export const getOrderByTrackingCode = async (trackingCode: string) => {
+// Dùng cho tab "Tra cứu đơn hàng" trong giao diện đã đăng nhập (customer quét QR/nhập mã).
+// Tái sử dụng nguyên vẹn quy tắc phân quyền của getOrderById: customer chỉ xem được đơn của chính mình.
+export const lookupOrderByCode = async (code: string, currentUser?: CurrentUser) => {
+  const normalized = code.trim();
+  if (!normalized) {
+    throw badRequest('Vui lòng nhập hoặc quét mã đơn hàng');
+  }
+
+  const order = await prisma.order.findFirst({
+    where: {
+      OR: [
+        { trackingCode: normalized },
+        { orderCode: normalized },
+        { channelOrderId: normalized },
+      ],
+    },
+    select: { id: true },
+  });
+
+  if (!order) {
+    throw notFound('Không tìm thấy đơn hàng với mã này');
+  }
+
+  return getOrderById(order.id, currentUser);
+};
+
+export const getOrderByTrackingCode = async (trackingCode: string, currentUser?: CurrentUser) => {
   const order = await prisma.order.findFirst({
     where: { trackingCode },
     include: {
@@ -173,7 +270,39 @@ export const getOrderByTrackingCode = async (trackingCode: string) => {
     throw notFound('Không tìm thấy đơn hàng với mã vận đơn này');
   }
 
+  // Permission check for packaging staff
+  if (currentUser && currentUser.roles.includes(RoleName.staff)) {
+    if (order.shopId && order.channelId) {
+      // Find the API connection for this order
+      const connection = await prisma.shopChannelConnection.findFirst({
+        where: {
+          shopId: order.shopId,
+          channelId: order.channelId,
+          status: 'connected',
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (connection) {
+        // Check if the user is allocated to this connection
+        const allocation = await prisma.userApiAllocation.findUnique({
+          where: {
+            userId_connectionId: {
+              userId: currentUser.userId,
+              connectionId: connection.id,
+            }
+          }
+        });
+
+        if (!allocation) {
+          throw forbidden('Tài khoản của bạn chưa được phân bổ API này để thực hiện đóng gói.');
+        }
+      }
+    }
+  }
+
   return {
+    id: order.id,
     orderCode: order.orderCode,
     trackingCode: order.trackingCode,
     status: order.status,
@@ -390,10 +519,19 @@ export const getOrderHistory = async (orderId: string) => {
   return history;
 };
 
-export const getOrderStats = async (shopId?: string, startDate?: string, endDate?: string) => {
+export const getOrderStats = async (
+  shopId?: string,
+  startDate?: string,
+  endDate?: string,
+  currentUser?: CurrentUser
+) => {
   const where: any = {};
   
-  if (shopId) {
+  const isGlobalUser = canManageOrdersAcrossShops(currentUser);
+
+  if (!isGlobalUser && currentUser?.shopId) {
+    where.shopId = currentUser.shopId;
+  } else if (shopId) {
     where.shopId = shopId;
   }
 

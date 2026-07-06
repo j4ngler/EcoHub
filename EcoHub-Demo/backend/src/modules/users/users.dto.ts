@@ -9,7 +9,7 @@ export const queryUsersSchema = z.object({
     // Cho phép chuỗi rỗng từ dropdown "Tất cả" → coi như undefined
     status: z.preprocess(
       (val) => (val === '' || val === undefined ? undefined : val),
-      z.enum(['active', 'inactive', 'suspended']).optional()
+      z.enum(['pending', 'active', 'inactive', 'suspended']).optional()
     ),
   }),
 });
@@ -27,7 +27,7 @@ export const createUserSchema = z.object({
       .min(8, 'Mật khẩu phải có ít nhất 8 ký tự'),
     fullName: z.string().min(2, 'Họ tên phải có ít nhất 2 ký tự'),
     phone: z.string().optional(),
-    status: z.enum(['active', 'inactive', 'suspended']).optional(),
+    status: z.enum(['pending', 'active', 'inactive', 'suspended']).optional(),
     roleId: z.string().uuid().optional(),
     // shopId là optional vì backend sẽ tự lấy từ req.user.shopId khi assume shop
     // Nếu không có trong context thì sẽ validate trong service
@@ -44,7 +44,7 @@ export const updateUserSchema = z.object({
     fullName: z.string().min(2, 'Họ tên phải có ít nhất 2 ký tự').optional(),
     phone: z.string().optional().nullable(),
     avatarUrl: z.string().url().optional().nullable(),
-    status: z.enum(['active', 'inactive', 'suspended']).optional(),
+    status: z.enum(['pending', 'active', 'inactive', 'suspended']).optional(),
     password: z.string().min(8, 'Mật khẩu phải có ít nhất 8 ký tự').optional(),
   }),
 });

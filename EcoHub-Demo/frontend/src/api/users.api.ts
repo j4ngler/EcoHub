@@ -1,6 +1,6 @@
 import api from './axios';
 
-export type UserStatus = 'active' | 'inactive' | 'suspended';
+export type UserStatus = 'pending' | 'active' | 'inactive' | 'suspended';
 
 export interface UsersRole {
   id: string;

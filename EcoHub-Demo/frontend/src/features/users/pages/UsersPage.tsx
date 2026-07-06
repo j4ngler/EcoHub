@@ -105,6 +105,11 @@ export default function UsersPage() {
     return filtered;
   }, [roles, activeShop, isShopContext]);
 
+  const selectedRoleName = useMemo(() => {
+    const roleObj = roles?.find((r) => r.id === createForm.roleId);
+    return roleObj?.name || '';
+  }, [roles, createForm.roleId]);
+
   const createMutation = useMutation({
     mutationFn: () =>
       usersApi.create({
@@ -256,6 +261,7 @@ export default function UsersPage() {
 
   const getStatusBadge = (status: string) => {
     const config: Record<string, { label: string; variant: 'success' | 'danger' | 'warning' }> = {
+      pending: { label: 'Chờ duyệt', variant: 'warning' },
       active: { label: 'Hoạt động', variant: 'success' },
       inactive: { label: 'Không hoạt động', variant: 'danger' },
       suspended: { label: 'Bị khóa', variant: 'warning' },
@@ -316,6 +322,7 @@ export default function UsersPage() {
                 onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}
               >
                 <option value="">Tất cả trạng thái</option>
+                <option value="pending">Chờ duyệt</option>
                 <option value="active">Hoạt động</option>
                 <option value="inactive">Không hoạt động</option>
                 <option value="suspended">Bị khóa</option>
@@ -589,6 +596,7 @@ export default function UsersPage() {
               value={createForm.status}
               onChange={(e) => setCreateForm({ ...createForm, status: e.target.value as UserStatus })}
               options={[
+                { value: 'pending', label: 'Chờ duyệt' },
                 { value: 'active', label: 'Hoạt động' },
                 { value: 'inactive', label: 'Không hoạt động' },
                 { value: 'suspended', label: 'Bị khóa' },
@@ -629,14 +637,20 @@ export default function UsersPage() {
                 value={activeShop ? `${activeShop.name} (${activeShop.code})` : 'Đang quản lý shop'}
                 disabled
               />
+            ) : selectedRoleName === 'super_admin' ? (
+              <Input
+                label="Shop"
+                value="Tất cả (Toàn hệ thống - dành cho Super Admin)"
+                disabled
+              />
             ) : (
               <Select
-                label="Shop (bắt buộc)"
+                label={selectedRoleName === 'admin' ? "Shop (không bắt buộc đối với Admin)" : "Shop (bắt buộc)"}
                 value={createForm.shopId}
                 onChange={(e) => setCreateForm({ ...createForm, shopId: e.target.value })}
-                required
+                required={selectedRoleName !== 'admin'}
                 options={[
-                  { value: '', label: 'Chọn shop...' },
+                  { value: '', label: selectedRoleName === 'admin' ? 'Tất cả (Toàn hệ thống)' : 'Chọn shop...' },
                   ...(shops || []).map((s) => ({
                     value: s.id,
                     label: `${s.name} (${s.code}) — ${s.phone || '-'} — ${s.email || '-'} — ${s.address || '-'}`,
@@ -690,6 +704,7 @@ export default function UsersPage() {
               value={editForm.status}
               onChange={(e) => setEditForm({ ...editForm, status: e.target.value as UserStatus })}
               options={[
+                { value: 'pending', label: 'Chờ duyệt' },
                 { value: 'active', label: 'Hoạt động' },
                 { value: 'inactive', label: 'Không hoạt động' },
                 { value: 'suspended', label: 'Bị khóa' },

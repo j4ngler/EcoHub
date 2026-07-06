@@ -11,19 +11,23 @@ export const registerSchema = z.object({
     password: z
       .string()
       .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
-      .regex(
-        /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/,
-        'Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ thường và 1 số'
-      ),
+      .regex(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, 'Mật khẩu phải chứa ít nhất 1 chữ hoa, 1 chữ thường và 1 số'),
     fullName: z.string().min(2, 'Họ tên phải có ít nhất 2 ký tự'),
     phone: z.string().optional(),
+    role: z.enum(['admin', 'staff', 'customer_service', 'customer', 'shipper'], {
+      errorMap: () => ({ message: 'Vai trò đăng ký không hợp lệ' }),
+    }),
   }),
 });
 
 export const loginSchema = z.object({
   body: z.object({
-    email: z.string().email('Email không hợp lệ'),
-    password: z.string().min(1, 'Vui lòng nhập mật khẩu'),
+    loginId: z.string().min(1, 'Vui long nhap email hoac ten dang nhap').optional(),
+    email: z.string().min(1, 'Vui long nhap email hoac ten dang nhap').optional(),
+    password: z.string().min(1, 'Vui long nhap mat khau'),
+  }).refine((data) => Boolean((data.loginId || data.email || '').trim()), {
+    message: 'Vui long nhap email hoac ten dang nhap',
+    path: ['loginId'],
   }),
 });
 
@@ -35,7 +39,6 @@ export const refreshTokenSchema = z.object({
 
 export const assumeShopSchema = z.object({
   body: z.object({
-    // null/undefined => thoát chế độ quản lý shop
     shopId: z.string().uuid().nullable().optional(),
   }),
 });

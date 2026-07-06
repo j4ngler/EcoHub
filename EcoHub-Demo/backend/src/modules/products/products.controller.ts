@@ -75,7 +75,8 @@ export const updateStock = async (req: AuthRequest, res: Response, next: NextFun
 
 export const getCategories = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const categories = await productService.getCategories(req.query.shopId as string);
+    const shopId = (req.user?.shopId as string) || (req.query.shopId as string);
+    const categories = await productService.getCategories(shopId);
     success(res, categories);
   } catch (error) {
     next(error);
@@ -84,7 +85,11 @@ export const getCategories = async (req: AuthRequest, res: Response, next: NextF
 
 export const createCategory = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const category = await productService.createCategory(req.body);
+    const payload = {
+      ...req.body,
+      shopId: req.user?.shopId || req.body.shopId,
+    };
+    const category = await productService.createCategory(payload);
     created(res, category, 'Tạo danh mục thành công');
   } catch (error) {
     next(error);

@@ -11,11 +11,11 @@ services:
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
       - ./uploads:/var/www/uploads
       - nginx_cache:/var/cache/nginx
     depends_on:
       - backend
-      - frontend
     restart: unless-stopped
     networks:
       - ecohub-network
@@ -70,8 +70,23 @@ services:
       - NODE_ENV=development
       - JWT_SECRET=your-super-secret-jwt-key-change-in-production
       - JWT_REFRESH_SECRET=your-refresh-secret-key-change-in-production
+      - FRONTEND_URL=${FRONTEND_URL:-http://101.99.38.74}
+      - BACKEND_PUBLIC_URL=${BACKEND_PUBLIC_URL:-http://101.99.38.74}
+      - SHOPEE_ENV=${SHOPEE_ENV:-test}
+      - SHOPEE_PARTNER_ID=${SHOPEE_PARTNER_ID}
+      - SHOPEE_PARTNER_KEY=${SHOPEE_PARTNER_KEY}
+      - SHOPEE_TEST_API_BASE_URL=${SHOPEE_TEST_API_BASE_URL:-https://openplatform.sandbox.test-stable.shopee.sg}
+      - SHOPEE_TEST_AUTH_BASE_URL=${SHOPEE_TEST_AUTH_BASE_URL:-https://open.sandbox.test-stable.shopee.com/auth}
+      - SHOPEE_TEST_REDIRECT_URL=${SHOPEE_TEST_REDIRECT_URL:-http://101.99.38.74/api/auth/shopee/callback}
+      - SHOPEE_LIVE_PARTNER_ID=${SHOPEE_LIVE_PARTNER_ID}
+      - SHOPEE_LIVE_PARTNER_KEY=${SHOPEE_LIVE_PARTNER_KEY}
+      - SHOPEE_LIVE_API_BASE_URL=${SHOPEE_LIVE_API_BASE_URL:-https://partner.shopeemobile.com}
+      - SHOPEE_LIVE_AUTH_BASE_URL=${SHOPEE_LIVE_AUTH_BASE_URL:-https://open.shopee.com/auth}
+      - SHOPEE_LIVE_REDIRECT_URL=${SHOPEE_LIVE_REDIRECT_URL:-https://101.99.38.74/api/auth/shopee/callback}
+      - SHOPEE_TOKEN_REFRESH_ENABLED=${SHOPEE_TOKEN_REFRESH_ENABLED:-true}
+      - SHOPEE_PUSH_CALLBACK_TOKEN=${SHOPEE_PUSH_CALLBACK_TOKEN}
       # Video storage (GB) used for dashboard percentage
-      - VIDEO_STORAGE_LIMIT_GB=50
+      - VIDEO_STORAGE_LIMIT_GB=100
       # Email Configuration
       - MAIL_MAILER=smtp
       - MAIL_HOST=e2.vinahost.vn
@@ -86,15 +101,12 @@ services:
     ports:
       - "3000:3000"
     volumes:
-      - ./backend:/app
-      - /app/node_modules
       - ./uploads:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: npm run dev
     restart: unless-stopped
     networks:
       - ecohub-network
@@ -106,17 +118,16 @@ services:
       dockerfile: Dockerfile
     container_name: ecohub-frontend
     environment:
-      - VITE_API_URL=http://localhost:3000/api
+      - VITE_API_URL=/api
       # Proxy /api và /uploads tới backend khi chạy trong Docker
       - VITE_PROXY_TARGET=http://backend:3000
+      - VITE_PUBLIC_HOST=${VITE_PUBLIC_HOST:-101.99.38.74}
+      - VITE_HMR_PROTOCOL=${VITE_HMR_PROTOCOL:-wss}
+      - VITE_HMR_CLIENT_PORT=${VITE_HMR_CLIENT_PORT:-443}
     ports:
       - "5173:5173"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
-    command: npm run dev -- --host
     restart: unless-stopped
     networks:
       - ecohub-network

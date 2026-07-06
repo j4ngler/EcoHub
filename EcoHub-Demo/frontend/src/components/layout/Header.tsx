@@ -1,15 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Menu, Bell, Search, LogOut, User, Settings, ChevronDown, Shield } from 'lucide-react';
+import { LogOut, User, Settings, ChevronDown, Shield } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { authApi } from '@/api/auth.api';
 import toast from 'react-hot-toast';
 
-interface HeaderProps {
-  onMenuClick: () => void;
-}
-
-export default function Header({ onMenuClick }: HeaderProps) {
+export default function Header() {
   const navigate = useNavigate();
   const { user, accessToken, setAuth, clearAuth, hasRole } = useAuthStore();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -44,64 +40,30 @@ export default function Header({ onMenuClick }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-white border-b">
-      <div className="flex items-center justify-between h-16 px-4 lg:px-6">
-        {/* Left side */}
-        <div className="flex items-center gap-4">
-          <button
-            onClick={onMenuClick}
-            className="p-2 rounded-lg hover:bg-gray-100 lg:hidden"
-          >
-            <Menu className="w-5 h-5" />
-          </button>
-          
-          {/* Search */}
-          <div className="hidden md:flex items-center gap-2 bg-gray-100 rounded-lg px-3 py-2 w-64">
-            <Search className="w-4 h-4 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Tìm kiếm..."
-              className="bg-transparent border-none outline-none text-sm flex-1 placeholder-gray-400"
-            />
-          </div>
-        </div>
+    <header className="sticky top-0 z-30 border-b bg-white">
+      <div className="flex h-16 items-center justify-between px-4 lg:px-6">
+        <div />
 
-        {/* Right side */}
         <div className="flex items-center gap-2">
-          {/* Notifications */}
-          <button className="relative p-2 rounded-lg hover:bg-gray-100">
-            <Bell className="w-5 h-5 text-gray-600" />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
-          </button>
-
-          {/* User menu */}
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="flex items-center gap-2 p-2 rounded-lg hover:bg-gray-100"
+              className="flex items-center gap-2 rounded-lg p-2 hover:bg-gray-100"
             >
-              <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                <span className="text-primary-700 font-medium text-sm">
-                  {user?.fullName?.charAt(0) || 'U'}
-                </span>
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary-100">
+                <span className="text-sm font-medium text-primary-700">{user?.fullName?.charAt(0) || 'U'}</span>
               </div>
-              <span className="hidden md:block text-sm font-medium text-gray-700">
-                {user?.fullName}
-              </span>
-              <ChevronDown className="w-4 h-4 text-gray-400" />
+              <span className="hidden text-sm font-medium text-gray-700 md:block">{user?.fullName}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400" />
             </button>
 
             {showDropdown && (
               <>
-                <div 
-                  className="fixed inset-0 z-40"
-                  onClick={() => setShowDropdown(false)}
-                />
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border z-50">
-                  {/* Clickable user header -> go to profile */}
+                <div className="fixed inset-0 z-40" onClick={() => setShowDropdown(false)} />
+                <div className="absolute right-0 z-50 mt-2 w-48 rounded-lg border bg-white shadow-lg">
                   <button
                     type="button"
-                    className="w-full text-left p-3 border-b hover:bg-gray-50 transition-colors"
+                    className="w-full border-b p-3 text-left transition-colors hover:bg-gray-50"
                     onClick={() => {
                       setShowDropdown(false);
                       navigate('/profile');
@@ -114,42 +76,42 @@ export default function Header({ onMenuClick }: HeaderProps) {
                     {isSuperAdmin && isShopContext && (
                       <button
                         type="button"
-                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                        className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
                         onClick={handleBackToSuperAdmin}
                       >
-                        <Shield className="w-4 h-4" />
+                        <Shield className="h-4 w-4" />
                         Về Super Admin
                       </button>
                     )}
                     <button
                       type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => {
                         setShowDropdown(false);
                         navigate('/profile');
                       }}
                     >
-                      <User className="w-4 h-4" />
+                      <User className="h-4 w-4" />
                       Hồ sơ cá nhân
                     </button>
                     <button
                       type="button"
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-lg"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-gray-700 hover:bg-gray-100"
                       onClick={() => {
                         setShowDropdown(false);
                         navigate('/settings');
                       }}
                     >
-                      <Settings className="w-4 h-4" />
+                      <Settings className="h-4 w-4" />
                       Cài đặt
                     </button>
                     <hr className="my-1" />
                     <button
                       type="button"
                       onClick={handleLogout}
-                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm text-red-600 hover:bg-red-50"
                     >
-                      <LogOut className="w-4 h-4" />
+                      <LogOut className="h-4 w-4" />
                       Đăng xuất
                     </button>
                   </div>

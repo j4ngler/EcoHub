@@ -1,22 +1,190 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Response } from 'express';
 import * as videoService from './videos.service';
 import * as videoS3Service from './videos.s3.service';
-import { success, created, paginated, noContent } from '../../utils/response';
+import { decodeS3Key, getPresignedGetUrl } from '../../services/s3.service';
+import { created, noContent, paginated, success } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
+import prisma from '../../config/database';
+import { badRequest, notFound } from '../../middlewares/error.middleware';
+
+export const streamStoredVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const key = decodeS3Key(req.params.encodedKey);
+    const wantsDownload = req.query.download === '1' || req.query.download === 'true';
+    const currentUser = req.user && {
+      userId: req.user.userId,
+      // @ts-ignore JWT roles map to RoleName[] here.
+      roles: req.user.roles,
+      shopId: req.user.shopId ?? null,
+    };
+    const proxyPath = `/api/videos/storage/${req.params.encodedKey}`;
+
+    // Tên file tải về: ưu tiên ?filename=, fallback theo tên object; loại bỏ ký tự nguy hiểm cho header
+    const rawName = (req.query.filename as string) || key.split('/').pop() || 'video.mp4';
+    const safeName = rawName.replace(/[\r\n"\\]/g, '').slice(0, 200);
+
+    // Ghi audit log
+    const userEmail = req.user?.email || 'unknown';
+    const userId = req.user?.userId || 'unknown';
+    const userRoles = req.user?.roles?.join(',') || 'unknown';
+    const userIp = req.ip || req.socket.remoteAddress || 'unknown';
+    const action = wantsDownload ? 'DOWNLOAD' : 'STREAM';
+
+    console.log(`[AUDIT LOG] User ${userEmail} (${userRoles}) requested ${action} for S3 key: ${key} from IP: ${userIp}`);
+
+    const dbVideo = await prisma.video.findUnique({
+      where: { s3Key: key },
+      include: {
+        order: {
+          select: { customerId: true },
+        },
+      },
+    });
+
+    if (dbVideo) {
+      if (dbVideo.status !== 'READY') {
+        throw badRequest('Video chua san sang de xem');
+      }
+      await videoS3Service.assertCanViewVideoRecord(dbVideo, currentUser);
+      await prisma.videoEvent.create({
+        data: {
+          videoId: dbVideo.id,
+          type: wantsDownload ? 'DOWNLOAD_REQUESTED' : 'STREAM_REQUESTED',
+          payload: {
+            userId,
+            email: userEmail,
+            roles: req.user?.roles,
+            ip: userIp,
+            userAgent: req.headers['user-agent'],
+          },
+        },
+      });
+    } else {
+      const packageVideo = await prisma.packageVideo.findFirst({
+        where: {
+          OR: [{ originalVideoUrl: proxyPath }, { processedVideoUrl: proxyPath }],
+        },
+        include: {
+          order: {
+            select: { shopId: true, customerId: true },
+          },
+        },
+      });
+
+      if (packageVideo) {
+        await videoS3Service.assertCanViewVideoRecord(
+          {
+            shopId: packageVideo.order.shopId,
+            uploaderUserId: packageVideo.recordedBy,
+            createdAt: packageVideo.createdAt,
+            order: { customerId: packageVideo.order.customerId },
+          },
+          currentUser
+        );
+      } else {
+        const receivingVideo = await prisma.receivingVideo.findFirst({
+          where: { videoUrl: proxyPath },
+          include: {
+            order: {
+              select: { shopId: true, customerId: true },
+            },
+          },
+        });
+
+        if (!receivingVideo) {
+          throw notFound('Khong tim thay video trong he thong');
+        }
+
+        await videoS3Service.assertCanViewVideoRecord(
+          {
+            shopId: receivingVideo.order.shopId,
+            uploaderUserId: receivingVideo.customerId,
+            createdAt: receivingVideo.createdAt,
+            order: { customerId: receivingVideo.order.customerId },
+          },
+          currentUser
+        );
+      }
+    }
+
+    const presigned = await getPresignedGetUrl({
+      key,
+      expiresInSeconds: 900,
+      responseContentDisposition: wantsDownload ? `attachment; filename="${safeName}"` : undefined,
+    });
+    res.redirect(presigned.url);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const streamPublicStoredVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const key = decodeS3Key(req.params.encodedKey);
+    const proxyPath = `/api/videos/storage/${req.params.encodedKey}`;
+
+    const packageVideo = await prisma.packageVideo.findFirst({
+      where: {
+        OR: [{ originalVideoUrl: proxyPath }, { processedVideoUrl: proxyPath }],
+      },
+      select: { id: true },
+    });
+    const receivingVideo = packageVideo
+      ? null
+      : await prisma.receivingVideo.findFirst({
+          where: { videoUrl: proxyPath },
+          select: { id: true },
+        });
+
+    if (!packageVideo && !receivingVideo) {
+      throw notFound('Khong tim thay video public trong he thong');
+    }
+
+    const presigned = await getPresignedGetUrl({
+      key,
+      expiresInSeconds: 900,
+    });
+    res.redirect(presigned.url);
+  } catch (error) {
+    next(error);
+  }
+};
 
 export const getVideos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const result = await videoService.getVideos({
-      page: Number(req.query.page) || 1,
-      limit: Number(req.query.limit) || 10,
-      search: req.query.search as string,
-      orderId: req.query.orderId as string,
-      status: req.query.status as string,
-      startDate: req.query.startDate as string,
-      endDate: req.query.endDate as string,
-      showDeleted: req.query.showDeleted === 'true',
-    }, req.user);
-    
+    const result = await videoService.getVideos(
+      {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        search: req.query.search as string,
+        orderId: req.query.orderId as string,
+        status: req.query.status as string,
+        startDate: req.query.startDate as string,
+        endDate: req.query.endDate as string,
+        showDeleted: req.query.showDeleted === 'true',
+      },
+      req.user
+    );
+
+    paginated(res, result.videos, result.total, result.page, result.limit);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getReceivingVideos = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await videoService.getReceivingVideos(
+      {
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
+        search: req.query.search as string,
+        orderId: req.query.orderId as string,
+        comparisonStatus: req.query.comparisonStatus as string,
+      },
+      req.user
+    );
+
     paginated(res, result.videos, result.total, result.page, result.limit);
   } catch (error) {
     next(error);
@@ -41,6 +209,34 @@ export const getVideoByTrackingCode = async (req: AuthRequest, res: Response, ne
   }
 };
 
+export const getPublicTrackingDetail = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const detail = await videoService.getPublicTrackingDetail(req.params.code);
+    success(res, detail);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const uploadPublicReceivingVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ success: false, message: 'Vui lòng upload video' });
+    }
+
+    const video = await videoService.uploadPublicReceivingVideo({
+      code: req.params.code,
+      file,
+      note: req.body.note,
+    });
+
+    created(res, video, 'Upload video mở hàng thành công');
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getVideosByOrder = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const videos = await videoService.getVideosByOrder(req.params.orderId, req.user);
@@ -54,7 +250,7 @@ export const uploadPackageVideo = async (req: AuthRequest, res: Response, next: 
   try {
     const file = req.file;
     if (!file) {
-      return res.status(400).json({ success: false, message: 'Vui lòng upload video' });
+      return res.status(400).json({ success: false, message: 'Vui long upload video' });
     }
 
     const video = await videoService.uploadPackageVideo({
@@ -65,7 +261,7 @@ export const uploadPackageVideo = async (req: AuthRequest, res: Response, next: 
       trackingCodePosition: req.body.trackingCodePosition,
     });
 
-    created(res, video, 'Upload video thành công');
+    created(res, video, 'Upload video thanh cong');
   } catch (error) {
     next(error);
   }
@@ -74,7 +270,7 @@ export const uploadPackageVideo = async (req: AuthRequest, res: Response, next: 
 export const approveVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const video = await videoService.approveVideo(req.params.id, req.user!.userId);
-    success(res, video, 'Phê duyệt video thành công');
+    success(res, video, 'Phe duyet video thanh cong');
   } catch (error) {
     next(error);
   }
@@ -93,7 +289,7 @@ export const uploadReceivingVideo = async (req: AuthRequest, res: Response, next
   try {
     const file = req.file;
     if (!file) {
-      return res.status(400).json({ success: false, message: 'Vui lòng upload video' });
+      return res.status(400).json({ success: false, message: 'Vui long upload video' });
     }
 
     const video = await videoService.uploadReceivingVideo({
@@ -103,7 +299,7 @@ export const uploadReceivingVideo = async (req: AuthRequest, res: Response, next
       customerId: req.user!.userId,
     });
 
-    created(res, video, 'Upload video nhận hàng thành công');
+    created(res, video, 'Upload video nhan hang thanh cong');
   } catch (error) {
     next(error);
   }
@@ -130,13 +326,13 @@ export const initS3Upload = async (req: AuthRequest, res: Response, next: NextFu
       },
       req.user && {
         userId: req.user.userId,
-        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        // @ts-ignore JWT roles map to RoleName[] here.
         roles: req.user.roles,
         shopId: req.user.shopId ?? null,
       }
     );
 
-    created(res, result, 'Khởi tạo upload video S3 thành công');
+    created(res, result, 'Khoi tao upload video S3 thanh cong');
   } catch (error) {
     next(error);
   }
@@ -155,13 +351,13 @@ export const completeS3Upload = async (req: AuthRequest, res: Response, next: Ne
       },
       req.user && {
         userId: req.user.userId,
-        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        // @ts-ignore JWT roles map to RoleName[] here.
         roles: req.user.roles,
         shopId: req.user.shopId ?? null,
       }
     );
 
-    success(res, result, 'Xác nhận upload video S3 thành công');
+    success(res, result, 'Xac nhan upload video S3 thanh cong');
   } catch (error) {
     next(error);
   }
@@ -169,13 +365,10 @@ export const completeS3Upload = async (req: AuthRequest, res: Response, next: Ne
 
 export const listS3Videos = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const page = Number(req.query.page) || 1;
-    const limit = Number(req.query.limit) || 10;
-
     const result = await videoS3Service.listVideos(
       {
-        page,
-        limit,
+        page: Number(req.query.page) || 1,
+        limit: Number(req.query.limit) || 10,
         shopId: (req.query.shopId as string) || undefined,
         uploaderUserId: (req.query.uploaderUserId as string) || undefined,
         orderId: (req.query.orderId as string) || undefined,
@@ -186,7 +379,7 @@ export const listS3Videos = async (req: AuthRequest, res: Response, next: NextFu
       },
       req.user && {
         userId: req.user.userId,
-        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        // @ts-ignore JWT roles map to RoleName[] here.
         roles: req.user.roles,
         shopId: req.user.shopId ?? null,
       }
@@ -204,13 +397,22 @@ export const getS3VideoViewUrl = async (req: AuthRequest, res: Response, next: N
       req.params.videoId,
       req.user && {
         userId: req.user.userId,
-        // @ts-ignore RoleName[] tương ứng với kiểu roles trong JWT
+        // @ts-ignore JWT roles map to RoleName[] here.
         roles: req.user.roles,
         shopId: req.user.shopId ?? null,
       }
     );
 
     success(res, result);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateReceivingVideo = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const updated = await videoService.updateReceivingVideo(req.params.id, req.body, req.user);
+    success(res, updated, 'Cập nhật video hoàn hàng thành công');
   } catch (error) {
     next(error);
   }

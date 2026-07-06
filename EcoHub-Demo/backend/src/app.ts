@@ -3,7 +3,6 @@ import path from 'path';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import rateLimit from 'express-rate-limit';
 
 // Import routes
 import authRoutes from './modules/auth/auth.routes';
@@ -18,11 +17,16 @@ import returnRoutes from './modules/returns/returns.routes';
 import metaRoutes from './modules/meta/meta.routes';
 import settingsRoutes from './modules/settings/settings.routes';
 import shopRoutes from './modules/shops/shops.routes';
+import captureRoutes from './modules/capture/capture.routes';
+import shopeeWebhookRoutes from './modules/channels/shopee-webhook.routes';
 
 // Import middlewares
 import { errorHandler } from './middlewares/error.middleware';
 
 const app: Application = express();
+
+const rateLimit = (_options: unknown) =>
+  (_req: Request, _res: Response, next: NextFunction) => next();
 
 // ===========================================
 // MIDDLEWARES
@@ -58,11 +62,15 @@ app.use('/uploads', express.static(path.resolve(process.cwd(), 'uploads')));
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // Limit each IP to 100 requests per windowMs
+  windowMs: 60 * 1000, // 1 minute
+  max: 600, // Limit each IP to 600 requests per minute
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Skip high-frequency capture status polling (FE polls these every 1-10s)
+  skip: (req: Request) => req.method === 'GET' && /\/capture\//.test(req.originalUrl),
   message: {
     success: false,
-    message: 'Quá nhiều yêu cầu, vui lòng thử lại sau 15 phút',
+    message: 'Quá nhiều yêu cầu, vui lòng thử lại sau ít phút',
   },
 });
 app.use('/api', limiter);
@@ -93,6 +101,8 @@ app.use('/api/returns', returnRoutes);
 app.use('/api/meta', metaRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/shops', shopRoutes);
+app.use('/api/capture', captureRoutes);
+app.use('/api/webhooks/shopee', shopeeWebhookRoutes);
 
 // API Documentation
 app.get('/api/docs', (req: Request, res: Response) => {
@@ -133,10 +143,21 @@ app.get('/api/docs', (req: Request, res: Response) => {
       },
       videos: {
         'GET /api/videos': 'Danh sách video',
+        'GET /api/videos/receiving': 'Danh sách video hoàn hàng',
         'GET /api/videos/:id': 'Chi tiết video',
         'POST /api/videos/upload': 'Upload video đóng gói',
+        'POST /api/videos/receiving/upload': 'Upload video hoàn hàng',
         'PUT /api/videos/:id/approve': 'Phê duyệt video',
         'GET /api/videos/tracking/:code': 'Video theo mã vận đơn',
+      },
+      capture: {
+        'GET /api/capture/health': 'Kiem tra kha nang runtime camera tren server hoac local runtime',
+        'GET /api/capture/camera-status': 'Trang thai camera tu backend runtime',
+        'GET /api/capture/upload-status': 'Trang thai upload queue tu backend runtime',
+        'POST /api/capture/start-cameras': 'Khoi dong camera tren server hoac local runtime',
+        'POST /api/capture/stop-cameras': 'Dung camera tren server hoac local runtime',
+        'POST /api/capture/start-recording': 'Bat dau quay tren runtime camera',
+        'POST /api/capture/stop-recording': 'Dung quay tren runtime camera',
       },
       shipping: {
         'GET /api/shipping/carriers': 'Danh sách hãng vận chuyển',

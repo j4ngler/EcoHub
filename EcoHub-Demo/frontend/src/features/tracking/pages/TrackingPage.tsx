@@ -1,268 +1,386 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { Search, Package, Truck, Video, CheckCircle, Clock, MapPin } from 'lucide-react';
-import { ordersApi } from '@/api/orders.api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Camera, CheckCircle, Clock, Package, ScanLine, Search, Truck, Upload, Video } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { videosApi } from '@/api/videos.api';
+import { getErrorMessage } from '@/api/axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge, { ORDER_STATUS_BADGES } from '@/components/ui/Badge';
-import { formatCurrency, formatDateTime } from '@/utils/format';
+import QrCodeScanner from '@/components/QrCodeScanner';
+import { formatDateTime } from '@/utils/format';
+
+type SearchMode = 'manual' | 'scan';
 
 export default function TrackingPage() {
   const { trackingCode: urlTrackingCode } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [searchCode, setSearchCode] = useState(urlTrackingCode || '');
   const [trackingCode, setTrackingCode] = useState(urlTrackingCode || '');
+  const [searchMode, setSearchMode] = useState<SearchMode>('manual');
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+  const [complaintNote, setComplaintNote] = useState('');
+  const previewRef = useRef<HTMLVideoElement | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
 
-  const { data: order, isLoading, error } = useQuery({
-    queryKey: ['tracking', trackingCode],
-    queryFn: () => ordersApi.getOrderByTrackingCode(trackingCode),
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['publicTracking', trackingCode],
+    queryFn: () => videosApi.getPublicTrackingDetail(trackingCode),
     enabled: !!trackingCode,
   });
 
-  const { data: videos } = useQuery({
-    queryKey: ['trackingVideos', trackingCode],
-    queryFn: () => videosApi.getVideoByTrackingCode(trackingCode),
-    enabled: !!trackingCode,
+  const uploadMutation = useMutation({
+    mutationFn: async () => {
+      if (!recordedBlob || !trackingCode) throw new Error('Chưa có video mở hàng để upload');
+      const formData = new FormData();
+      formData.append('video', recordedBlob, `receiving-${trackingCode}.webm`);
+      if (complaintNote.trim()) {
+        formData.append('note', complaintNote.trim());
+      }
+      return videosApi.uploadPublicReceivingVideo(trackingCode, formData);
+    },
+    onSuccess: () => {
+      toast.success('Đã upload video mở hàng');
+      setRecordedBlob(null);
+      setComplaintNote('');
+      queryClient.invalidateQueries({ queryKey: ['publicTracking', trackingCode] });
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
   });
+
+  useEffect(() => {
+    if (previewRef.current && cameraStream) {
+      previewRef.current.srcObject = cameraStream;
+    }
+  }, [cameraStream]);
+
+  useEffect(() => {
+    return () => {
+      cameraStream?.getTracks().forEach((track) => track.stop());
+    };
+  }, [cameraStream]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchCode.trim()) {
-      setTrackingCode(searchCode.trim());
-      navigate(`/tracking/${searchCode.trim()}`);
+    const code = searchCode.trim();
+    if (!code) return;
+    setTrackingCode(code);
+    navigate(`/tracking/${code}`);
+  };
+
+  const handleScannedCode = (code: string) => {
+    const trimmed = code.trim();
+    if (!trimmed) return;
+    setSearchCode(trimmed);
+    setTrackingCode(trimmed);
+    navigate(`/tracking/${trimmed}`);
+  };
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: true,
+      });
+      setCameraStream(stream);
+    } catch (err) {
+      toast.error('Không mở được camera. Hãy kiểm tra quyền camera/microphone trên trình duyệt.');
     }
   };
 
-  const statusConfig = order ? ORDER_STATUS_BADGES[order.status] : null;
+  const startRecording = async () => {
+    let stream = cameraStream;
+    if (!stream) {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: true,
+      });
+      setCameraStream(stream);
+    }
+
+    chunksRef.current = [];
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+      ? 'video/webm;codecs=vp8,opus'
+      : 'video/webm';
+    const recorder = new MediaRecorder(stream, { mimeType });
+    recorderRef.current = recorder;
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunksRef.current.push(event.data);
+    };
+    recorder.onstop = () => {
+      setRecordedBlob(new Blob(chunksRef.current, { type: 'video/webm' }));
+      setIsRecording(false);
+    };
+    recorder.start(1000);
+    setRecordedBlob(null);
+    setIsRecording(true);
+  };
+
+  const stopRecording = () => {
+    recorderRef.current?.stop();
+  };
+
+  const statusConfig = data?.order ? ORDER_STATUS_BADGES[data.order.status] : null;
+  const firstPackageVideo = data?.packageVideos?.[0];
+  const recordedSizeMb = recordedBlob ? (recordedBlob.size / 1024 / 1024).toFixed(1) : null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-blue-100">
-      {/* Header */}
-      <div className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-6">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary-600 rounded-lg flex items-center justify-center">
-              <Truck className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">EcoHub Tracking</h1>
-              <p className="text-sm text-gray-500">Tra cứu đơn hàng và video đóng gói</p>
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-sky-100">
+      <div className="border-b bg-white shadow-sm">
+        <div className="mx-auto flex max-w-5xl items-center gap-3 px-4 py-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600">
+            <Truck className="h-5 w-5 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-bold text-gray-900">EcoHub Tracking</h1>
+            <p className="text-sm text-gray-500">Xem video đóng gói và quay video mở hàng</p>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Search form */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <form onSubmit={handleSearch}>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Nhập mã vận đơn để tra cứu
-              </label>
-              <div className="flex gap-3">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+      <div className="mx-auto max-w-5xl space-y-6 px-4 py-6">
+        <Card>
+          <CardContent className="space-y-4 p-4">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant={searchMode === 'manual' ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setSearchMode('manual')}
+              >
+                <Search className="mr-2 h-4 w-4" />
+                Nhập mã
+              </Button>
+              <Button
+                type="button"
+                variant={searchMode === 'scan' ? 'primary' : 'outline'}
+                size="sm"
+                onClick={() => setSearchMode('scan')}
+              >
+                <ScanLine className="mr-2 h-4 w-4" />
+                Quét QR bằng camera
+              </Button>
+            </div>
+
+            {searchMode === 'manual' ? (
+              <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
                   <input
                     type="text"
                     value={searchCode}
                     onChange={(e) => setSearchCode(e.target.value)}
-                    placeholder="Ví dụ: ECOXYZ123456"
+                    placeholder="Nhập mã vận đơn hoặc mã đơn hàng"
                     className="input pl-10"
                   />
                 </div>
                 <Button type="submit">Tra cứu</Button>
-              </div>
-            </form>
+              </form>
+            ) : (
+              <QrCodeScanner onScan={handleScannedCode} />
+            )}
           </CardContent>
         </Card>
 
-        {/* Loading */}
-        {isLoading && (
+        {isLoading ? (
+          <Card>
+            <CardContent className="py-12 text-center text-gray-500">Đang tải thông tin đơn hàng...</CardContent>
+          </Card>
+        ) : null}
+
+        {error && trackingCode ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <div className="animate-spin w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-gray-500">Đang tìm kiếm...</p>
+              <Package className="mx-auto mb-3 h-12 w-12 text-gray-300" />
+              <p className="font-medium text-gray-700">Không tìm thấy đơn hàng với mã này</p>
+              <p className="mt-1 text-sm text-gray-500">Vui lòng kiểm tra lại mã trên QR hoặc mã vận đơn.</p>
             </CardContent>
           </Card>
-        )}
+        ) : null}
 
-        {/* Error */}
-        {error && trackingCode && (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Package className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-              <p className="text-gray-500">Không tìm thấy đơn hàng với mã vận đơn này</p>
-              <p className="text-sm text-gray-400 mt-2">
-                Vui lòng kiểm tra lại mã vận đơn
-              </p>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Results */}
-        {order && (
-          <div className="space-y-6">
-            {/* Order info */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="w-5 h-5" />
-                    Thông tin đơn hàng
-                  </CardTitle>
-                  <Badge variant={statusConfig?.variant || 'default'}>
-                    {statusConfig?.label || order.status}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Mã đơn hàng</p>
-                    <p className="font-medium">{order.orderCode}</p>
+        {data ? (
+          <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <CardTitle className="flex items-center gap-2">
+                      <Package className="h-5 w-5" />
+                      Thông tin đơn hàng
+                    </CardTitle>
+                    <Badge variant={statusConfig?.variant || 'default'}>
+                      {statusConfig?.label || data.order.status}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Info label="Mã đơn" value={data.order.orderCode} />
+                    <Info label="Mã vận đơn" value={data.order.trackingCode || '-'} mono />
+                    <Info label="Người nhận" value={data.order.customerName} />
+                    <Info label="Đơn vị vận chuyển" value={data.order.carrier?.name || '-'} />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500">Mã vận đơn</p>
-                    <p className="font-mono font-medium">{order.trackingCode}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Người nhận</p>
-                    <p className="font-medium">{order.customerName}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Giá trị đơn hàng</p>
-                    <p className="font-medium text-primary-600">{formatCurrency(order.totalAmount)}</p>
-                  </div>
-                </div>
-
-                <div>
-                  <p className="text-sm text-gray-500 mb-1">Địa chỉ giao hàng</p>
-                  <div className="flex items-start gap-2">
-                    <MapPin className="w-4 h-4 text-gray-400 mt-0.5" />
-                    <p>{order.shippingAddress}</p>
-                  </div>
-                </div>
-
-                {/* Products */}
-                <div>
-                  <p className="text-sm text-gray-500 mb-2">Sản phẩm</p>
-                  <div className="space-y-2">
-                    {order.items?.map((item: any, index: number) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white rounded flex items-center justify-center">
-                            <Package className="w-5 h-5 text-gray-400" />
-                          </div>
-                          <div>
-                            <p className="font-medium">{item.productName}</p>
-                            <p className="text-sm text-gray-500">x{item.quantity}</p>
-                          </div>
+                    <p className="mb-2 text-sm font-medium text-gray-500">Sản phẩm</p>
+                    <div className="space-y-2">
+                      {data.order.items.map((item, index) => (
+                        <div key={`${item.productName}-${index}`} className="rounded-lg border bg-gray-50 p-3">
+                          <p className="font-medium text-gray-900">{item.productName}</p>
+                          <p className="text-sm text-gray-500">
+                            SKU: {item.productSku || '-'} · Số lượng: {item.quantity}
+                          </p>
                         </div>
-                        <p className="font-medium">{formatCurrency(item.unitPrice)}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Status timeline */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="w-5 h-5" />
-                  Trạng thái vận chuyển
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {order.packedAt && (
-                    <div className="flex gap-3">
-                      <div className="relative">
-                        <div className="w-3 h-3 rounded-full bg-green-500" />
-                        <div className="absolute top-3 left-1.5 w-0.5 h-full -translate-x-1/2 bg-gray-200" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Đã đóng gói</p>
-                        <p className="text-sm text-gray-500">{formatDateTime(order.packedAt)}</p>
-                      </div>
-                    </div>
-                  )}
-                  {order.shippedAt && (
-                    <div className="flex gap-3">
-                      <div className="relative">
-                        <div className="w-3 h-3 rounded-full bg-green-500" />
-                        <div className="absolute top-3 left-1.5 w-0.5 h-full -translate-x-1/2 bg-gray-200" />
-                      </div>
-                      <div>
-                        <p className="font-medium">Đang vận chuyển</p>
-                        <p className="text-sm text-gray-500">{formatDateTime(order.shippedAt)}</p>
-                      </div>
-                    </div>
-                  )}
-                  {order.deliveredAt && (
-                    <div className="flex gap-3">
-                      <div className="w-3 h-3 rounded-full bg-green-500" />
-                      <div>
-                        <p className="font-medium">Đã giao hàng</p>
-                        <p className="text-sm text-gray-500">{formatDateTime(order.deliveredAt)}</p>
-                      </div>
-                    </div>
-                  )}
-                  <div className="flex gap-3">
-                    <div className="w-3 h-3 rounded-full bg-primary-600" />
-                    <div>
-                      <p className="font-medium">Tạo đơn hàng</p>
-                      <p className="text-sm text-gray-500">{formatDateTime(order.createdAt)}</p>
+                      ))}
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
 
-            {/* Videos */}
-            {videos && videos.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Video className="w-5 h-5" />
+                    <Video className="h-5 w-5" />
                     Video đóng gói
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-2">
-                    {videos.map((video: any) => (
-                      <div
-                        key={video.id}
-                        className="flex items-center justify-between gap-3 border rounded-lg px-3 py-2 bg-white"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center">
-                            <Video className="w-4 h-4 text-gray-500" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-gray-900 truncate">
-                              {video.trackingCode || order.trackingCode || order.orderCode}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Đóng gói lúc: {formatDateTime(video.createdAt)}
-                            </p>
-                          </div>
-                        </div>
-                        <Button size="sm" className="shrink-0">
-                          Xem video
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
+                  {firstPackageVideo ? (
+                    <div className="space-y-3">
+                      <video
+                        src={firstPackageVideo.videoUrl}
+                        controls
+                        playsInline
+                        className="aspect-video w-full rounded-xl bg-black"
+                      />
+                      <p className="text-sm text-gray-500">
+                        Quay lúc: {formatDateTime(firstPackageVideo.createdAt)}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-dashed p-8 text-center text-gray-500">
+                      Chưa có video đóng gói cho đơn này.
+                    </div>
+                  )}
                 </CardContent>
               </Card>
-            )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Camera className="h-5 w-5" />
+                    Quay video mở hàng
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <video ref={previewRef} autoPlay muted playsInline className="aspect-video w-full rounded-xl bg-black" />
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" variant="outline" onClick={startCamera} disabled={isRecording}>
+                      Bật camera
+                    </Button>
+                    {!isRecording ? (
+                      <Button type="button" onClick={startRecording}>
+                        Bắt đầu quay
+                      </Button>
+                    ) : (
+                      <Button type="button" variant="danger" onClick={stopRecording}>
+                        Kết thúc quay
+                      </Button>
+                    )}
+                  </div>
+                  {recordedBlob ? (
+                    <div className="rounded-xl border bg-emerald-50 p-4">
+                      <div className="mb-3 flex items-center gap-2 text-emerald-700">
+                        <CheckCircle className="h-5 w-5" />
+                        <span className="font-medium">Đã ghi video mở hàng ({recordedSizeMb} MB)</span>
+                      </div>
+                      <textarea
+                        value={complaintNote}
+                        onChange={(e) => setComplaintNote(e.target.value)}
+                        placeholder="Ghi chú khiếu nại nếu có"
+                        className="input min-h-[88px]"
+                      />
+                      <Button
+                        type="button"
+                        className="mt-3"
+                        onClick={() => uploadMutation.mutate()}
+                        disabled={uploadMutation.isPending}
+                      >
+                        <Upload className="mr-2 h-4 w-4" />
+                        Upload video mở hàng
+                      </Button>
+                    </div>
+                  ) : null}
+                </CardContent>
+              </Card>
+            </div>
+
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Trạng thái gửi/hoàn
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 text-sm">
+                  <TimelineItem label="Tạo đơn" value={data.order.createdAt} active />
+                  <TimelineItem label="Đóng gói" value={data.order.packedAt} />
+                  <TimelineItem label="Đã gửi hàng" value={data.order.shippedAt} />
+                  <TimelineItem label="Đã giao hàng" value={data.order.deliveredAt} />
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Video mở hàng đã gửi</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {data.receivingVideos.length === 0 ? (
+                    <p className="text-sm text-gray-500">Chưa có video mở hàng.</p>
+                  ) : (
+                    data.receivingVideos.map((video) => (
+                      <div key={video.id} className="rounded-lg border p-3">
+                        <video src={video.videoUrl} controls playsInline className="mb-2 aspect-video w-full rounded bg-black" />
+                        <p className="text-xs text-gray-500">
+                          Gửi lúc: {formatDateTime(video.recordedAt || video.createdAt)}
+                        </p>
+                        {video.comparisonNotes ? (
+                          <p className="mt-1 text-sm text-gray-700">Ghi chú: {video.comparisonNotes}</p>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </div>
-        )}
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function Info({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <p className="text-sm text-gray-500">{label}</p>
+      <p className={`font-medium text-gray-900 ${mono ? 'font-mono' : ''}`}>{value}</p>
+    </div>
+  );
+}
+
+function TimelineItem({ label, value, active }: { label: string; value?: string | null; active?: boolean }) {
+  return (
+    <div className="flex items-start gap-3">
+      <div className={`mt-1 h-3 w-3 rounded-full ${value || active ? 'bg-emerald-500' : 'bg-gray-300'}`} />
+      <div>
+        <p className="font-medium text-gray-900">{label}</p>
+        <p className="text-gray-500">{value ? formatDateTime(value) : 'Chưa có dữ liệu'}</p>
       </div>
     </div>
   );

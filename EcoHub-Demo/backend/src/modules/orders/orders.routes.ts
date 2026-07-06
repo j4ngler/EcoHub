@@ -6,6 +6,9 @@ import { createOrderSchema, updateOrderSchema, queryOrdersSchema, updateStatusSc
 
 const router = Router();
 
+// Public tracking page for shippers/customers. It returns only one order by tracking code.
+router.get('/tracking/:trackingCode', orderController.getOrderByTrackingCode);
+
 // All routes require authentication
 router.use(authenticate);
 
@@ -24,8 +27,12 @@ router.get(
   orderController.getOrderStats
 );
 
-// Get order by tracking code (public for customers)
-router.get('/tracking/:trackingCode', orderController.getOrderByTrackingCode);
+// Tra cứu đơn hàng theo mã (tab "Tra cứu đơn hàng" - quét QR/nhập mã trong giao diện đã đăng nhập)
+router.get(
+  '/lookup/:code',
+  authorizePermission('orders.view'),
+  orderController.lookupOrderByCode
+);
 
 // Get order by ID
 router.get(

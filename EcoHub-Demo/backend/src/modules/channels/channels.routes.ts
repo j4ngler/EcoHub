@@ -1,31 +1,107 @@
 import { Router } from 'express';
 import * as channelController from './channels.controller';
-import { authenticate, authorizePermission } from '../../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
+import { authenticate, authorize } from '../../middlewares/auth.middleware';
 
 const router = Router();
 
+router.get('/tiktok/callback', channelController.tiktokOAuthCallback);
+router.get('/auth/tiktok/callback', channelController.tiktokOAuthCallback);
+router.get('/shopee/callback', channelController.shopeeOAuthCallback);
+router.get('/auth/shopee/callback', channelController.shopeeOAuthCallback);
+
 router.use(authenticate);
 
-// Get all channels
 router.get('/', channelController.getChannels);
+router.get(
+  '/admin/overview',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.getAdminApiOverview
+);
+router.get(
+  '/shop/:shopId/connections',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.getShopConnections
+);
+router.get(
+  '/connections/channel/:channelId',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.getChannelConnections
+);
+router.get(
+  '/shop/:shopId/overview',
+  authorize(RoleName.super_admin, RoleName.admin, RoleName.staff, RoleName.customer_service),
+  channelController.getShopChannelOverview
+);
+router.get(
+  '/:id/oauth-info',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.getChannelOAuthInfo
+);
+router.get(
+  '/:id/debug-info',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.getChannelDebugInfo
+);
+router.get(
+  '/:id',
+  authorize(RoleName.super_admin, RoleName.admin, RoleName.staff, RoleName.customer_service),
+  channelController.getChannelById
+);
 
-// Get channel by ID
-router.get('/:id', channelController.getChannelById);
+router.post(
+  '/:id/connect',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.connectChannel
+);
+router.post(
+  '/:id/test-api',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.testChannelApi
+);
+router.post(
+  '/:id/merchant-token',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.applyMerchantTokenFallback
+);
+router.post(
+  '/:id/sync-orders',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.syncOrders
+);
+router.post(
+  '/:id/sync-products',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.syncProducts
+);
 
-// Get shop channel connections
-router.get('/shop/:shopId/connections', authorizePermission('settings.view'), channelController.getShopConnections);
+router.delete(
+  '/:id/disconnect',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.disconnectChannel
+);
 
-// Connect to channel
-router.post('/:id/connect', authorizePermission('settings.update'), channelController.connectChannel);
+router.delete(
+  '/:id/connection',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.deleteChannelConnection
+);
 
-// Disconnect from channel
-router.delete('/:id/disconnect', authorizePermission('settings.update'), channelController.disconnectChannel);
-
-// Sync orders from channel
-router.post('/:id/sync-orders', authorizePermission('orders.create'), channelController.syncOrders);
-
-// Sync products from channel
-router.post('/:id/sync-products', authorizePermission('products.create'), channelController.syncProducts);
+router.get(
+  '/connections/:connectionId/eligible-users',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.getEligibleUsersForAllocation
+);
+router.get(
+  '/connections/:connectionId/allocations',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.getConnectionAllocations
+);
+router.post(
+  '/connections/:connectionId/allocations',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.saveConnectionAllocations
+);
 
 export default router;
+

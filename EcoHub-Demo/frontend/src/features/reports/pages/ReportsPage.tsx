@@ -1,297 +1,195 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  BarChart3, 
-  TrendingUp, 
-  DollarSign, 
-  ShoppingCart,
-  Video,
-  Users,
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  BarChart3,
   Download,
-  Truck,
   Package,
-  RefreshCw
+  RefreshCw,
+  ShoppingCart,
+  Truck,
+  Users,
+  Video,
 } from 'lucide-react';
-import { reportsApi } from '@/api/reports.api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import Button from '@/components/ui/Button';
-import { formatCurrency, formatNumber } from '@/utils/format';
-import { getErrorMessage } from '@/api/axios';
-import toast from 'react-hot-toast';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
   Legend,
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell
+  Tooltip,
+  XAxis,
+  YAxis,
 } from 'recharts';
+import toast from 'react-hot-toast';
+import { reportsApi, ReportParams } from '@/api/reports.api';
+import { getErrorMessage } from '@/api/axios';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import Button from '@/components/ui/Button';
+import { ORDER_STATUS_BADGES } from '@/components/ui/Badge';
+import { formatCurrency, formatNumber } from '@/utils/format';
 
-const COLORS = ['#3b82f6', '#22c55e', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+type Tab = 'operational' | 'financial';
 
 export default function ReportsPage() {
-  const [activeTab, setActiveTab] = useState<'financial' | 'operational'>('financial');
-  const [dateRange, setDateRange] = useState({
+  const [activeTab, setActiveTab] = useState<Tab>('operational');
+  const [filters, setFilters] = useState<ReportParams>({
     startDate: '',
     endDate: '',
+    orderStatus: '',
+    staffId: '',
   });
-
   const queryClient = useQueryClient();
 
+  const cleanedFilters = Object.fromEntries(
+    Object.entries(filters).filter(([, value]) => value !== undefined && value !== '')
+  ) as ReportParams;
+
   const { data: dashboard } = useQuery({
-    queryKey: ['dashboard', dateRange],
-    queryFn: () => reportsApi.getDashboard(dateRange),
-  });
-
-  const { data: orderReport } = useQuery({
-    queryKey: ['orderReport', dateRange],
-    queryFn: () => reportsApi.getOrderReport(dateRange),
-  });
-
-  const { data: revenueReport } = useQuery({
-    queryKey: ['revenueReport', dateRange],
-    queryFn: () => reportsApi.getRevenueReport(dateRange),
-  });
-
-  const { data: staffPerformance } = useQuery({
-    queryKey: ['staffPerformance', dateRange],
-    queryFn: () => reportsApi.getStaffPerformance(dateRange),
+    queryKey: ['dashboard', cleanedFilters],
+    queryFn: () => reportsApi.getDashboard(cleanedFilters),
   });
 
   const { data: operationalReport } = useQuery({
-    queryKey: ['operationalReport', dateRange],
-    queryFn: () => reportsApi.getOperationalReport(dateRange),
+    queryKey: ['operationalReport', cleanedFilters],
+    queryFn: () => reportsApi.getOperationalReport(cleanedFilters),
+  });
+
+  const { data: staffPerformance } = useQuery({
+    queryKey: ['staffPerformance', cleanedFilters],
+    queryFn: () => reportsApi.getStaffPerformance(cleanedFilters),
+  });
+
+  const { data: revenueReport } = useQuery({
+    queryKey: ['revenueReport', cleanedFilters],
+    queryFn: () => reportsApi.getRevenueReport(cleanedFilters),
   });
 
   const syncNowMutation = useMutation({
     mutationFn: () => reportsApi.syncNow(['shopee', 'tiktok']),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      queryClient.invalidateQueries({ queryKey: ['orderReport'] });
-      queryClient.invalidateQueries({ queryKey: ['revenueReport'] });
-      queryClient.invalidateQueries({ queryKey: ['staffPerformance'] });
       queryClient.invalidateQueries({ queryKey: ['operationalReport'] });
-      toast.success(`Đã đồng bộ: ${data.total.synced} đơn (tạo ${data.total.created}, cập nhật ${data.total.updated})`);
+      queryClient.invalidateQueries({ queryKey: ['staffPerformance'] });
+      queryClient.invalidateQueries({ queryKey: ['revenueReport'] });
+      toast.success(`Đã đồng bộ: ${data.total.synced} đơn, tạo mới ${data.total.created}, cập nhật ${data.total.updated}`);
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
   const exportMutation = useMutation({
-    mutationFn: () => reportsApi.exportReport({ ...dateRange, type: 'dashboard', format: 'json' }),
+    mutationFn: () => reportsApi.exportReport({ ...cleanedFilters, type: activeTab, format: 'json' }),
     onSuccess: (data) => {
-      toast.success('Đã xuất báo cáo');
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `baocao-${dateRange.startDate || 'all'}-${dateRange.endDate || 'all'}.json`;
+      a.download = `ecohub-report-${activeTab}.json`;
       a.click();
       URL.revokeObjectURL(url);
+      toast.success('Đã xuất báo cáo');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  // Prepare chart data
-  const orderStatusData = dashboard?.ordersByStatus?.map((item, index) => ({
-    name: item.status,
-    value: item.count,
-    color: COLORS[index % COLORS.length],
-  })) || [];
-
-  const channelRevenueData = revenueReport?.byChannel?.map((item: any) => ({
-    name: item.channelName,
-    revenue: item.revenue,
-    orders: item.orderCount,
-  })) || [];
-
-  const storageSummary = dashboard?.summary?.storage;
-  const largestVideos = dashboard?.storage?.largestVideos || [];
-  const formatVideoStorage = (usedBytes: number, totalBytes: number) => {
-    const GB = 1024 ** 3;
-    const MB = 1024 ** 2;
-    if (usedBytes < GB) {
-      return `${(usedBytes / MB).toFixed(1)} MB / ${(totalBytes / GB).toFixed(1)} GB`;
-    }
-    return `${(usedBytes / GB).toFixed(2)} / ${(totalBytes / GB).toFixed(1)} GB`;
-  };
-
-  const operationalDailyData = (operationalReport?.daily || []).map((d) => ({
-    date: d.date,
-    orders: d.orders.total,
-    videosProcessed: d.videos.processed,
+  const operationalDailyData = (operationalReport?.daily || []).map((row) => ({
+    date: row.date,
+    total: row.orders.total,
+    packed: row.orders.packed || 0,
+    unpacked: row.orders.unpacked || 0,
+    shipping: row.orders.shipping,
+    returned: row.orders.returned || 0,
+    receivingVideos: row.receivingVideos.total,
   }));
+
+  const staffChartData = (staffPerformance?.staff || []).map((staff: any) => ({
+    name: staff.name,
+    videos: staff.totalVideos,
+    rate: staff.approvalRate,
+  }));
+
+  const statusOptions = [
+    '',
+    'pending',
+    'confirmed',
+    'packing',
+    'packed',
+    'shipping',
+    'delivered',
+    'completed',
+    'returned',
+    'cancelled',
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Báo cáo</h1>
-          <p className="text-gray-500">Thống kê và phân tích dữ liệu</p>
+          <p className="text-gray-500">Theo dõi đơn trong ngày, đóng gói theo nhân viên, gửi/hoàn và doanh thu.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <input
             type="date"
             className="input"
-            value={dateRange.startDate}
-            onChange={(e) => setDateRange({ ...dateRange, startDate: e.target.value })}
+            value={filters.startDate || ''}
+            onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
           />
           <input
             type="date"
             className="input"
-            value={dateRange.endDate}
-            onChange={(e) => setDateRange({ ...dateRange, endDate: e.target.value })}
+            value={filters.endDate || ''}
+            onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
           />
-          {activeTab === 'operational' && (
-            <Button
-              variant="outline"
-              onClick={() => syncNowMutation.mutate()}
-              disabled={syncNowMutation.isPending}
-            >
-              <RefreshCw className={`w-4 h-4 mr-2 ${syncNowMutation.isPending ? 'animate-spin' : ''}`} />
-              Cập nhật dữ liệu
-            </Button>
-          )}
-          <Button
-            variant="outline"
-            onClick={() => exportMutation.mutate()}
-            disabled={exportMutation.isPending}
+          <select
+            className="input"
+            value={filters.orderStatus || ''}
+            onChange={(e) => setFilters({ ...filters, orderStatus: e.target.value })}
           >
-            <Download className={`w-4 h-4 mr-2 ${exportMutation.isPending ? 'animate-spin' : ''}`} />
+            {statusOptions.map((status) => (
+              <option key={status || 'all'} value={status}>
+                {status ? ORDER_STATUS_BADGES[status]?.label || status : 'Tất cả trạng thái'}
+              </option>
+            ))}
+          </select>
+          <Button variant="outline" onClick={() => syncNowMutation.mutate()} disabled={syncNowMutation.isPending}>
+            <RefreshCw className={`mr-2 h-4 w-4 ${syncNowMutation.isPending ? 'animate-spin' : ''}`} />
+            Đồng bộ
+          </Button>
+          <Button variant="outline" onClick={() => exportMutation.mutate()} disabled={exportMutation.isPending}>
+            <Download className="mr-2 h-4 w-4" />
             Xuất báo cáo
           </Button>
         </div>
       </div>
 
-      {/* Tabs */}
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="border-b border-gray-200">
-          <nav className="flex space-x-8 px-6" aria-label="Tabs">
-            <button
-              onClick={() => setActiveTab('financial')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'financial'
-                  ? 'border-emerald-500 text-emerald-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Báo cáo Tài chính
-            </button>
-            <button
-              onClick={() => setActiveTab('operational')}
-              className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'operational'
-                  ? 'border-emerald-500 text-emerald-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-            >
-              Báo cáo Vận hành
-            </button>
+      <div className="rounded-xl bg-white shadow-sm">
+        <div className="border-b px-6">
+          <nav className="flex gap-8">
+            <TabButton active={activeTab === 'operational'} onClick={() => setActiveTab('operational')}>
+              Báo cáo vận hành
+            </TabButton>
+            <TabButton active={activeTab === 'financial'} onClick={() => setActiveTab('financial')}>
+              Báo cáo tài chính
+            </TabButton>
           </nav>
         </div>
 
         <div className="p-6">
-          {activeTab === 'financial' ? (
-            <>
-              {/* Financial Reports */}
-              {/* Summary cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-500">Tổng doanh thu</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatCurrency(revenueReport?.summary?.totalRevenue || 0)}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-green-100 rounded-xl">
-                        <DollarSign className="w-6 h-6 text-green-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-500">Số đơn hàng</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatNumber(revenueReport?.summary?.orderCount || 0)}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-blue-100 rounded-xl">
-                        <ShoppingCart className="w-6 h-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-500">Giá trị đơn TB</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatCurrency(revenueReport?.summary?.averageOrderValue || 0)}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-yellow-100 rounded-xl">
-                        <TrendingUp className="w-6 h-6 text-yellow-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-500">Phí vận chuyển</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatCurrency(revenueReport?.summary?.totalShippingFee || 0)}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-purple-100 rounded-xl">
-                        <Truck className="w-6 h-6 text-purple-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+          {activeTab === 'operational' ? (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                <MetricCard icon={ShoppingCart} label="Tổng đơn" value={dashboard?.summary.orders.total || 0} />
+                <MetricCard icon={Package} label="Chưa đóng gói" value={dashboard?.summary.videos.unpacked || 0} />
+                <MetricCard icon={Video} label="Đã đóng gói" value={dashboard?.summary.videos.packed || 0} />
+                <MetricCard icon={Truck} label="Đang gửi/hoàn" value={(dashboard?.summary.orders.shipping || 0) + countStatus(dashboard?.shippingReturnSummary, 'returned')} />
               </div>
 
-              {/* Revenue by channel */}
               <Card>
                 <CardHeader>
-                  <CardTitle>Doanh thu theo kênh bán hàng</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={channelRevenueData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="name" />
-                        <YAxis />
-                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                        <Bar dataKey="revenue" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          ) : (
-            <>
-              {/* Operational Reports */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Vận hành theo ngày</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5" />
+                    Vận hành theo ngày
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="h-80">
@@ -302,286 +200,185 @@ export default function ReportsPage() {
                         <YAxis />
                         <Tooltip />
                         <Legend />
-                        <Bar dataKey="orders" name="Đơn hàng" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-                        <Bar dataKey="videosProcessed" name="Video đã xử lý" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="total" name="Tổng đơn" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="packed" name="Đã đóng gói" fill="#22c55e" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="unpacked" name="Chưa đóng gói" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                        <Bar dataKey="returned" name="Hoàn" fill="#ef4444" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Summary cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-500">Tổng đơn hàng</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatNumber(dashboard?.summary?.orders?.total || 0)}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-blue-100 rounded-xl">
-                        <ShoppingCart className="w-6 h-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-500">Video đã xử lý</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatNumber(dashboard?.summary?.videos?.processed || 0)}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-purple-100 rounded-xl">
-                        <Video className="w-6 h-6 text-purple-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-500">Đơn chưa đóng gói</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {formatNumber(
-                            (dashboard?.summary?.orders?.total || 0) - (dashboard?.summary?.videos?.total || 0)
-                          )}
-                        </p>
-                      </div>
-                      <div className="p-3 bg-amber-100 rounded-xl">
-                        <Package className="w-6 h-6 text-amber-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardContent className="p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-500">Dung lượng video</p>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {storageSummary
-                            ? formatVideoStorage(storageSummary.usedBytes, storageSummary.totalBytes)
-                            : '0 / 0 GB'}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Đã dùng: {storageSummary ? storageSummary.usedPercent.toFixed(1) : '0'}%
-                        </p>
-                      </div>
-                      <div className="p-3 rounded-xl"
-                        style={{
-                          backgroundColor:
-                            storageSummary?.status === 'critical'
-                              ? '#fee2e2'
-                              : storageSummary?.status === 'warning'
-                              ? '#fef3c7'
-                              : '#e0f2fe',
-                        }}
-                      >
-                        <Video className="w-6 h-6 text-blue-600" />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Chi tiết theo ngày</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-gray-500 border-b">
-                          <th className="py-2 pr-4">Ngày</th>
-                          <th className="py-2 pr-4">Đơn</th>
-                          <th className="py-2 pr-4">Video</th>
-                          <th className="py-2 pr-4">Video đã xử lý</th>
-                          <th className="py-2 pr-4">Video lỗi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(operationalReport?.daily || []).map((row) => (
-                          <tr key={row.date} className="border-b last:border-b-0">
-                            <td className="py-2 pr-4 font-medium text-gray-900">{row.date}</td>
-                            <td className="py-2 pr-4">{formatNumber(row.orders.total)}</td>
-                            <td className="py-2 pr-4">{formatNumber(row.videos.total)}</td>
-                            <td className="py-2 pr-4">{formatNumber(row.videos.processed)}</td>
-                            <td className="py-2 pr-4">{formatNumber(row.videos.failed)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Order status pie chart */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle>Phân bổ đơn hàng theo trạng thái</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie
-                          data={orderStatusData}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={60}
-                          outerRadius={100}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {orderStatusData.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.color} />
-                          ))}
-                        </Pie>
-                        <Tooltip />
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <div className="flex flex-wrap justify-center gap-4 mt-4">
-                    {orderStatusData.map((item, index) => (
-                      <div key={index} className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: item.color }}
-                        />
-                        <span className="text-sm text-gray-600">
-                          {item.name}: {item.value}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Staff performance */}
-              <Card className="mb-6">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Users className="w-5 h-5" />
-                    Hiệu suất nhân viên
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="bg-gray-50">
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Nhân viên
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Tổng video
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Đã phê duyệt
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                            Tỷ lệ duyệt
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {staffPerformance?.staff?.map((staff: any) => (
-                          <tr key={staff.id} className="hover:bg-gray-50">
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-primary-100 rounded-full flex items-center justify-center">
-                                  <span className="font-medium text-primary-600 text-sm">
-                                    {staff.name?.charAt(0) || '?'}
-                                  </span>
-                                </div>
-                                <div>
-                                  <p className="font-medium text-gray-900">{staff.name}</p>
-                                  <p className="text-sm text-gray-500">{staff.email}</p>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 font-medium">
-                              {formatNumber(staff.totalVideos)}
-                            </td>
-                            <td className="px-6 py-4">{formatNumber(staff.approvedVideos)}</td>
-                            <td className="px-6 py-4">
-                              <div className="flex items-center gap-2">
-                                <div className="w-20 bg-gray-200 rounded-full h-2">
-                                  <div
-                                    className="bg-green-500 h-2 rounded-full"
-                                    style={{ width: `${staff.approvalRate}%` }}
-                                  />
-                                </div>
-                                <span className="text-sm text-gray-600">{staff.approvalRate}%</span>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Storage detail - largest videos */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Video dung lượng lớn (gần đầy kho)</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {largestVideos.length === 0 ? (
-                    <p className="text-sm text-gray-500">Chưa có dữ liệu video.</p>
-                  ) : (
+                  <CardHeader>
+                    <CardTitle>Chi tiết theo ngày</CardTitle>
+                  </CardHeader>
+                  <CardContent>
                     <div className="overflow-x-auto">
-                      <table className="w-full">
+                      <table className="min-w-full text-sm">
                         <thead>
-                          <tr className="bg-gray-50">
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Mã đơn / Mã vận đơn
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Dung lượng
-                            </th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                              Thời gian tạo
-                            </th>
+                          <tr className="border-b text-left text-gray-500">
+                            <th className="py-2 pr-4">Ngày</th>
+                            <th className="py-2 pr-4">Tổng đơn</th>
+                            <th className="py-2 pr-4">Đã đóng gói</th>
+                            <th className="py-2 pr-4">Chưa đóng gói</th>
+                            <th className="py-2 pr-4">Đang gửi</th>
+                            <th className="py-2 pr-4">Hoàn</th>
+                            <th className="py-2 pr-4">Video mở hàng</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {largestVideos.map((v: any) => (
-                            <tr key={v.id}>
-                              <td className="px-6 py-4 text-sm text-gray-900">
-                                <div className="font-medium">{v.orderCode}</div>
-                                <div className="text-xs text-gray-500">{v.trackingCode}</div>
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-900">
-                                {(v.totalSizeBytes / (1024 ** 2)).toFixed(1)} MB
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-500">
-                                {new Date(v.createdAt).toLocaleString('vi-VN')}
-                              </td>
+                        <tbody>
+                          {(operationalReport?.daily || []).map((row) => (
+                            <tr key={row.date} className="border-b last:border-b-0">
+                              <td className="py-2 pr-4 font-medium">{row.date}</td>
+                              <td className="py-2 pr-4">{formatNumber(row.orders.total)}</td>
+                              <td className="py-2 pr-4">{formatNumber(row.orders.packed || 0)}</td>
+                              <td className="py-2 pr-4">{formatNumber(row.orders.unpacked || 0)}</td>
+                              <td className="py-2 pr-4">{formatNumber(row.orders.shipping)}</td>
+                              <td className="py-2 pr-4">{formatNumber(row.orders.returned || 0)}</td>
+                              <td className="py-2 pr-4">{formatNumber(row.receivingVideos.total)}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
                     </div>
-                  )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Đóng gói theo nhân viên
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {(staffPerformance?.staff || []).length === 0 ? (
+                      <p className="py-8 text-center text-gray-500">Chưa có dữ liệu</p>
+                    ) : (
+                      <>
+                        <div className="h-64 w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={staffChartData}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="name" />
+                              <YAxis yAxisId="left" orientation="left" stroke="#10b981" />
+                              <YAxis yAxisId="right" orientation="right" stroke="#6366f1" unit="%" />
+                              <Tooltip />
+                              <Legend />
+                              <Bar yAxisId="left" dataKey="videos" name="Số video đóng gói" fill="#10b981" radius={[4, 4, 0, 0]} />
+                              <Bar yAxisId="right" dataKey="rate" name="Tỷ lệ duyệt" fill="#6366f1" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
+                        <div className="space-y-3">
+                          {staffPerformance?.staff.map((staff: any) => (
+                            <button
+                              key={staff.id}
+                              type="button"
+                              className={`w-full rounded-lg border p-3 text-left transition hover:bg-emerald-50 ${
+                                filters.staffId === staff.id ? 'border-emerald-500 bg-emerald-50' : ''
+                              }`}
+                              onClick={() => setFilters({ ...filters, staffId: filters.staffId === staff.id ? '' : staff.id })}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-medium text-gray-900">{staff.name}</p>
+                                  <p className="text-xs text-gray-500">{staff.email}</p>
+                                </div>
+                                <div className="text-right">
+                                  <p className="font-semibold">{formatNumber(staff.totalVideos)} video</p>
+                                  <p className="text-xs text-gray-500">Duyệt {staff.approvalRate}%</p>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <MetricCard
+                  icon={ShoppingCart}
+                  label="Số đơn hoàn tất"
+                  value={revenueReport?.summary?.orderCount || 0}
+                />
+                <MetricCard
+                  icon={BarChart3}
+                  label="Tổng doanh thu"
+                  value={formatCurrency(revenueReport?.summary?.totalRevenue || 0)}
+                />
+                <MetricCard
+                  icon={Truck}
+                  label="Phí vận chuyển"
+                  value={formatCurrency(revenueReport?.summary?.totalShippingFee || 0)}
+                />
+              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Doanh thu theo kênh bán hàng</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-80">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={revenueReport?.byChannel || []}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="channelName" />
+                        <YAxis />
+                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                        <Bar dataKey="revenue" name="Doanh thu" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 </CardContent>
               </Card>
-            </>
+            </div>
           )}
         </div>
       </div>
     </div>
   );
+}
+
+function TabButton({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`border-b-2 px-1 py-4 text-sm font-medium ${
+        active ? 'border-emerald-500 text-emerald-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MetricCard({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm text-gray-500">{label}</p>
+            <p className="mt-1 text-2xl font-bold text-gray-900">{typeof value === 'number' ? formatNumber(value) : value}</p>
+          </div>
+          <div className="rounded-xl bg-emerald-100 p-3 text-emerald-600">
+            <Icon className="h-6 w-6" />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function countStatus(items: Array<{ status: string; count: number }> | undefined, status: string) {
+  return items?.find((item) => item.status === status)?.count || 0;
 }

@@ -15,6 +15,10 @@ export const getOrders = async (req: AuthRequest, res: Response, next: NextFunct
       carrierId: req.query.carrierId as string,
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
+      packingStatus: req.query.packingStatus as string,
+      shippingReturnStatus: req.query.shippingReturnStatus as string,
+      videoStatus: req.query.videoStatus as string,
+      recordedBy: req.query.recordedBy as string,
     }, req.user);
     
     paginated(res, result.orders, result.total, result.page, result.limit);
@@ -32,9 +36,18 @@ export const getOrderById = async (req: AuthRequest, res: Response, next: NextFu
   }
 };
 
+export const lookupOrderByCode = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const order = await orderService.lookupOrderByCode(req.params.code, req.user);
+    success(res, order);
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getOrderByTrackingCode = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const order = await orderService.getOrderByTrackingCode(req.params.trackingCode);
+    const order = await orderService.getOrderByTrackingCode(req.params.trackingCode, req.user);
     success(res, order);
   } catch (error) {
     next(error);
@@ -97,7 +110,8 @@ export const getOrderStats = async (req: AuthRequest, res: Response, next: NextF
     const stats = await orderService.getOrderStats(
       req.query.shopId as string,
       req.query.startDate as string,
-      req.query.endDate as string
+      req.query.endDate as string,
+      req.user
     );
     success(res, stats);
   } catch (error) {

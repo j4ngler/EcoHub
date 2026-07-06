@@ -18,6 +18,19 @@ export const queryOrdersSchema = z.object({
     carrierId: z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
     startDate: z.string().optional(),
     endDate: z.string().optional(),
+    packingStatus: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.enum(['unpacked', 'packing', 'packed']).optional()
+    ),
+    shippingReturnStatus: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.enum(['not_shipped', 'shipping', 'delivered', 'returned']).optional()
+    ),
+    videoStatus: z.preprocess(
+      (v) => (v === '' ? undefined : v),
+      z.enum(['with_video', 'without_video', 'processing', 'completed']).optional()
+    ),
+    recordedBy: z.preprocess((v) => (v === '' ? undefined : v), z.string().uuid().optional()),
   }),
 });
 

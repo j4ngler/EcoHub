@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import * as authController from './auth.controller';
+import { tiktokOAuthCallback, shopeeOAuthCallback } from '../channels/channels.controller';
 import { validate } from '../../middlewares/validation.middleware';
 import { authenticate } from '../../middlewares/auth.middleware';
 import { assumeShopSchema, loginSchema, registerSchema, refreshTokenSchema } from './auth.dto';
@@ -7,6 +8,9 @@ import { assumeShopSchema, loginSchema, registerSchema, refreshTokenSchema } fro
 const router = Router();
 
 // Public routes
+router.get('/tiktok/callback', tiktokOAuthCallback);
+router.get('/shopee/callback', shopeeOAuthCallback);
+router.get('/register-options', authController.getRegisterOptions);
 router.post('/register', validate(registerSchema), authController.register);
 router.post('/login', validate(loginSchema), authController.login);
 router.post('/refresh-token', validate(refreshTokenSchema), authController.refreshToken);

@@ -16,6 +16,7 @@ datasource db {
 // ============================================
 
 enum UserStatus {
+  pending
   active
   inactive
   suspended
@@ -27,6 +28,7 @@ enum RoleName {
   staff
   customer_service
   customer
+  shipper
 }
 
 enum ChannelStatus {
@@ -139,6 +141,7 @@ model User {
   updatedAt       DateTime    @updatedAt @map("updated_at")
 
   // Relations
+
   userRoles             UserRole[]
   assignedRoles         UserRole[]          @relation("AssignedBy")
   ownedShops            Shop[]
@@ -153,6 +156,7 @@ model User {
   reviewedReturns       ReturnRequest[]     @relation("ReviewedBy")
   inventoryTransactions InventoryTransaction[]
   notifications         Notification[]
+  apiAllocations        UserApiAllocation[]
 
   @@map("users")
 }
@@ -268,6 +272,10 @@ model ShopChannelConnection {
   shopId         String        @map("shop_id")
   channelId      String        @map("channel_id")
   channelShopId  String?       @map("channel_shop_id")
+  merchantId     String?       @map("merchant_id")
+  mainAccountId  String?       @map("main_account_id")
+  shopIdRemote   String?       @map("shop_id_remote")
+  shopCipher     String?       @map("shop_cipher")
   accessToken    String?       @map("access_token")
   refreshToken   String?       @map("refresh_token")
   tokenExpiresAt DateTime?     @map("token_expires_at")
@@ -278,9 +286,28 @@ model ShopChannelConnection {
   // Relations
   shop    Shop         @relation(fields: [shopId], references: [id], onDelete: Cascade)
   channel SalesChannel @relation(fields: [channelId], references: [id])
+  apiAllocations UserApiAllocation[]
 
-  @@unique([shopId, channelId])
+  @@index([channelId, shopIdRemote])
+  @@index([shopId, channelId])
   @@map("shop_channel_connections")
+}
+
+model ChannelWebhookEvent {
+  id           String    @id @default(uuid())
+  channelCode  String    @map("channel_code")
+  eventCode    Int       @map("event_code")
+  remoteShopId String?   @map("remote_shop_id")
+  eventKey     String    @unique @map("event_key")
+  payload      Json
+  status       String    @default("received")
+  error        String?
+  receivedAt   DateTime  @default(now()) @map("received_at")
+  processedAt  DateTime? @map("processed_at")
+
+  @@index([channelCode, eventCode, receivedAt])
+  @@index([remoteShopId])
+  @@map("channel_webhook_events")
 }
 
 // ============================================
@@ -724,4 +751,22 @@ model ReportSubscription {
 
   @@unique([shopId, email, reportType])
   @@map("report_subscriptions")
+}
+
+// ============================================
+// API ALLOCATION FOR SUBORDINATE ACCOUNTS
+// ============================================
+
+model UserApiAllocation {
+  id           String   @id @default(uuid())
+  userId       String   @map("user_id")
+  connectionId String   @map("connection_id")
+  allocatedAt  DateTime @default(now()) @map("allocated_at")
+
+  // Relations
+  user       User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection ShopChannelConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, connectionId])
+  @@map("user_api_allocations")
 }

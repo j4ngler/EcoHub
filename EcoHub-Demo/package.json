@@ -8,9 +8,11 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend:https\" \"npm run dev:frontend:http\"",
     "dev:backend": "npm run dev --workspace=backend",
     "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:frontend:http": "npm run dev:http --workspace=frontend",
+    "dev:frontend:https": "npm run dev:https --workspace=frontend",
     "build": "npm run build --workspaces",
     "build:backend": "npm run build --workspace=backend",
     "build:frontend": "npm run build --workspace=frontend",
@@ -19,6 +21,7 @@
     "db:studio": "npm run db:studio --workspace=backend"
   },
   "devDependencies": {
+    "@mohtasham/md-to-docx": "^2.12.4",
     "concurrently": "^8.2.2"
   },
   "engines": {

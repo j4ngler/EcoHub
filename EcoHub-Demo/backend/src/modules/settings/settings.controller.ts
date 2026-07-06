@@ -5,6 +5,25 @@ import { AuthRequest } from '../../middlewares/auth.middleware';
 import { RoleName } from '@prisma/client';
 import { badRequest } from '../../middlewares/error.middleware';
 
+export const getCaptureSettings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const settings = await settingsService.buildCaptureSettingsOverview(req.user?.userId);
+    success(res, settings);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateCaptureSettings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await settingsService.updateCaptureSettings(req.body || {}, req.user?.userId);
+    const settings = await settingsService.buildCaptureSettingsOverview(req.user?.userId);
+    success(res, settings, 'Đã cập nhật cấu hình camera');
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const getReportSubscriptions = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const queryShopId = typeof req.query?.shopId === 'string' && req.query.shopId.trim() ? req.query.shopId.trim() : null;
@@ -98,6 +117,34 @@ export const deleteReportSubscription = async (req: AuthRequest, res: Response, 
     const shopId = req.user?.shopId ?? null;
     await settingsService.deleteReportSubscription(req.params.id, shopId);
     noContent(res);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getS3Settings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const settings = await settingsService.getS3Settings();
+    success(res, settings);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const getS3Capacity = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const capacity = await settingsService.getS3Capacity();
+    success(res, capacity);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateS3Settings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const payload = req.body || {};
+    const settings = await settingsService.updateS3Settings(payload);
+    success(res, settings, 'Đã cập nhật cấu hình lưu trữ S3');
   } catch (error) {
     next(error);
   }

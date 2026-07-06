@@ -23,18 +23,16 @@ export const authenticate = async (
 ) => {
   try {
     const authHeader = req.headers.authorization;
-    
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw unauthorized('Token không được cung cấp');
+    const queryToken = typeof req.query.access_token === 'string' ? req.query.access_token : null;
+
+    if ((!authHeader || !authHeader.startsWith('Bearer ')) && !queryToken) {
+      throw unauthorized('Token khong duoc cung cap');
     }
 
-    const token = authHeader.split(' ')[1];
-    
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.split(' ')[1] : queryToken!;
+
     try {
-      const decoded = jwt.verify(
-        token,
-        process.env.JWT_SECRET || 'secret'
-      ) as JwtPayload;
+      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret') as JwtPayload;
 
       let user;
       try {
@@ -42,25 +40,25 @@ export const authenticate = async (
           where: { id: decoded.userId },
           include: {
             userRoles: {
-              include: { role: true }
-            }
-          }
+              include: { role: true },
+            },
+          },
         });
       } catch (dbError) {
         console.error('[authenticate] Database error:', dbError);
-        return next(serviceUnavailable('Không kết nối được database. Kiểm tra backend và PostgreSQL.'));
+        return next(serviceUnavailable('Khong ket noi duoc database. Kiem tra backend va PostgreSQL.'));
       }
 
       if (!user || user.status !== 'active') {
-        throw unauthorized('Tài khoản không tồn tại hoặc đã bị vô hiệu hóa');
+        throw unauthorized('Tai khoan khong ton tai hoac da bi vo hieu hoa');
       }
 
       let roles: JwtPayload['roles'];
       try {
-        roles = decoded.roles || user.userRoles.map(ur => ur.role.name);
+        roles = user.userRoles.map((ur) => ur.role.name);
       } catch (e) {
         console.error('[authenticate] Error mapping roles:', e);
-        return next(serviceUnavailable('Lỗi xử lý quyền. Kiểm tra dữ liệu UserRole/Role.'));
+        return next(serviceUnavailable('Loi xu ly quyen. Kiem tra du lieu UserRole/Role.'));
       }
 
       req.user = {
@@ -74,16 +72,16 @@ export const authenticate = async (
       next();
     } catch (error) {
       if (error instanceof jwt.TokenExpiredError) {
-        throw unauthorized('Token đã hết hạn');
+        throw unauthorized('Token da het han');
       }
       if (error instanceof jwt.JsonWebTokenError) {
-        throw unauthorized('Token không hợp lệ');
+        throw unauthorized('Token khong hop le');
       }
       if ((error as any)?.statusCode === 401) {
         return next(error);
       }
       console.error('[authenticate] Unexpected error:', error);
-      return next(serviceUnavailable('Lỗi xác thực. Thử đăng nhập lại.'));
+      return next(serviceUnavailable('Loi xac thuc. Thu dang nhap lai.'));
     }
   } catch (error) {
     next(error);
@@ -94,13 +92,13 @@ export const authorize = (...allowedRoles: RoleName[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw unauthorized('Chưa xác thực');
+        throw unauthorized('Chua xac thuc');
       }
 
-      const hasRole = req.user.roles.some(role => allowedRoles.includes(role));
-      
+      const hasRole = req.user.roles.some((role) => allowedRoles.includes(role));
+
       if (!hasRole) {
-        throw forbidden('Không có quyền thực hiện hành động này');
+        throw forbidden('Khong co quyen thuc hien hanh dong nay');
       }
 
       next();
@@ -114,17 +112,15 @@ export const authorizePermission = (...requiredPermissions: string[]) => {
   return async (req: AuthRequest, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw unauthorized('Chưa xác thực');
+        throw unauthorized('Chua xac thuc');
       }
 
       const activeShopId = req.user.shopId ?? null;
 
-      // Super admin has all permissions (trừ khi đang impersonate shop)
       if (!req.user.impersonating && req.user.roles.includes(RoleName.super_admin)) {
         return next();
       }
 
-      // Get user's permissions
       const userRoles = await prisma.userRole.findMany({
         where: {
           userId: req.user.userId,
@@ -134,24 +130,24 @@ export const authorizePermission = (...requiredPermissions: string[]) => {
           role: {
             include: {
               permissions: {
-                include: { permission: true }
-              }
-            }
-          }
-        }
+                include: { permission: true },
+              },
+            },
+          },
+        },
       });
 
       const userPermissions = new Set<string>();
-      userRoles.forEach(ur => {
-        ur.role.permissions.forEach(rp => {
+      userRoles.forEach((ur) => {
+        ur.role.permissions.forEach((rp) => {
           userPermissions.add(rp.permission.name);
         });
       });
 
-      const hasPermission = requiredPermissions.every(p => userPermissions.has(p));
-      
+      const hasPermission = requiredPermissions.every((p) => userPermissions.has(p));
+
       if (!hasPermission) {
-        throw forbidden('Không có quyền thực hiện hành động này');
+        throw forbidden('Khong co quyen thuc hien hanh dong nay');
       }
 
       next();

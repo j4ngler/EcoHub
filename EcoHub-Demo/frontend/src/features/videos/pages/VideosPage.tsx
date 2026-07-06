@@ -1,15 +1,18 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Video, Search, Upload, Filter, Eye, Trash2, HardDrive, Clock, CheckCircle, GitCompare } from 'lucide-react';
-import { videosApi, VideoQueryParams } from '@/api/videos.api';
+import { Video, Search, Upload, Filter, Eye, Trash2, HardDrive, Clock, CheckCircle, GitCompare, Play, Download } from 'lucide-react';
+import { videosApi, VideoQueryParams, PackageVideo } from '@/api/videos.api';
 import { getErrorMessage } from '@/api/axios';
 import { formatDateTime } from '@/utils/format';
 import toast from 'react-hot-toast';
 import Modal from '@/components/ui/Modal';
+import { useAuthStore } from '@/store/authStore';
 
 export default function VideosPage() {
   const navigate = useNavigate();
+  const { user, accessToken } = useAuthStore();
+  const isSuperAdmin = user?.roles?.includes('super_admin');
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState<VideoQueryParams>({
     page: 1,
@@ -40,7 +43,27 @@ export default function VideosPage() {
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
+  const [viewVideo, setViewVideo] = useState<PackageVideo | null>(null);
   const [compareVideoId, setCompareVideoId] = useState<string | null>(null);
+
+  // URL phát trực tiếp (proxy backend -> redirect presigned S3)
+  const getPlayableUrl = (video: PackageVideo): string => {
+    const baseUrl = video.processedVideoUrl || video.originalVideoUrl || (video as any).videoUrl || '';
+    if (!baseUrl) return '';
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    return accessToken ? `${baseUrl}${sep}access_token=${accessToken}` : baseUrl;
+  };
+
+  // URL tải về: thêm download=1 để backend đặt Content-Disposition: attachment
+  const getDownloadUrl = (video: PackageVideo): string => {
+    const baseUrl = video.processedVideoUrl || video.originalVideoUrl || (video as any).videoUrl || '';
+    if (!baseUrl) return '';
+    const name = `${video.trackingCode || video.order?.orderCode || 'video'}.mp4`;
+    const sep = baseUrl.includes('?') ? '&' : '?';
+    const url = `${baseUrl}${sep}download=1&filename=${encodeURIComponent(name)}`;
+    const tokenSep = url.includes('?') ? '&' : '?';
+    return accessToken ? `${url}${tokenSep}access_token=${accessToken}` : url;
+  };
   const { data: compareData, isLoading: compareLoading } = useQuery({
     queryKey: ['videos', 'compare', compareVideoId],
     queryFn: () => (compareVideoId ? videosApi.compareVideos(compareVideoId) : Promise.resolve(null)),
@@ -61,6 +84,20 @@ export default function VideosPage() {
 
   const videos = data?.data ?? [];
   const meta = data?.meta;
+  const formatDuration = (seconds?: number | null) => {
+    if (!seconds || seconds <= 0) return '-';
+
+    const totalSeconds = Math.floor(seconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const remainingSeconds = totalSeconds % 60;
+
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(remainingSeconds).padStart(2, '0')}`;
+    }
+
+    return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -69,14 +106,7 @@ export default function VideosPage() {
           <h1 className="text-2xl font-bold text-gray-900">Video đóng gói</h1>
           <p className="mt-1 text-gray-500">Quản lý video đóng gói có mã vận đơn</p>
         </div>
-        <button
-          type="button"
-          onClick={() => navigate('/videos/create')}
-          className="flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg hover:from-emerald-700 hover:to-teal-700 transition-colors"
-        >
-          <Upload className="h-5 w-5" />
-          Tạo video mới
-        </button>
+
       </div>
 
       {/* Filters - EcoVision style */}
@@ -136,17 +166,8 @@ export default function VideosPage() {
           <p className="mt-1 text-gray-500">
             {filters.search || filters.status
               ? 'Không có video phù hợp bộ lọc.'
-              : 'Tạo video đóng gói đầu tiên từ đơn hàng.'}
+              : 'Hệ thống chưa ghi nhận video đóng gói nào.'}
           </p>
-          {!filters.search && !filters.status && (
-            <button
-              type="button"
-              onClick={() => navigate('/videos/create')}
-              className="mt-6 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
-            >
-              Tạo video mới
-            </button>
-          )}
         </div>
       ) : (
         <div className="bg-white rounded-xl shadow-sm overflow-x-auto">
@@ -228,7 +249,10 @@ export default function VideosPage() {
                       {(() => {
                         const originalSize = Number(video.originalVideoSize || 0);
                         const processedSize = Number(video.processedVideoSize || 0);
-                        const totalSize = originalSize + processedSize;
+                        const totalSize =
+                          video.originalVideoUrl && video.originalVideoUrl === video.processedVideoUrl
+                            ? processedSize || originalSize
+                            : originalSize + processedSize;
                         if (totalSize === 0) return '-';
                         const sizeMB = totalSize / (1024 * 1024);
                         return (
@@ -264,6 +288,26 @@ export default function VideosPage() {
                         >
                           <Eye className="h-5 w-5" />
                         </button>
+                        {getPlayableUrl(video) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setViewVideo(video)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Xem video"
+                            >
+                              <Play className="h-5 w-5" />
+                            </button>
+                            <a
+                              href={getDownloadUrl(video)}
+                              download
+                              className="text-gray-600 hover:text-gray-900"
+                              title="Tải video"
+                            >
+                              <Download className="h-5 w-5" />
+                            </a>
+                          </>
+                        )}
                         {!video.deletedAt && (
                           <>
                             {!video.approvedAt && (video.processingStatus === 'completed' || video.processingStatus === 'uploaded') && (
@@ -329,6 +373,35 @@ export default function VideosPage() {
           </button>
         </div>
       )}
+
+      {/* Modal xem video đóng gói */}
+      <Modal
+        open={!!viewVideo}
+        onClose={() => setViewVideo(null)}
+        title={viewVideo ? `Video - ${viewVideo.trackingCode || viewVideo.order?.orderCode || ''}` : 'Xem video'}
+        size="xl"
+      >
+        {viewVideo && getPlayableUrl(viewVideo) ? (
+          <div className="space-y-4">
+            <div className="overflow-hidden rounded-lg bg-black">
+              <video src={getPlayableUrl(viewVideo)} controls autoPlay className="max-h-[70vh] w-full" />
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <p className="break-all font-mono text-xs text-gray-400">{getPlayableUrl(viewVideo)}</p>
+              <a
+                href={getDownloadUrl(viewVideo)}
+                download
+                className="inline-flex flex-shrink-0 items-center rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-emerald-700"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Tải video (.mp4)
+              </a>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">Video này chưa có đường dẫn phát hợp lệ.</p>
+        )}
+      </Modal>
 
       {/* Modal so sánh video đóng gói vs nhận hàng */}
       <Modal

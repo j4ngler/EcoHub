@@ -9,7 +9,10 @@ export const getDashboard = async (req: AuthRequest, res: Response, next: NextFu
       shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
-    });
+      staffId: req.query.staffId as string,
+      orderStatus: req.query.orderStatus as string,
+      packingStatus: req.query.packingStatus as string,
+    }, req.user);
     success(res, dashboard);
   } catch (error) {
     next(error);
@@ -23,7 +26,8 @@ export const getOrderReport = async (req: AuthRequest, res: Response, next: Next
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
       groupBy: (req.query.groupBy as string) || 'day',
-    });
+      orderStatus: req.query.orderStatus as string,
+    }, req.user);
     success(res, report);
   } catch (error) {
     next(error);
@@ -36,7 +40,8 @@ export const getVideoReport = async (req: AuthRequest, res: Response, next: Next
       shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
-    });
+      staffId: req.query.staffId as string,
+    }, req.user);
     success(res, report);
   } catch (error) {
     next(error);
@@ -50,7 +55,7 @@ export const getRevenueReport = async (req: AuthRequest, res: Response, next: Ne
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
       groupBy: (req.query.groupBy as string) || 'day',
-    });
+    }, req.user);
     success(res, report);
   } catch (error) {
     next(error);
@@ -63,7 +68,8 @@ export const getStaffPerformance = async (req: AuthRequest, res: Response, next:
       shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
-    });
+      staffId: req.query.staffId as string,
+    }, req.user);
     success(res, report);
   } catch (error) {
     next(error);
@@ -77,7 +83,9 @@ export const getOperationalReport = async (req: AuthRequest, res: Response, next
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
       groupBy: (req.query.groupBy as string) || 'day',
-    });
+      staffId: req.query.staffId as string,
+      orderStatus: req.query.orderStatus as string,
+    }, req.user);
     success(res, report);
   } catch (error) {
     next(error);
@@ -100,10 +108,10 @@ export const exportReport = async (req: AuthRequest, res: Response, next: NextFu
     // For now, return JSON
     // In production, you would generate CSV/Excel files
     const data = await reportService.getDashboard({
-      shopId: req.query.shopId as string,
+      shopId: (req.query.shopId as string) || (req.user?.shopId as string),
       startDate: req.query.startDate as string,
       endDate: req.query.endDate as string,
-    });
+    }, req.user);
     
     success(res, data);
   } catch (error) {

@@ -7,24 +7,24 @@ const router = Router();
 router.use(authenticate);
 
 // Dashboard summary
-router.get('/dashboard', authorizePermission('reports.view'), reportController.getDashboard);
+router.get('/dashboard', reportController.getDashboard);
 
 // Order reports
-router.get('/orders', authorizePermission('reports.view'), reportController.getOrderReport);
+router.get('/orders', reportController.getOrderReport);
 
 // Video reports
-router.get('/videos', authorizePermission('reports.view'), reportController.getVideoReport);
+router.get('/videos', reportController.getVideoReport);
 
 // Revenue reports
-router.get('/revenue', authorizePermission('reports.view'), reportController.getRevenueReport);
+router.get('/revenue', reportController.getRevenueReport);
 
 // Staff performance
-router.get('/staff-performance', authorizePermission('reports.view'), reportController.getStaffPerformance);
+router.get('/staff-performance', reportController.getStaffPerformance);
 
 // Operational report (daily)
-router.get('/operational', authorizePermission('reports.view'), reportController.getOperationalReport);
+router.get('/operational', reportController.getOperationalReport);
 
-// Sync now (Shopee/TikTok demo)
+// Sync now
 router.post('/sync-now', authorizePermission('orders.create'), reportController.syncNow);
 
 // Export report

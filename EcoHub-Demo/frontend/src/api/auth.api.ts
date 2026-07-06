@@ -1,7 +1,7 @@
 import api from './axios';
 
 export interface LoginDto {
-  email: string;
+  loginId: string;
   password: string;
 }
 
@@ -11,6 +11,19 @@ export interface RegisterDto {
   password: string;
   fullName: string;
   phone?: string;
+  role: 'admin' | 'staff' | 'customer_service' | 'customer' | 'shipper';
+}
+
+export interface RegisterOptionRole {
+  id: string;
+  name: 'admin' | 'staff' | 'customer_service' | 'customer';
+  description?: string | null;
+}
+
+export interface RegisterOptionShop {
+  id: string;
+  name: string;
+  code: string;
 }
 
 export interface AuthResponse {
@@ -28,14 +41,31 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
+export interface PendingRegisterResponse {
+  approvalRequired: true;
+  message?: string;
+  user: AuthResponse['user'] & { status?: string };
+}
+
+export type RegisterResponse = AuthResponse | PendingRegisterResponse;
+
 export const authApi = {
   login: async (data: LoginDto): Promise<AuthResponse> => {
     const response = await api.post('/auth/login', data);
     return response.data.data;
   },
   
-  register: async (data: RegisterDto): Promise<AuthResponse> => {
+  register: async (data: RegisterDto): Promise<RegisterResponse> => {
     const response = await api.post('/auth/register', data);
+    return response.data.data;
+  },
+
+  getRegisterOptions: async (): Promise<{
+    roles: RegisterOptionRole[];
+    defaultShop: RegisterOptionShop | null;
+    shopMode: 'single' | 'multiple';
+  }> => {
+    const response = await api.get('/auth/register-options');
     return response.data.data;
   },
   

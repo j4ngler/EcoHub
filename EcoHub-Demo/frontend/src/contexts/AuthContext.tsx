@@ -17,7 +17,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (loginId: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (userData: any) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
@@ -38,9 +38,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [storeUser]);
 
-  const login = async (email: string, password: string) => {
+  const login = async (loginId: string, password: string) => {
     try {
-      const response = await authApi.login({ email, password });
+      const response = await authApi.login({ loginId, password });
       setAuth(response.user, response.accessToken, response.refreshToken);
       setUser(response.user);
       return { success: true };
@@ -55,6 +55,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const register = async (userData: any) => {
     try {
       const response = await authApi.register(userData);
+      if (!('accessToken' in response)) {
+        return { success: true };
+      }
       setAuth(response.user, response.accessToken, response.refreshToken);
       setUser(response.user);
       return { success: true };

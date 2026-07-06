@@ -15,7 +15,10 @@ export const getRoles = async (req: AuthRequest, res: Response, next: NextFuncti
 
 export const getShops = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const shops = await metaService.getShops();
+    const shops = await metaService.getShops({
+      userId: req.user?.userId,
+      roles: req.user?.roles || [],
+    });
     success(res, shops);
   } catch (error) {
     console.error('[getShops]', error);

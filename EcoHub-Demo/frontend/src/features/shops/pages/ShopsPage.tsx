@@ -293,7 +293,7 @@ export default function ShopsPage() {
               label="Mã shop"
               value={createForm.code}
               onChange={(e) => setCreateForm({ ...createForm, code: e.target.value })}
-              helperText="Ví dụ: ECOHUB_DEMO"
+              helperText="Mã shop dùng để định danh duy nhất trong hệ thống"
               required
             />
             <Input

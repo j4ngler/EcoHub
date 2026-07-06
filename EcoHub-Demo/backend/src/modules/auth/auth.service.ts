@@ -1,9 +1,9 @@
 import bcrypt from 'bcryptjs';
 import jwt, { SignOptions } from 'jsonwebtoken';
-import prisma from '../../config/database';
-import { unauthorized, conflict, notFound, badRequest } from '../../middlewares/error.middleware';
-import { RegisterDto } from './auth.dto';
 import { RoleName } from '@prisma/client';
+import prisma from '../../config/database';
+import { badRequest, conflict, notFound, unauthorized } from '../../middlewares/error.middleware';
+import { RegisterDto } from './auth.dto';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'secret';
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh-secret';
@@ -17,6 +17,14 @@ interface TokenPayload {
   shopId?: string | null;
   impersonating?: boolean;
 }
+
+const PUBLIC_REGISTER_ROLES: RoleName[] = ([
+  RoleName.admin,
+  RoleName.staff,
+  RoleName.customer_service,
+  RoleName.customer,
+  RoleName.shipper,
+] as Array<RoleName | undefined>).filter((role): role is RoleName => Boolean(role));
 
 const generateTokens = (payload: TokenPayload) => {
   const accessTokenOptions: SignOptions = {
@@ -32,7 +40,17 @@ const generateTokens = (payload: TokenPayload) => {
   return { accessToken, refreshToken };
 };
 
-const sanitizeUserForAuth = (user: { id: string; username: string; email: string; fullName: string; phone?: string | null; avatarUrl?: string | null }, roles: RoleName[]) => ({
+const sanitizeUserForAuth = (
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    fullName: string;
+    phone?: string | null;
+    avatarUrl?: string | null;
+  },
+  roles: RoleName[]
+) => ({
   id: user.id,
   username: user.username,
   email: user.email,
@@ -42,27 +60,67 @@ const sanitizeUserForAuth = (user: { id: string; username: string; email: string
   roles,
 });
 
+export const getRegisterOptions = async () => {
+  const [shops, roles] = await Promise.all([
+    prisma.shop.findMany({
+      where: { status: 'active' },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, name: true, code: true },
+    }),
+    prisma.role.findMany({
+      where: { name: { in: PUBLIC_REGISTER_ROLES } },
+      orderBy: { createdAt: 'asc' },
+      select: { id: true, name: true, description: true },
+    }),
+  ]);
+
+  return {
+    roles,
+    defaultShop: shops[0] || null,
+    shopMode: shops.length === 1 ? 'single' : 'multiple',
+  };
+};
+
 export const register = async (data: RegisterDto) => {
-  // Check if email exists
   const existingEmail = await prisma.user.findUnique({
     where: { email: data.email },
   });
   if (existingEmail) {
-    throw conflict('Email đã được sử dụng');
+    throw conflict('Email da duoc su dung');
   }
 
-  // Check if username exists
   const existingUsername = await prisma.user.findUnique({
     where: { username: data.username },
   });
   if (existingUsername) {
-    throw conflict('Tên đăng nhập đã được sử dụng');
+    throw conflict('Ten dang nhap da duoc su dung');
   }
 
-  // Hash password
+  if (!PUBLIC_REGISTER_ROLES.includes(data.role as RoleName)) {
+    throw badRequest('Khong the dang ky vai tro nay tu form cong khai');
+  }
+
+  const role = await prisma.role.findUnique({
+    where: { name: data.role as RoleName },
+  });
+  if (!role) {
+    throw badRequest('Vai tro dang ky chua duoc cau hinh');
+  }
+
+  const activeShops = await prisma.shop.findMany({
+    where: { status: 'active' },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, name: true, code: true },
+  });
+
+  const isAdminRegistration = data.role === RoleName.admin;
+  if (!isAdminRegistration && !activeShops.length) {
+    throw notFound('Chua co shop noi bo de gan cho tai khoan dang ky');
+  }
+
+  const shop = activeShops[0] || null;
   const passwordHash = await bcrypt.hash(data.password, 12);
 
-  // Create user
   const user = await prisma.user.create({
     data: {
       username: data.username,
@@ -70,46 +128,68 @@ export const register = async (data: RegisterDto) => {
       passwordHash,
       fullName: data.fullName,
       phone: data.phone,
+      status: isAdminRegistration ? 'pending' : 'active',
+      userRoles: {
+        create: {
+          roleId: role.id,
+          shopId: isAdminRegistration ? null : shop!.id,
+        },
+      },
     },
   });
 
-  // Assign customer role by default
-  const customerRole = await prisma.role.findUnique({
-    where: { name: RoleName.customer },
-  });
-
-  if (customerRole) {
-    await prisma.userRole.create({
-      data: {
-        userId: user.id,
-        roleId: customerRole.id,
+  const roles: RoleName[] = [role.name];
+  if (isAdminRegistration) {
+    return {
+      approvalRequired: true,
+      message: 'Tai khoan admin da duoc tao va dang cho super admin phe duyet',
+      user: {
+        ...sanitizeUserForAuth(user, roles),
+        status: user.status,
+        activeShop: null,
+        shops: [],
       },
-    });
+    };
   }
 
-  // Generate tokens
   const tokens = generateTokens({
     userId: user.id,
     email: user.email,
-    roles: [RoleName.customer],
+    roles,
+    shopId: shop!.id,
+    impersonating: false,
   });
 
   return {
     user: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      fullName: user.fullName,
-      phone: user.phone,
+      ...sanitizeUserForAuth(user, roles),
+      activeShop: {
+        id: shop!.id,
+        name: shop!.name,
+        code: shop!.code,
+      },
+      shops: [
+        {
+          id: shop!.id,
+          name: shop!.name,
+          code: shop!.code,
+          role: role.name,
+        },
+      ],
     },
     ...tokens,
   };
 };
 
-export const login = async (email: string, password: string) => {
-  // Find user
-  const user = await prisma.user.findUnique({
-    where: { email },
+export const login = async (loginId: string, password: string) => {
+  const normalizedLoginId = String(loginId || '').trim();
+  const user = await prisma.user.findFirst({
+    where: {
+      OR: [
+        { email: { equals: normalizedLoginId, mode: 'insensitive' } },
+        { username: { equals: normalizedLoginId, mode: 'insensitive' } },
+      ],
+    },
     include: {
       userRoles: {
         include: { role: true, shop: true },
@@ -118,34 +198,30 @@ export const login = async (email: string, password: string) => {
   });
 
   if (!user) {
-    throw unauthorized('Email hoặc mật khẩu không đúng');
+    throw unauthorized('Email/tên đăng nhập hoặc mật khẩu không đúng');
+  }
+
+  if (user.status === 'pending') {
+    throw unauthorized('Tài khoản đang chờ super admin phê duyệt');
   }
 
   if (user.status !== 'active') {
     throw unauthorized('Tài khoản đã bị vô hiệu hóa');
   }
 
-  // Check password
   const isValidPassword = await bcrypt.compare(password, user.passwordHash);
   if (!isValidPassword) {
-    throw unauthorized('Email hoặc mật khẩu không đúng');
+    throw unauthorized('Email/tên đăng nhập hoặc mật khẩu không đúng');
   }
 
-  // Update last login
   await prisma.user.update({
     where: { id: user.id },
     data: { lastLoginAt: new Date() },
   });
 
-  // Generate tokens
-  const roles = user.userRoles.map(ur => ur.role.name);
-
-  // Nếu KHÔNG phải super_admin và user có gắn với 1 shop cụ thể
-  // => mặc định coi như đang làm việc trong shop đó
+  const roles = user.userRoles.map((ur) => ur.role.name);
   const isSuperAdmin = roles.includes(RoleName.super_admin);
-  const defaultShop = isSuperAdmin
-    ? null
-    : user.userRoles.find(ur => ur.shop)?.shop || null;
+  const defaultShop = isSuperAdmin ? null : user.userRoles.find((ur) => ur.shop)?.shop || null;
 
   const tokens = generateTokens({
     userId: user.id,
@@ -167,7 +243,6 @@ export const login = async (email: string, password: string) => {
 };
 
 export const assumeShop = async (userId: string, shopId: string | null) => {
-  // Load user + roles (có shop scope)
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -181,10 +256,16 @@ export const assumeShop = async (userId: string, shopId: string | null) => {
     throw unauthorized('Tài khoản không tồn tại hoặc đã bị vô hiệu hóa');
   }
 
-  // Thoát chế độ quản lý shop => token "bình thường" (giữ super_admin nếu có)
   if (!shopId) {
-    const roles = user.userRoles.map(ur => ur.role.name);
-    const tokens = generateTokens({ userId: user.id, email: user.email, roles, shopId: null, impersonating: false });
+    const roles = user.userRoles.map((ur) => ur.role.name);
+    const tokens = generateTokens({
+      userId: user.id,
+      email: user.email,
+      roles,
+      shopId: null,
+      impersonating: false,
+    });
+
     return {
       user: { ...sanitizeUserForAuth(user, roles), activeShop: null },
       activeShop: null,
@@ -196,21 +277,18 @@ export const assumeShop = async (userId: string, shopId: string | null) => {
     where: { id: shopId },
     select: { id: true, name: true, code: true },
   });
-  if (!targetShop) throw notFound('Không tìm thấy shop');
+  if (!targetShop) {
+    throw notFound('Không tìm thấy shop');
+  }
 
-  const isSuperAdmin = user.userRoles.some(ur => ur.role.name === RoleName.super_admin);
-
-  // Role trong shop mà user có (hoặc super_admin thì cho phép vào như admin)
-  const shopScopedRoles = user.userRoles.filter(ur => ur.shopId === shopId).map(ur => ur.role.name);
+  const isSuperAdmin = user.userRoles.some((ur) => ur.role.name === RoleName.super_admin);
+  const shopScopedRoles = user.userRoles.filter((ur) => ur.shopId === shopId).map((ur) => ur.role.name);
   const allowed = isSuperAdmin || shopScopedRoles.length > 0;
-  if (!allowed) throw unauthorized('Bạn không có quyền quản lý shop này');
+  if (!allowed) {
+    throw unauthorized('Bạn không có quyền quản lý shop này');
+  }
 
-  // Nếu là super_admin và không có role shop => impersonate như admin để dùng đúng permission scope
-  let effectiveRoles: RoleName[] =
-    shopScopedRoles.length > 0 ? shopScopedRoles : [RoleName.admin];
-
-  // Giữ lại super_admin trong token để UI vẫn biết đây là super admin,
-  // nhưng authorizePermission sẽ KHÔNG auto-bypass khi impersonating = true.
+  let effectiveRoles: RoleName[] = shopScopedRoles.length > 0 ? shopScopedRoles : [RoleName.admin];
   if (isSuperAdmin && !effectiveRoles.includes(RoleName.super_admin)) {
     effectiveRoles = [RoleName.super_admin, ...effectiveRoles];
   }
@@ -234,7 +312,6 @@ export const refreshToken = async (refreshToken: string) => {
   try {
     const decoded = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as TokenPayload;
 
-    // Verify user still exists
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
       include: {
@@ -248,8 +325,7 @@ export const refreshToken = async (refreshToken: string) => {
       throw unauthorized('Tài khoản không tồn tại hoặc đã bị vô hiệu hóa');
     }
 
-    // Generate new tokens - giữ nguyên shopId/impersonating từ token cũ
-    const roles = user.userRoles.map(ur => ur.role.name);
+    const roles = user.userRoles.map((ur) => ur.role.name);
     const tokens = generateTokens({
       userId: user.id,
       email: user.email,
@@ -270,7 +346,7 @@ export const refreshToken = async (refreshToken: string) => {
   }
 };
 
-export const getMe = async (userId: string) => {
+export const getMe = async (userId: string, activeShopId?: string | null) => {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
@@ -293,13 +369,17 @@ export const getMe = async (userId: string) => {
     throw notFound('Không tìm thấy người dùng');
   }
 
-  const roles = user.userRoles.map(ur => ur.role.name);
+  const roles = user.userRoles.map((ur) => ur.role.name);
   const permissions = new Set<string>();
-  user.userRoles.forEach(ur => {
-    ur.role.permissions.forEach(rp => {
+  user.userRoles.forEach((ur) => {
+    ur.role.permissions.forEach((rp) => {
       permissions.add(rp.permission.name);
     });
   });
+
+  const activeShop = activeShopId
+    ? user.userRoles.find((ur) => ur.shop?.id === activeShopId)?.shop || null
+    : null;
 
   return {
     id: user.id,
@@ -314,9 +394,12 @@ export const getMe = async (userId: string) => {
     createdAt: user.createdAt,
     roles,
     permissions: Array.from(permissions),
+    activeShop: activeShop
+      ? { id: activeShop.id, name: activeShop.name, code: activeShop.code }
+      : null,
     shops: user.userRoles
-      .filter(ur => ur.shop)
-      .map(ur => ({
+      .filter((ur) => ur.shop)
+      .map((ur) => ({
         id: ur.shop!.id,
         name: ur.shop!.name,
         code: ur.shop!.code,
@@ -358,16 +441,13 @@ export const changePassword = async (
     throw notFound('Không tìm thấy người dùng');
   }
 
-  // Verify current password
   const isValidPassword = await bcrypt.compare(currentPassword, user.passwordHash);
   if (!isValidPassword) {
     throw badRequest('Mật khẩu hiện tại không đúng');
   }
 
-  // Hash new password
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
-  // Update password
   await prisma.user.update({
     where: { id: userId },
     data: { passwordHash },

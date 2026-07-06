@@ -7,6 +7,7 @@ import RegisterPage from '@/features/auth/pages/RegisterPage';
 import DashboardPage from '@/features/dashboard/pages/DashboardPage';
 import OrdersPage from '@/features/orders/pages/OrdersPage';
 import OrderDetailPage from '@/features/orders/pages/OrderDetailPage';
+import OrderLookupPage from '@/features/orders/pages/OrderLookupPage';
 import ProductsPage from '@/features/products/pages/ProductsPage';
 import VideosPage from '@/features/videos/pages/VideosPage';
 import CreateVideoPage from '@/features/videos/pages/CreateVideoPage';
@@ -16,10 +17,13 @@ import ReportsPage from '@/features/reports/pages/ReportsPage';
 import TrackingPage from '@/features/tracking/pages/TrackingPage';
 import InventoryPage from '@/features/products/pages/InventoryPage';
 import SettingsPage from '@/features/settings/pages/SettingsPage';
+import CameraSettingsPage from '@/features/settings/pages/CameraSettingsPage';
 import ReceivingVideosPage from '@/features/videos/pages/ReceivingVideosPage';
 import ShopsPage from '@/features/shops/pages/ShopsPage';
 import ReturnsPage from '@/features/returns/pages/ReturnsPage';
 import ShippingSettingsPage from '@/features/settings/pages/ShippingSettingsPage';
+import S3StoragePage from '@/features/settings/pages/S3StoragePage';
+import ApiManagementPage from '@/features/channels/pages/ApiManagementPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore();
@@ -38,6 +42,29 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/dashboard" replace />;
   }
   
+  return <>{children}</>;
+}
+
+function RoleRoute({
+  children,
+  allowedRoles,
+  disallowRoles = [],
+}: {
+  children: React.ReactNode;
+  allowedRoles?: string[];
+  disallowRoles?: string[];
+}) {
+  const user = useAuthStore((s) => s.user);
+  const roles = user?.roles || [];
+
+  if (allowedRoles && !allowedRoles.some((role) => roles.includes(role))) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  if (disallowRoles.some((role) => roles.includes(role))) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
   return <>{children}</>;
 }
 
@@ -63,15 +90,49 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
+          <Route
+            path="order-lookup"
+            element={
+              <RoleRoute allowedRoles={['customer', 'shipper']}>
+                <OrderLookupPage />
+              </RoleRoute>
+            }
+          />
           <Route path="products" element={<ProductsPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="videos" element={<VideosPage />} />
-          <Route path="videos/create" element={<CreateVideoPage />} />
+          <Route
+            path="videos/create"
+            element={
+              <RoleRoute disallowRoles={['super_admin']}>
+                <CreateVideoPage />
+              </RoleRoute>
+            }
+          />
+
           <Route path="videos/receiving" element={<ReceivingVideosPage />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="profile" element={<ProfilePage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route
+            path="camera-settings"
+            element={
+              <RoleRoute disallowRoles={['super_admin']}>
+                <CameraSettingsPage />
+              </RoleRoute>
+            }
+          />
+          <Route path="channel-management" element={<ApiManagementPage />} />
+          <Route path="api-management" element={<Navigate to="/channel-management" replace />} />
           <Route path="settings/shipping" element={<ShippingSettingsPage />} />
+          <Route
+            path="settings/s3"
+            element={
+              <RoleRoute allowedRoles={['super_admin']}>
+                <S3StoragePage />
+              </RoleRoute>
+            }
+          />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="returns" element={<ReturnsPage />} />
           <Route path="shops" element={<ShopsPage />} />

@@ -1,8 +1,9 @@
-import { VideoModule, VideoUploadStatus, RoleName } from '@prisma/client';
+import { RoleName, VideoModule, VideoUploadStatus } from '@prisma/client';
 import prisma from '../../config/database';
 import { badRequest, forbidden, notFound } from '../../middlewares/error.middleware';
 import { getPagination, parseDateRange } from '../../utils/helpers';
-import { getPresignedPutUrl, getPresignedGetUrl, headObject } from '../../services/s3.service';
+import { getPresignedGetUrl, getPresignedPutUrl, headObject } from '../../services/s3.service';
+import { getCaptureSettings } from '../settings/settings.service';
 
 type CurrentUser = {
   userId: string;
@@ -45,7 +46,6 @@ const inferExtension = (contentType?: string, fileName?: string) => {
   }
 
   if (!contentType) return 'mp4';
-
   if (contentType === 'video/mp4') return 'mp4';
   if (contentType === 'video/quicktime') return 'mov';
   if (contentType === 'video/x-matroska') return 'mkv';
@@ -53,17 +53,121 @@ const inferExtension = (contentType?: string, fileName?: string) => {
   return 'mp4';
 };
 
+const sanitizeS3Segment = (value: string | null | undefined, fallback: string) => {
+  const safe = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9._-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+  return safe || fallback;
+};
+
 const buildS3Key = (params: {
   shopId: string;
   module: VideoModule;
   orderId: string;
+  trackingCode?: string | null;
   uploaderUserId: string;
   extension: string;
+  employeeName?: string;
+  workSessionLabel?: string;
 }) => {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const random = Math.random().toString(36).slice(2, 8);
 
-  return `videos/${params.shopId}/${params.module}/${params.orderId}/${params.uploaderUserId}/${timestamp}_${random}.${params.extension}`;
+  const employeeFolder = sanitizeS3Segment(params.employeeName, 'unknown_employee');
+  const sessionFolder = sanitizeS3Segment(params.workSessionLabel, 'ca');
+  const safeOrderCode = sanitizeS3Segment(params.trackingCode || params.orderId, 'order');
+  const safeExtension = sanitizeS3Segment(params.extension, 'mp4');
+
+  return `videos/${employeeFolder}/${sessionFolder}/${params.module}/processed/${safeOrderCode}_${employeeFolder}_${timestamp}_${random}.${safeExtension}`;
+};
+
+const isGlobalVideoViewer = (roles: RoleName[]) =>
+  roles.includes(RoleName.super_admin) ||
+  roles.includes(RoleName.admin) ||
+  roles.includes(RoleName.customer_service) ||
+  // Shipper tra cứu video đóng gói của nhiều đơn/nhiều shop khác nhau đang giao.
+  roles.includes(RoleName.shipper);
+
+const startOfToday = () => {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date;
+};
+
+const canAccessShop = async (currentUser: CurrentUser, shopId: string | null) => {
+  if (!shopId || isGlobalVideoViewer(currentUser.roles || [])) return true;
+  if (currentUser.shopId === shopId) return true;
+
+  const role = await prisma.userRole.findFirst({
+    where: {
+      userId: currentUser.userId,
+      shopId,
+    },
+    select: { id: true },
+  });
+
+  return Boolean(role);
+};
+
+const ensureCanAccessShop = async (currentUser: CurrentUser, shopId: string | null) => {
+  if (!(await canAccessShop(currentUser, shopId))) {
+    throw forbidden('Ban khong duoc phep thao tac voi video cua shop nay');
+  }
+};
+
+const accessibleShopWhere = async (currentUser: CurrentUser) => {
+  const roles = currentUser.roles || [];
+  if (isGlobalVideoViewer(roles)) return {};
+
+  const userRoles = await prisma.userRole.findMany({
+    where: {
+      userId: currentUser.userId,
+      shopId: { not: null },
+    },
+    select: { shopId: true },
+  });
+  const shopIds = Array.from(
+    new Set([
+      ...(currentUser.shopId ? [currentUser.shopId] : []),
+      ...userRoles.map((role) => role.shopId).filter(Boolean),
+    ])
+  ) as string[];
+
+  return shopIds.length ? { shopId: { in: shopIds } } : { shopId: '__no_access__' };
+};
+
+export const assertCanViewVideoRecord = async (
+  video: {
+    shopId: string | null;
+    uploaderUserId?: string | null;
+    createdAt?: Date | null;
+    order?: { customerId?: string | null } | null;
+  },
+  currentUser?: CurrentUser
+) => {
+  if (!currentUser) {
+    throw forbidden('Vui long dang nhap de xem video');
+  }
+
+  const roles = currentUser.roles || [];
+  const isCustomer = roles.includes(RoleName.customer);
+  const isStaff = roles.includes(RoleName.staff);
+
+  await ensureCanAccessShop(currentUser, video.shopId);
+
+  if (isCustomer && video.order?.customerId && video.order.customerId !== currentUser.userId) {
+    throw forbidden('Ban khong duoc phep xem video cua don hang nay');
+  }
+
+  if (!isGlobalVideoViewer(roles) && isStaff) {
+    const isOwnVideo = video.uploaderUserId === currentUser.userId;
+    const isTodayVideo = video.createdAt ? video.createdAt >= startOfToday() : false;
+    if (!isOwnVideo && !isTodayVideo) {
+      throw forbidden('Ban chi duoc xem video trong ngay hoac video do minh upload');
+    }
+  }
 };
 
 const ensureCanAccessOrder = async (orderId: string, currentUser?: CurrentUser) => {
@@ -73,6 +177,8 @@ const ensureCanAccessOrder = async (orderId: string, currentUser?: CurrentUser) 
       id: true,
       shopId: true,
       customerId: true,
+      channelId: true,
+      trackingCode: true,
     },
   });
 
@@ -85,17 +191,46 @@ const ensureCanAccessOrder = async (orderId: string, currentUser?: CurrentUser) 
   }
 
   const roles = currentUser.roles || [];
-  const isSuperAdmin = roles.includes(RoleName.super_admin);
   const isCustomer = roles.includes(RoleName.customer);
+  const hasShopAccess = await canAccessShop(currentUser, order.shopId);
 
-  // Nếu đang ở ngữ cảnh shop thì chỉ thao tác với đơn thuộc shop đó (trừ Super Admin)
-  if (currentUser.shopId && order.shopId !== currentUser.shopId && !isSuperAdmin) {
+  if (!hasShopAccess) {
     throw forbidden('Bạn không được phép thao tác với đơn hàng của shop khác');
   }
 
-  // Nếu là khách hàng: chỉ được thao tác với đơn của chính mình
   if (isCustomer && order.customerId && order.customerId !== currentUser.userId) {
     throw forbidden('Bạn chỉ được thao tác với đơn hàng của chính mình');
+  }
+
+  // Permission check for packaging staff
+  if (roles.includes(RoleName.staff)) {
+    if (order.shopId && order.channelId) {
+      // Find the API connection for this order
+      const connection = await prisma.shopChannelConnection.findFirst({
+        where: {
+          shopId: order.shopId,
+          channelId: order.channelId,
+          status: 'connected',
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (connection) {
+        // Check if the user is allocated to this connection
+        const allocation = await prisma.userApiAllocation.findUnique({
+          where: {
+            userId_connectionId: {
+              userId: currentUser.userId,
+              connectionId: connection.id,
+            }
+          }
+        });
+
+        if (!allocation) {
+          throw forbidden('Tài khoản của bạn chưa được phân bổ API này để thực hiện đóng gói.');
+        }
+      }
+    }
   }
 
   return order;
@@ -122,16 +257,31 @@ export const initUpload = async (params: InitUploadParams, currentUser?: Current
   }
 
   const order = await ensureCanAccessOrder(params.orderId, currentUser);
-
   const contentType = params.contentType || 'video/mp4';
   const extension = inferExtension(contentType, params.fileName);
+
+  let employeeName = '';
+  let workSessionLabel = '';
+
+  try {
+    const settings = await getCaptureSettings();
+    if (settings?.employeeSession) {
+      employeeName = settings.employeeSession.employeeName;
+      workSessionLabel = settings.employeeSession.workSessionLabel;
+    }
+  } catch (err) {
+    console.error('[S3 upload] Failed to load capture settings:', err);
+  }
 
   const s3Key = buildS3Key({
     shopId: order.shopId,
     module: params.module,
     orderId: order.id,
+    trackingCode: order.trackingCode,
     uploaderUserId: currentUser.userId,
     extension,
+    employeeName,
+    workSessionLabel,
   });
 
   const presigned = await getPresignedPutUrl({
@@ -201,10 +351,9 @@ export const completeUpload = async (params: CompleteUploadParams, currentUser?:
     throw notFound('Không tìm thấy video');
   }
 
-  const roles = currentUser.roles || [];
-  const isSuperAdmin = roles.includes(RoleName.super_admin);
+  const hasShopAccess = await canAccessShop(currentUser, video.shopId);
 
-  if (currentUser.shopId && video.shopId !== currentUser.shopId && !isSuperAdmin) {
+  if (!hasShopAccess) {
     throw forbidden('Bạn không được phép chỉnh sửa video của shop khác');
   }
 
@@ -213,7 +362,6 @@ export const completeUpload = async (params: CompleteUploadParams, currentUser?:
   }
 
   const isFailure = params.success === false || !!params.errorCode || !!params.errorMessage;
-
   if (isFailure) {
     const updated = await prisma.video.update({
       where: { id: video.id },
@@ -243,7 +391,6 @@ export const completeUpload = async (params: CompleteUploadParams, currentUser?:
     return updated;
   }
 
-  // Kiểm tra object trong S3 có tồn tại không
   const head = await headObject(video.s3Key);
   if (!head) {
     const updated = await prisma.video.update({
@@ -337,6 +484,8 @@ export const getVideoViewUrl = async (videoId: string, currentUser?: CurrentUser
     throw badRequest('Video chưa sẵn sàng để xem (đang upload hoặc đã lỗi)');
   }
 
+  await assertCanViewVideoRecord(video, currentUser);
+
   const roles = currentUser.roles || [];
   const isSuperAdmin = roles.includes(RoleName.super_admin);
   const isAdmin = roles.includes(RoleName.admin);
@@ -344,19 +493,16 @@ export const getVideoViewUrl = async (videoId: string, currentUser?: CurrentUser
   const isStaff = roles.includes(RoleName.staff);
   const isCustomer = roles.includes(RoleName.customer);
 
-  // Giới hạn theo shop
-  if (currentUser.shopId && video.shopId !== currentUser.shopId && !isSuperAdmin) {
+  if (false) {
     throw forbidden('Bạn không được phép xem video của shop khác');
   }
 
-  // Khách hàng chỉ xem video của đơn hàng của chính mình
   if (isCustomer && video.order.customerId && video.order.customerId !== currentUser.userId) {
     throw forbidden('Bạn không được phép xem video của đơn hàng này');
   }
 
-  // Nhân viên đóng gói chỉ xem video do mình upload, trừ khi là Admin / CSKH / Super Admin
   const isAdminLike = isSuperAdmin || isAdmin || isCustomerService;
-  if (!isAdminLike && isStaff && video.uploaderUserId !== currentUser.userId) {
+  if (false) {
     throw forbidden('Bạn chỉ được phép xem video do mình upload');
   }
 
@@ -395,16 +541,14 @@ export const listVideos = async (params: ListVideosParams, currentUser?: Current
   }
 
   const { page, limit, skip } = getPagination(params.page, params.limit);
-
   const where: any = {};
-
   const roles = currentUser.roles || [];
-  const isSuperAdmin = roles.includes(RoleName.super_admin);
 
-  // Giới hạn theo shop
-  if (currentUser.shopId && !isSuperAdmin) {
-    where.shopId = currentUser.shopId;
-  } else if (params.shopId) {
+  Object.assign(where, await accessibleShopWhere(currentUser));
+  if (params.shopId) {
+    if (!(await canAccessShop(currentUser, params.shopId))) {
+      throw forbidden('Ban khong duoc phep xem video cua shop nay');
+    }
     where.shopId = params.shopId;
   }
 
@@ -417,15 +561,14 @@ export const listVideos = async (params: ListVideosParams, currentUser?: Current
   }
 
   if (params.module) {
-    const moduleValue = typeof params.module === 'string' ? params.module : params.module.toString();
+    const moduleValue = String(params.module);
     if (Object.values(VideoModule).includes(moduleValue as VideoModule)) {
       where.module = moduleValue;
     }
   }
 
   if (params.status) {
-    const statusValue =
-      typeof params.status === 'string' ? params.status.toUpperCase() : params.status.toString();
+    const statusValue = String(params.status).toUpperCase();
     if (Object.values(VideoUploadStatus).includes(statusValue as VideoUploadStatus)) {
       where.status = statusValue;
     }
@@ -436,15 +579,13 @@ export const listVideos = async (params: ListVideosParams, currentUser?: Current
     where.createdAt = dateFilter;
   }
 
-  // Nhân viên đóng gói chỉ xem video do mình upload (trong shop), Admin / CSKH / Super Admin xem tất cả
-  const isAdmin = roles.includes(RoleName.admin);
-  const isCustomerService = roles.includes(RoleName.customer_service);
   const isStaff = roles.includes(RoleName.staff);
 
-  const isAdminLike = isSuperAdmin || isAdmin || isCustomerService;
-
-  if (!isAdminLike && isStaff) {
-    where.uploaderUserId = currentUser.userId;
+  if (!isGlobalVideoViewer(roles) && isStaff) {
+    where.OR = [
+      { uploaderUserId: currentUser.userId },
+      { createdAt: { gte: startOfToday() } },
+    ];
   }
 
   const [videos, total] = await Promise.all([
@@ -501,12 +642,12 @@ export const cleanupStaleUploads = async (maxMinutesUploading = 30) => {
 
   let failedCount = 0;
 
-  for (const v of staleVideos) {
-    const head = await headObject(v.s3Key);
+  for (const video of staleVideos) {
+    const head = await headObject(video.s3Key);
 
     if (!head) {
       await prisma.video.update({
-        where: { id: v.id },
+        where: { id: video.id },
         data: {
           status: VideoUploadStatus.FAILED,
           errorCode: 'TIMEOUT',
@@ -516,7 +657,7 @@ export const cleanupStaleUploads = async (maxMinutesUploading = 30) => {
 
       await prisma.videoEvent.create({
         data: {
-          videoId: v.id,
+          videoId: video.id,
           type: 'UPLOAD_TIMEOUT',
           payload: {
             reason: 'NO_OBJECT',
@@ -534,4 +675,3 @@ export const cleanupStaleUploads = async (maxMinutesUploading = 30) => {
     markedFailed: failedCount,
   };
 };
-

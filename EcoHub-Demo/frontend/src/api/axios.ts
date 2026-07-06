@@ -1,8 +1,7 @@
 import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-// Use relative path - Vite proxy will handle forwarding in dev, Nginx in prod
-const API_URL = '/api';
+const API_URL = (import.meta.env.VITE_API_URL as string | undefined) || '/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -31,6 +30,15 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
     const is401 = error.response?.status === 401;
+    const requestUrl = String(originalRequest?.url || '');
+    const isPublicAuthRequest = ['/auth/login', '/auth/register', '/auth/refresh-token'].some((path) =>
+      requestUrl.includes(path)
+    );
+
+    // Login/register errors belong to the form. Do not redirect or refresh an old session.
+    if (is401 && isPublicAuthRequest) {
+      return Promise.reject(error);
+    }
 
     const doLogout = () => {
       useAuthStore.getState().clearAuth();

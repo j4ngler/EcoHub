@@ -57,3 +57,7 @@ temp/
 *.tsbuildinfo
 .eslintcache
 .cache/
+
+private_key.pem
+*.pem
+*.key
