@@ -5,13 +5,16 @@ EcoHub là web app TypeScript cho quản lý đơn hàng, kết nối TikTok Sho
 ## Cấu trúc
 
 ```text
-backend/              API Node.js + Express + Prisma
-frontend/             React + Vite + TypeScript
-nginx/                Reverse proxy và static serving
-docker-compose.yml    Môi trường Docker mặc định
-docker-compose.prod.yml
-.env.example          Mẫu biến môi trường
+EcoHub-Demo/
+  backend/              API Node.js + Express + Prisma
+  frontend/             React + Vite + TypeScript
+  nginx/                Reverse proxy và static serving
+  docker-compose.yml    Môi trường Docker mặc định
+  docker-compose.prod.yml
+  .env.example          Mẫu biến môi trường
 ```
+
+Các lệnh bên dưới mặc định chạy trong thư mục `EcoHub-Demo/`.
 
 ## Yêu cầu
 
@@ -26,6 +29,7 @@ docker-compose.prod.yml
 1. Tạo file môi trường:
 
 ```bash
+cd EcoHub-Demo
 cp .env.example .env
 ```
 
@@ -84,6 +88,7 @@ Nếu chạy trên server public, thay `FRONTEND_URL`, `BACKEND_PUBLIC_URL`, cal
 1. Cài dependencies:
 
 ```bash
+cd EcoHub-Demo
 npm install
 ```
 
@@ -153,6 +158,7 @@ Trên server:
 ```bash
 cd /path/to/EcoHub
 git pull origin main
+cd EcoHub-Demo
 
 docker compose build --no-cache backend frontend nginx
 docker compose run --rm backend npx prisma migrate deploy
