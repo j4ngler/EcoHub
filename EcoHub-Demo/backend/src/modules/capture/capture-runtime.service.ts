@@ -1,25 +1,13 @@
 import fs from 'fs/promises';
-import fsSync from 'fs';
 import path from 'path';
 import prisma from '../../config/database';
 import * as uploadQueueService from './upload-queue.service';
 import { lookupAndPersistOrder } from '../channels/tiktok-sync.service';
 import { lookupAndPersistShopeeOrder } from '../channels/shopee-sync.service';
+import { getBarcodeMapCache } from './barcode-mapping.service';
 import { RoleName } from '@prisma/client';
 
-const getBarcodeSkuMap = (): Record<string, string> => {
-  try {
-    const filePath = path.resolve(process.cwd(), 'src/config/barcode_sku_map.json');
-    if (fsSync.existsSync(filePath)) {
-      return JSON.parse(fsSync.readFileSync(filePath, 'utf-8'));
-    }
-  } catch (error) {
-    console.error('Failed to read barcode_sku_map.json:', error);
-  }
-  return {
-    '792259386': 'IPC-A52P-Pro-64',
-  };
-};
+const getBarcodeSkuMap = (): Record<string, string> => getBarcodeMapCache();
 
 type RecordingFlow = 'outbound' | 'return';
 type RuntimeUserScope = { userId: string; roles?: RoleName[] };

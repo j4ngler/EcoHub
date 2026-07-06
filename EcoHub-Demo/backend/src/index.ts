@@ -4,11 +4,15 @@ import { initEmailService } from './services/email.service';
 import { startReportScheduler } from './services/report-scheduler.service';
 import { startVideoUploadMonitor } from './services/video-upload-monitor.service';
 import { startShopeeTokenRefresh } from './services/shopee-token-refresh.service';
+import { initBarcodeMapCache } from './modules/capture/barcode-mapping.service';
 
 const PORT = process.env.PORT || 3000;
 
 // Initialize email service
 initEmailService();
+
+// Load barcode -> SKU mapping cache (migrates legacy JSON file into DB on first run)
+initBarcodeMapCache();
 
 // Start report scheduler (sends daily reports at 18:00)
 startReportScheduler();

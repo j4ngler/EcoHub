@@ -9,6 +9,7 @@ import {
   PackageSearch,
   PlusCircle,
   RotateCcw,
+  ScanLine,
   Settings,
   ShoppingCart,
   Store,
@@ -102,6 +103,12 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     { name: 'Shop', href: '/shops', icon: Store, roles: ['super_admin'] },
     { name: 'Cài đặt', href: '/settings', icon: Settings, roles: ['super_admin', 'admin'], end: true },
     { name: 'Vận chuyển', href: '/settings/shipping', icon: Truck, roles: ['super_admin', 'admin'], hidden: true },
+    {
+      name: 'Ánh xạ mã vạch',
+      href: '/settings/barcode-mapping',
+      icon: ScanLine,
+      roles: ['super_admin', 'admin', 'staff'],
+    },
     { name: 'Lưu trữ S3', href: '/settings/s3', icon: Cloud, roles: ['super_admin'] },
     { name: 'Báo cáo', href: '/reports', icon: BarChart3, roles: ['super_admin', 'admin'] },
   ];

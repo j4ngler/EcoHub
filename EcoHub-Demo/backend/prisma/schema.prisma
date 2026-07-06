@@ -757,6 +757,17 @@ model ReportSubscription {
 // API ALLOCATION FOR SUBORDINATE ACCOUNTS
 // ============================================
 
+model BarcodeMapping {
+  id        String   @id @default(uuid())
+  barcode   String   @unique
+  sku       String
+  note      String?
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("barcode_mappings")
+}
+
 model UserApiAllocation {
   id           String   @id @default(uuid())
   userId       String   @map("user_id")

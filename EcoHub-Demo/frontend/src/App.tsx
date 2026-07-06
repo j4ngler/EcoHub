@@ -23,6 +23,7 @@ import ShopsPage from '@/features/shops/pages/ShopsPage';
 import ReturnsPage from '@/features/returns/pages/ReturnsPage';
 import ShippingSettingsPage from '@/features/settings/pages/ShippingSettingsPage';
 import S3StoragePage from '@/features/settings/pages/S3StoragePage';
+import BarcodeMappingPage from '@/features/settings/pages/BarcodeMappingPage';
 import ApiManagementPage from '@/features/channels/pages/ApiManagementPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -125,6 +126,14 @@ function App() {
           <Route path="channel-management" element={<ApiManagementPage />} />
           <Route path="api-management" element={<Navigate to="/channel-management" replace />} />
           <Route path="settings/shipping" element={<ShippingSettingsPage />} />
+          <Route
+            path="settings/barcode-mapping"
+            element={
+              <RoleRoute disallowRoles={['customer', 'shipper']}>
+                <BarcodeMappingPage />
+              </RoleRoute>
+            }
+          />
           <Route
             path="settings/s3"
             element={

@@ -1,6 +1,6 @@
 import { NextFunction, Response } from 'express';
 import { badRequest } from '../../middlewares/error.middleware';
-import { success } from '../../utils/response';
+import { success, created, noContent } from '../../utils/response';
 import { AuthRequest } from '../../middlewares/auth.middleware';
 import { spawn } from 'child_process';
 import * as captureService from './capture.service';
@@ -9,6 +9,7 @@ import * as captureRuntimeService from './capture-runtime.service';
 import * as rtspRuntimeService from './rtsp-runtime.service';
 import * as rtspRecordingService from './rtsp-recording.service';
 import * as uploadQueueService from './upload-queue.service';
+import * as barcodeMappingService from './barcode-mapping.service';
 
 const relay = async (
   promise: Promise<{ ok: boolean; status: number; data: unknown }>,
@@ -612,6 +613,41 @@ export const rtspPreview = async (req: AuthRequest, res: Response, next: NextFun
 export const cleanupUploads = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     success(res, await uploadQueueService.forceCleanup(), 'Da chay cleanup queue va tep tam');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listBarcodeMappings = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    success(res, await barcodeMappingService.listBarcodeMappings());
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const createBarcodeMapping = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const mapping = await barcodeMappingService.createBarcodeMapping(req.body || {});
+    created(res, mapping, 'Đã thêm ánh xạ mã vạch');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const updateBarcodeMapping = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const mapping = await barcodeMappingService.updateBarcodeMapping(req.params.id, req.body || {});
+    success(res, mapping, 'Đã cập nhật ánh xạ mã vạch');
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const deleteBarcodeMapping = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await barcodeMappingService.deleteBarcodeMapping(req.params.id);
+    noContent(res);
   } catch (error) {
     next(error);
   }

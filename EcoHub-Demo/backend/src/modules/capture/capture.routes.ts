@@ -1,12 +1,34 @@
 import { Router } from 'express';
+import { RoleName } from '@prisma/client';
 import * as captureController from './capture.controller';
-import { authenticate, authorizePermission } from '../../middlewares/auth.middleware';
+import { authenticate, authorize, authorizePermission } from '../../middlewares/auth.middleware';
 import { validate } from '../../middlewares/validation.middleware';
 import { prepareUploadSchema } from './capture.dto';
 
 const router = Router();
 
 router.use(authenticate);
+
+router.get(
+  '/barcode-mappings',
+  authorizePermission('videos.upload'),
+  captureController.listBarcodeMappings
+);
+router.post(
+  '/barcode-mappings',
+  authorize(RoleName.super_admin, RoleName.admin),
+  captureController.createBarcodeMapping
+);
+router.put(
+  '/barcode-mappings/:id',
+  authorize(RoleName.super_admin, RoleName.admin),
+  captureController.updateBarcodeMapping
+);
+router.delete(
+  '/barcode-mappings/:id',
+  authorize(RoleName.super_admin, RoleName.admin),
+  captureController.deleteBarcodeMapping
+);
 
 router.get('/service-info', authorizePermission('settings.view'), captureController.serviceInfo);
 router.get('/health', authorizePermission('videos.view'), captureController.health);
