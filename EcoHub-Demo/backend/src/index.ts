@@ -4,6 +4,7 @@ import { initEmailService } from './services/email.service';
 import { startReportScheduler } from './services/report-scheduler.service';
 import { startVideoUploadMonitor } from './services/video-upload-monitor.service';
 import { startShopeeTokenRefresh } from './services/shopee-token-refresh.service';
+import { startReturnSyncScheduler } from './services/return-sync-scheduler.service';
 import { initBarcodeMapCache } from './modules/capture/barcode-mapping.service';
 
 const PORT = process.env.PORT || 3000;
@@ -22,6 +23,9 @@ startVideoUploadMonitor();
 
 // Refresh Shopee access tokens before their four-hour lifetime expires.
 startShopeeTokenRefresh();
+
+// Silently poll TikTok/Shopee for return updates and keep Order/ReturnRequest in sync.
+startReturnSyncScheduler();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);

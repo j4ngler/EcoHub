@@ -1,7 +1,8 @@
 import { createHmac } from 'crypto';
+import { OrderStatus, ReturnStatus } from '@prisma/client';
 import prisma from '../../config/database';
 import { badRequest } from '../../middlewares/error.middleware';
-import { type NormalizedOrder, upsertNormalizedOrder } from './tiktok-sync.service';
+import { type NormalizedOrder, upsertNormalizedOrder, upsertReturnForOrder } from './tiktok-sync.service';
 
 export type ShopeeConnection = {
   id: string;
@@ -106,23 +107,40 @@ const requestShopee = async (
   return payload;
 };
 
-const mapOrderStatus = (status: unknown) => {
+const mapOrderStatus = (status: unknown): OrderStatus => {
   switch (asString(status).toUpperCase()) {
     case 'READY_TO_SHIP':
-      return 'confirmed';
+      return OrderStatus.confirmed;
     case 'PROCESSED':
-      return 'processing';
+      return OrderStatus.packing;
     case 'SHIPPED':
+      return OrderStatus.shipping;
     case 'TO_CONFIRM_RECEIVE':
-      return 'shipped';
+      return OrderStatus.delivered;
     case 'COMPLETED':
-      return 'completed';
+      return OrderStatus.completed;
     case 'IN_CANCEL':
     case 'CANCELLED':
-      return 'cancelled';
+      return OrderStatus.cancelled;
     default:
-      return 'pending';
+      return OrderStatus.pending;
   }
+};
+
+// Best-effort mapping of Shopee return/negotiation status strings to EcoHub's ReturnStatus.
+// Not verified against the official field-level docs (open.shopee.com blocked automated
+// access when researched) — adjust the substring rules below once confirmed against a real
+// get_return_detail response.
+export const mapShopeeReturnStatus = (status: unknown): ReturnStatus => {
+  const value = asString(status).toUpperCase();
+  if (value.includes('COMPLETE') || value.includes('CLOSED') || value.includes('REFUND_APPROVED')) {
+    return ReturnStatus.completed;
+  }
+  if (value.includes('REJECT')) return ReturnStatus.rejected;
+  if (value.includes('CANCEL')) return ReturnStatus.rejected;
+  if (value.includes('ACCEPT') || value.includes('APPROVE')) return ReturnStatus.approved;
+  if (value.includes('PROCESS') || value.includes('JUDG')) return ReturnStatus.processing;
+  return ReturnStatus.pending;
 };
 
 const getTrackingCode = (order: Record<string, any>) => {
@@ -262,6 +280,62 @@ export const syncShopeeOrdersForConnection = async (
     data: { lastSyncAt: new Date() },
   });
   return { synced: created + updated, created, updated, failed, lastSyncAt: new Date() };
+};
+
+// "get_return_list" / "get_return_detail" — https://open.shopee.com (domain blocked automated
+// access when researched; path/field names below follow the public v2 Returns API convention
+// and should be verified against a real sandbox response before relying on them in production).
+const getReturnList = async (
+  connection: ShopeeConnection,
+  options: { days?: number } = {}
+) => {
+  const now = Math.floor(Date.now() / 1000);
+  const days = Math.min(15, Math.max(1, options.days || 15));
+  const payload = await requestShopee(connection, '/api/v2/returns/get_return_list', {
+    create_time_from: now - days * 86400,
+    create_time_to: now,
+    page_size: 100,
+  });
+  const response = asRecord(payload.response);
+  return asArray(response.return).map((row) => asString(row.return_sn)).filter(Boolean);
+};
+
+export const syncShopeeReturnsForConnection = async (connection: ShopeeConnection, userId: string) => {
+  const returnSns = await getReturnList(connection);
+  let processed = 0;
+  let failed = 0;
+
+  for (const returnSn of returnSns) {
+    try {
+      const payload = await requestShopee(connection, '/api/v2/returns/get_return_detail', {
+        return_sn: returnSn,
+      });
+      const detail = asRecord(payload.response);
+      const orderSn = asString(detail.order_sn);
+      if (!orderSn) continue;
+
+      const mappedStatus = mapShopeeReturnStatus(detail.status || detail.negotiation_status);
+      const result = await upsertReturnForOrder({
+        orderLookupCode: orderSn,
+        externalReturnId: `shopee:${returnSn}`,
+        platform: 'shopee',
+        reason: detail.reason,
+        status: mappedStatus,
+        refundAmount: asNumber(detail.refund_amount, 0) || undefined,
+        markOrderReturned: mappedStatus === ReturnStatus.completed,
+      });
+      if (result) processed += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn('[Shopee sync] return upsert failed:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  await prisma.shopChannelConnection.update({
+    where: { id: connection.id },
+    data: { lastSyncAt: new Date() },
+  });
+  return { processed, failed, lastSyncAt: new Date() };
 };
 
 export const lookupAndPersistShopeeOrder = async (params: {

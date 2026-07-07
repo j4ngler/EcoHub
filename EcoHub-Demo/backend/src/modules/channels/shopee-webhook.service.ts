@@ -1,12 +1,19 @@
 import { createHash, timingSafeEqual } from 'crypto';
+import { OrderStatus, ReturnStatus } from '@prisma/client';
 import prisma from '../../config/database';
 import { forbidden } from '../../middlewares/error.middleware';
+import { upsertReturnForOrder } from './tiktok-sync.service';
+import { mapShopeeReturnStatus } from './shopee-sync.service';
 
 const CALLBACK_TOKEN = (process.env.SHOPEE_PUSH_CALLBACK_TOKEN || '').trim();
 
 const asRecord = (value: unknown): Record<string, any> =>
   value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, any>) : {};
 const asString = (value: unknown) => String(value ?? '').trim();
+const asNumber = (value: unknown, fallback = 0) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
 
 const verifyCallbackToken = (provided?: string) => {
   if (!CALLBACK_TOKEN) return;
@@ -17,20 +24,21 @@ const verifyCallbackToken = (provided?: string) => {
   }
 };
 
-const mapShopeeStatus = (status: unknown) => {
+const mapShopeeStatus = (status: unknown): OrderStatus | null => {
   switch (asString(status).toUpperCase()) {
     case 'READY_TO_SHIP':
-      return 'confirmed';
+      return OrderStatus.confirmed;
     case 'PROCESSED':
-      return 'processing';
+      return OrderStatus.packing;
     case 'SHIPPED':
+      return OrderStatus.shipping;
     case 'TO_CONFIRM_RECEIVE':
-      return 'shipped';
+      return OrderStatus.delivered;
     case 'COMPLETED':
-      return 'completed';
+      return OrderStatus.completed;
     case 'IN_CANCEL':
     case 'CANCELLED':
-      return 'cancelled';
+      return OrderStatus.cancelled;
     default:
       return null;
   }
@@ -56,9 +64,30 @@ const processOrderPush = async (payload: Record<string, any>) => {
   await prisma.order.update({
     where: { id: order.id },
     data: {
-      ...(mappedStatus ? { status: mappedStatus as any } : {}),
+      ...(mappedStatus ? { status: mappedStatus } : {}),
       ...(trackingCode ? { trackingCode } : {}),
     },
+  });
+};
+
+// Shopee's exact push event `code` for return/refund updates was not verified (doc access
+// blocked when researched) — detect by payload shape (`return_sn` present) instead of a magic
+// code number so this keeps working regardless of which code Shopee actually sends.
+const processReturnPush = async (payload: Record<string, any>) => {
+  const data = asRecord(payload.data);
+  const returnSn = asString(data.return_sn || data.returnsn);
+  const orderSn = asString(data.order_sn || data.ordersn);
+  if (!returnSn || !orderSn) return;
+
+  const mappedStatus = mapShopeeReturnStatus(data.status || data.negotiation_status);
+  await upsertReturnForOrder({
+    orderLookupCode: orderSn,
+    externalReturnId: `shopee:${returnSn}`,
+    platform: 'shopee',
+    reason: data.reason,
+    status: mappedStatus,
+    refundAmount: asNumber(data.refund_amount, 0) || undefined,
+    markOrderReturned: mappedStatus === ReturnStatus.completed,
   });
 };
 
@@ -92,7 +121,12 @@ export const receiveShopeeWebhook = async (params: {
   if (event.status === 'processed') return { accepted: true, duplicate: true };
 
   try {
-    await processOrderPush(payload);
+    const data = asRecord(payload.data);
+    if (asString(data.return_sn || data.returnsn)) {
+      await processReturnPush(payload);
+    } else {
+      await processOrderPush(payload);
+    }
     await prisma.channelWebhookEvent.update({
       where: { id: event.id },
       data: { status: 'processed', processedAt: new Date(), error: null },

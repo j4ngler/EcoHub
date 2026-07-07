@@ -386,8 +386,7 @@ export default function VideosPage() {
             <div className="overflow-hidden rounded-lg bg-black">
               <video src={getPlayableUrl(viewVideo)} controls autoPlay className="max-h-[70vh] w-full" />
             </div>
-            <div className="flex items-center justify-between gap-3">
-              <p className="break-all font-mono text-xs text-gray-400">{getPlayableUrl(viewVideo)}</p>
+            <div className="flex items-center justify-end gap-3">
               <a
                 href={getDownloadUrl(viewVideo)}
                 download

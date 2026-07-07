@@ -74,6 +74,11 @@ router.post(
   authorize(RoleName.super_admin, RoleName.admin),
   channelController.syncProducts
 );
+router.post(
+  '/:id/sync-returns',
+  authorize(RoleName.super_admin, RoleName.admin),
+  channelController.syncReturns
+);
 
 router.delete(
   '/:id/disconnect',

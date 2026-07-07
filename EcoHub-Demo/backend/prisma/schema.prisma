@@ -639,29 +639,34 @@ model VideoEvent {
 // ============================================
 
 model ReturnRequest {
-  id           String       @id @default(uuid())
-  orderId      String       @map("order_id")
-  customerId   String       @map("customer_id")
-  
+  id               String       @id @default(uuid())
+  orderId          String       @map("order_id")
+  customerId       String?      @map("customer_id")
+
+  // Set when the return was synced automatically from a marketplace (TikTok Shop / Shopee)
+  // instead of created by a customer inside EcoHub.
+  externalReturnId String?      @unique @map("external_return_id")
+  platform         String?
+
   reason       ReturnReason
   description  String?
   images       Json?
-  
+
   status       ReturnStatus @default(pending)
-  
+
   reviewedBy   String?      @map("reviewed_by")
   reviewedAt   DateTime?    @map("reviewed_at")
   reviewNotes  String?      @map("review_notes")
-  
+
   refundAmount Decimal?     @map("refund_amount") @db.Decimal(15, 2)
   refundedAt   DateTime?    @map("refunded_at")
-  
+
   createdAt    DateTime     @default(now()) @map("created_at")
   updatedAt    DateTime     @updatedAt @map("updated_at")
 
   // Relations
   order    Order @relation(fields: [orderId], references: [id])
-  customer User  @relation("CustomerReturns", fields: [customerId], references: [id])
+  customer User? @relation("CustomerReturns", fields: [customerId], references: [id])
   reviewer User? @relation("ReviewedBy", fields: [reviewedBy], references: [id])
 
   @@map("return_requests")

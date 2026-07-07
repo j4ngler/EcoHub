@@ -69,6 +69,15 @@ export interface ShopChannelOverview {
     merchantShort: string;
     alerts: Array<{ level: 'warning' | 'danger' | 'info'; text: string }>;
   };
+  shopeeSnapshot: {
+    headline: string;
+    detail: string;
+    badgeVariant: 'default' | 'success' | 'warning' | 'danger';
+    helpUrl: string;
+    shopName: string;
+    merchantShort: string;
+    alerts: Array<{ level: 'warning' | 'danger' | 'info'; text: string }>;
+  };
   apiStatusRecords: ChannelConnectionSnapshot[];
 }
 

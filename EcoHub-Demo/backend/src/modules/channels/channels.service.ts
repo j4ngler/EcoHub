@@ -3,10 +3,11 @@ import { createHmac } from 'crypto';
 import { RoleName } from '@prisma/client';
 import prisma from '../../config/database';
 import { badRequest, forbidden, notFound } from '../../middlewares/error.middleware';
-import { syncOrdersForConnection, syncProductsForConnection } from './tiktok-sync.service';
+import { syncOrdersForConnection, syncProductsForConnection, syncReturnsForConnection } from './tiktok-sync.service';
 import {
   syncShopeeOrdersForConnection,
   syncShopeeProductsForConnection,
+  syncShopeeReturnsForConnection,
 } from './shopee-sync.service';
 
 type ConnectionHealth = 'invalid' | 'partial' | 'ready';
@@ -49,6 +50,15 @@ export interface ShopChannelOverview {
     needAttentionChannels: number;
   };
   sellerSnapshot: {
+    headline: string;
+    detail: string;
+    badgeVariant: 'default' | 'success' | 'warning' | 'danger';
+    helpUrl: string;
+    shopName: string;
+    merchantShort: string;
+    alerts: Array<{ level: 'warning' | 'danger' | 'info'; text: string }>;
+  };
+  shopeeSnapshot: {
     headline: string;
     detail: string;
     badgeVariant: 'default' | 'success' | 'warning' | 'danger';
@@ -373,52 +383,60 @@ const toConnectionSnapshot = (connection: any): ChannelConnectionSnapshot => {
   };
 };
 
-const getSellerSnapshot = (records: ChannelConnectionSnapshot[]) => {
-  const noAlerts: Array<{ level: 'warning' | 'danger' | 'info'; text: string }> = [];
-  const tiktok = records.find((item) => item.channelCode === 'tiktok') || records[0];
+const CHANNEL_HELP_URL: Record<string, string> = {
+  tiktok: 'https://partner.tiktokshop.com/',
+  shopee: 'https://open.shopee.com/',
+};
 
-  if (!tiktok) {
+const getSellerSnapshot = (records: ChannelConnectionSnapshot[], channelCode?: string) => {
+  const noAlerts: Array<{ level: 'warning' | 'danger' | 'info'; text: string }> = [];
+  const target = channelCode
+    ? records.find((item) => item.channelCode === channelCode)
+    : records.find((item) => item.channelCode === 'tiktok') || records[0];
+  const helpUrl = CHANNEL_HELP_URL[channelCode || target?.channelCode || 'tiktok'] || CHANNEL_HELP_URL.tiktok;
+
+  if (!target) {
     return {
       headline: 'Chua lien ket API',
       detail: 'Hay luu token hoac ket noi kenh ban de dong bo don hang va san pham.',
       badgeVariant: 'default' as const,
-      helpUrl: 'https://partner.tiktokshop.com/',
+      helpUrl,
       shopName: '-',
       merchantShort: '-',
       alerts: noAlerts,
     };
   }
 
-  if (tiktok.apiStatus === 'ready') {
+  if (target.apiStatus === 'ready') {
     return {
-      headline: `Da lien ket ${tiktok.channelName}`,
+      headline: `Da lien ket ${target.channelName}`,
       detail: 'Ket noi on dinh. Co the chay sync thu cong hoac scheduler dinh ky.',
       badgeVariant: 'success' as const,
-      helpUrl: 'https://partner.tiktokshop.com/',
-      shopName: tiktok.channelName,
-      merchantShort: tiktok.merchantOrShopId ? maskSecret(tiktok.merchantOrShopId, 5) : '-',
+      helpUrl,
+      shopName: target.channelName,
+      merchantShort: target.merchantOrShopId ? maskSecret(target.merchantOrShopId, 5) : '-',
       alerts: noAlerts,
     };
   }
 
-  if (tiktok.apiStatus === 'partial') {
+  if (target.apiStatus === 'partial') {
     return {
-      headline: `${tiktok.channelName} chua day du`,
+      headline: `${target.channelName} chua day du`,
       detail: 'Dang co token nhung thieu mot so truong bat buoc de sync on dinh.',
       badgeVariant: 'warning' as const,
-      helpUrl: 'https://partner.tiktokshop.com/',
-      shopName: tiktok.channelName,
-      merchantShort: tiktok.merchantOrShopId ? maskSecret(tiktok.merchantOrShopId, 5) : '-',
-      alerts: [{ level: 'warning' as const, text: tiktok.detail }],
+      helpUrl,
+      shopName: target.channelName,
+      merchantShort: target.merchantOrShopId ? maskSecret(target.merchantOrShopId, 5) : '-',
+      alerts: [{ level: 'warning' as const, text: target.detail }],
     };
   }
 
   return {
-    headline: `Chua lien ket ${tiktok.channelName}`,
-    detail: 'Chua co access token dung API. Hay ket noi TikTok de cap quyen.',
+    headline: `Chua lien ket ${target.channelName}`,
+    detail: `Chua co access token dung API. Hay ket noi ${target.channelName} de cap quyen.`,
     badgeVariant: 'danger' as const,
-    helpUrl: 'https://partner.tiktokshop.com/',
-    shopName: tiktok.channelName,
+    helpUrl,
+    shopName: target.channelName,
     merchantShort: '-',
     alerts: [{ level: 'danger' as const, text: 'Kenh chua co access token / refresh token hop le.' }],
   };
@@ -1497,7 +1515,8 @@ export const getShopChannelOverview = async (shopId: string): Promise<ShopChanne
       readyChannels,
       needAttentionChannels: Math.max(0, connectedChannels - readyChannels),
     },
-    sellerSnapshot: getSellerSnapshot(records),
+    sellerSnapshot: getSellerSnapshot(records, 'tiktok'),
+    shopeeSnapshot: getSellerSnapshot(records, 'shopee'),
     apiStatusRecords: records,
   };
 };
@@ -2125,7 +2144,11 @@ export const testChannelApi = async (channelId: string, shopId: string, userId?:
   };
 };
 
-export const getChannelDebugInfo = async (channelId: string, shopId: string): Promise<ChannelDebugInfo> => {
+export const getChannelDebugInfo = async (
+  channelId: string,
+  shopId: string,
+  userId?: string
+): Promise<ChannelDebugInfo> => {
   const channel = await prisma.salesChannel.findUnique({ where: { id: channelId } });
   if (!channel) throw notFound('Khong tim thay kenh ban hang');
 
@@ -2135,12 +2158,15 @@ export const getChannelDebugInfo = async (channelId: string, shopId: string): Pr
     include: { channel: true },
   });
 
+  const isTikTok = channel.code === 'tiktok';
+  const isShopee = channel.code === 'shopee';
+
   const oauthInfo =
-    channel.code === 'tiktok' && shopId
-      ? await getChannelOAuthInfo(channelId, undefined, shopId).catch(() => ({
+    (isTikTok || isShopee) && shopId
+      ? await getChannelOAuthInfo(channelId, userId, shopId).catch(() => ({
           channelCode: channel.code,
           oauthConnectUrl: null,
-          callbackUrl: buildTikTokCallbackUrl(),
+          callbackUrl: isTikTok ? buildTikTokCallbackUrl() : isShopee ? SHOPEE_REDIRECT_URL : null,
           authMode: 'native-oauth' as const,
         }))
       : {
@@ -2150,17 +2176,21 @@ export const getChannelDebugInfo = async (channelId: string, shopId: string): Pr
           authMode: 'manual' as const,
         };
 
-  const sellerSnapshot = connection ? getSellerSnapshot([toConnectionSnapshot(connection)]) : null;
+  const sellerSnapshot = connection ? getSellerSnapshot([toConnectionSnapshot(connection)], channel.code) : null;
 
   return {
     channelCode: channel.code,
-    authMode: channel.code === 'tiktok' ? 'native-oauth' : 'manual',
-    callbackUrl: channel.code === 'tiktok' ? buildTikTokCallbackUrl() : null,
+    authMode: isTikTok || isShopee ? 'native-oauth' : 'manual',
+    callbackUrl: isTikTok ? buildTikTokCallbackUrl() : isShopee ? SHOPEE_REDIRECT_URL : null,
     oauthConnectUrl: oauthInfo.oauthConnectUrl,
-    serviceIdConfigured: Boolean(TIKTOK_SERVICE_ID),
-    appKeyConfigured: Boolean(TIKTOK_APP_KEY),
-    appSecretConfigured: Boolean(TIKTOK_APP_SECRET),
-    tokenExchangeConfigured: Boolean(getTokenExchangeUrls().length),
+    serviceIdConfigured: isTikTok ? Boolean(TIKTOK_SERVICE_ID) : isShopee ? Boolean(SHOPEE_PARTNER_ID) : false,
+    appKeyConfigured: isTikTok ? Boolean(TIKTOK_APP_KEY) : isShopee ? Boolean(SHOPEE_PARTNER_ID) : false,
+    appSecretConfigured: isTikTok ? Boolean(TIKTOK_APP_SECRET) : isShopee ? Boolean(SHOPEE_PARTNER_KEY) : false,
+    tokenExchangeConfigured: isTikTok
+      ? Boolean(getTokenExchangeUrls().length)
+      : isShopee
+        ? Boolean(SHOPEE_PARTNER_ID && SHOPEE_PARTNER_KEY)
+        : false,
     selectedShopId: shopId || null,
     sellerSnapshot,
     connection: connection ? toConnectionSnapshot(connection) : null,
@@ -2239,6 +2269,31 @@ export const syncOrders = async (channelId: string, shopId: string, userId: stri
         ? await syncShopeeOrdersForConnection(connection, userId)
         : (() => {
             throw badRequest(`Chưa hỗ trợ đồng bộ đơn hàng cho kênh ${connection.channel.name}`);
+          })();
+  return {
+    channel: connection.channel.name,
+    ...result,
+  };
+};
+
+export const syncReturns = async (channelId: string, shopId: string, userId: string) => {
+  const connection = await prisma.shopChannelConnection.findFirst({
+    where: { shopId, channelId, status: 'connected' },
+    orderBy: { createdAt: 'desc' },
+    include: { channel: true },
+  });
+
+  if (!connection || connection.status !== 'connected') {
+    throw badRequest('Kenh chua duoc ket noi');
+  }
+
+  const result =
+    connection.channel.code === 'tiktok'
+      ? await syncReturnsForConnection(connection, userId)
+      : connection.channel.code === 'shopee'
+        ? await syncShopeeReturnsForConnection(connection, userId)
+        : (() => {
+            throw badRequest(`Chưa hỗ trợ đồng bộ hoàn hàng cho kênh ${connection.channel.name}`);
           })();
   return {
     channel: connection.channel.name,

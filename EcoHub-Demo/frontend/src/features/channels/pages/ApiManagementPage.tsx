@@ -43,6 +43,14 @@ const operatorTabLabelMap: Record<OperatorTab, string> = {
   guide: 'Hướng dẫn',
 };
 
+type ShopeeTab = 'status' | 'debug' | 'guide';
+
+const shopeeTabLabelMap: Record<ShopeeTab, string> = {
+  status: 'Trạng thái',
+  debug: 'Debug',
+  guide: 'Hướng dẫn',
+};
+
 const apiStatusVariantMap: Record<string, 'default' | 'success' | 'warning' | 'danger'> = {
   ready: 'success',
   partial: 'warning',
@@ -351,6 +359,7 @@ function OperatorApiView({
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedShopId, setSelectedShopId] = useState(activeShopId);
   const [activeTab, setActiveTab] = useState<OperatorTab>('status');
+  const [shopeeActiveTab, setShopeeActiveTab] = useState<ShopeeTab>('status');
   const [oauthInfoByChannel, setOauthInfoByChannel] = useState<Record<string, ChannelOAuthInfo>>({});
   const [formByChannel, setFormByChannel] = useState<
     Record<string, { accessToken: string; refreshToken: string; channelShopId: string }>
@@ -385,6 +394,12 @@ function OperatorApiView({
     queryKey: ['channel-debug-info', channels.find((channel) => channel.code === 'tiktok')?.id, effectiveShopId],
     queryFn: () => channelsApi.getDebugInfo(channels.find((channel) => channel.code === 'tiktok')!.id, effectiveShopId),
     enabled: canEdit && !!channels.find((channel) => channel.code === 'tiktok') && !!effectiveShopId,
+  });
+
+  const { data: shopeeDebugInfo } = useQuery<ChannelDebugInfo>({
+    queryKey: ['channel-debug-info', channels.find((channel) => channel.code === 'shopee')?.id, effectiveShopId],
+    queryFn: () => channelsApi.getDebugInfo(channels.find((channel) => channel.code === 'shopee')!.id, effectiveShopId),
+    enabled: canEdit && !!channels.find((channel) => channel.code === 'shopee') && !!effectiveShopId,
   });
 
   useEffect(() => {
@@ -461,7 +476,8 @@ function OperatorApiView({
             try {
               const oauthInfo = await channelsApi.getOAuthInfo(channel.id, shopIdForRequest);
               return [channel.id, oauthInfo] as const;
-            } catch {
+            } catch (error) {
+              toast.error(`Không lấy được URL uỷ quyền ${channel.name}: ${getErrorMessage(error)}`);
               return null;
             }
           })
@@ -641,8 +657,25 @@ function OperatorApiView({
     ? ['status', 'api-status', 'shops', 'debug', 'guide']
     : ['status', 'api-status', 'shops', 'guide'];
 
+  const renderShopeeTabButton = (tab: ShopeeTab) => (
+    <button
+      key={tab}
+      type="button"
+      onClick={() => setShopeeActiveTab(tab)}
+      className={`border-b-2 px-4 py-3 text-sm font-medium transition ${
+        shopeeActiveTab === tab
+          ? 'border-emerald-600 text-emerald-700'
+          : 'border-transparent text-gray-500 hover:text-gray-700'
+      }`}
+    >
+      {shopeeTabLabelMap[tab]}
+    </button>
+  );
+
+  const visibleShopeeTabs: ShopeeTab[] = canEdit ? ['status', 'debug', 'guide'] : ['status', 'guide'];
+
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="mx-auto max-w-7xl space-y-6">
       <div className="space-y-2">
         <h1 className="text-3xl font-bold text-gray-900">Kết nối API bán hàng</h1>
         <p className="text-sm text-gray-500">
@@ -680,7 +713,41 @@ function OperatorApiView({
       </div>
 
       <Card>
-        <CardContent className="flex flex-wrap items-center gap-3 p-4">
+        <CardContent className="space-y-4 p-4">
+          <div className="flex flex-wrap items-center gap-4">
+            <div className="min-w-[280px] flex-1">
+              <Select
+                label="Shop đang quản lý"
+                value={effectiveShopId}
+                onChange={(e) => setSelectedShopId(e.target.value)}
+                options={shops.map((shop) => ({
+                  value: shop.id,
+                  label: `${shop.name} (${shop.code})`,
+                }))}
+              />
+            </div>
+            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
+              <div>
+                <b>Kênh:</b> {tiktokChannel?.name || 'TikTok Shop'}
+              </div>
+              <div>
+                <b>Trạng thái:</b> {tiktokStatus?.apiStatusLabel || 'Chưa có dữ liệu'}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid gap-5 lg:grid-cols-2 items-start">
+        <div className="space-y-5">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wifi className="h-5 w-5 text-emerald-600" />
+              TikTok Shop
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-3">
           <Button
             variant="primary"
             disabled={!tiktokChannel || !effectiveShopId || !canEdit || !tiktokOauthInfo?.oauthConnectUrl}
@@ -689,16 +756,6 @@ function OperatorApiView({
           >
             <Link2 className="mr-2 h-4 w-4" />
             Kết nối TikTok Shop
-          </Button>
-
-          <Button
-            variant="primary"
-            disabled={!shopeeChannel || !canEdit || !shopeeOauthInfo?.oauthConnectUrl}
-            className={!canEdit ? 'hidden' : undefined}
-            onClick={startShopeeOAuth}
-          >
-            <Link2 className="mr-2 h-4 w-4" />
-            Kết nối Shopee
           </Button>
 
           <Button
@@ -726,120 +783,6 @@ function OperatorApiView({
             <BookOpen className="mr-2 h-4 w-4" />
             Hướng dẫn TikTok
           </Button>
-
-          <Button variant="ghost" loading={overviewFetching} onClick={() => void refreshChannelData()}>
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Làm mới
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between gap-3">
-            <span>Shopee Open Platform</span>
-            <Badge variant={shopeeConnection?.status === 'connected' ? 'success' : 'warning'}>
-              {shopeeConnection?.status === 'connected' ? 'Đã kết nối' : 'Chưa kết nối'}
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid gap-3 text-sm text-gray-600 sm:grid-cols-3">
-            <div>
-              <b>Shop ID:</b> {shopeeConnection?.shopIdRemote || '-'}
-            </div>
-            <div>
-              <b>API:</b> {shopeeStatus?.apiStatusLabel || 'Chưa có dữ liệu'}
-            </div>
-            <div>
-              <b>Đồng bộ gần nhất:</b>{' '}
-              {shopeeConnection?.lastSyncAt
-                ? new Date(shopeeConnection.lastSyncAt).toLocaleString('vi-VN')
-                : '-'}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="outline"
-              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
-              loading={testApiMutation.isPending}
-              onClick={() =>
-                shopeeChannel &&
-                testApiMutation.mutate({ channelId: shopeeChannel.id, shopId: effectiveShopId })
-              }
-            >
-              Kiểm tra Shopee
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
-              loading={syncOrdersMutation.isPending}
-              onClick={() =>
-                shopeeChannel &&
-                syncOrdersMutation.mutate({ channelId: shopeeChannel.id, shopId: effectiveShopId })
-              }
-            >
-              Đồng bộ đơn Shopee
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
-              loading={syncProductsMutation.isPending}
-              onClick={() =>
-                shopeeChannel &&
-                syncProductsMutation.mutate({ channelId: shopeeChannel.id, shopId: effectiveShopId })
-              }
-            >
-              Đồng bộ sản phẩm Shopee
-            </Button>
-            <Button
-              variant="danger"
-              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
-              loading={deleteConnectionMutation.isPending}
-              onClick={() => {
-                if (
-                  shopeeChannel &&
-                  window.confirm(
-                    'Xóa kết nối API Shopee? Token và bản ghi kết nối sẽ bị xóa khỏi hệ thống.'
-                  )
-                ) {
-                  deleteConnectionMutation.mutate({
-                    channelId: shopeeChannel.id,
-                    shopId: effectiveShopId,
-                  });
-                }
-              }}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Xóa kết nối API
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="space-y-4 p-4">
-          <div className="flex flex-wrap items-center gap-4">
-            <div className="min-w-[280px] flex-1">
-              <Select
-                label="Shop đang quản lý"
-                value={effectiveShopId}
-                onChange={(e) => setSelectedShopId(e.target.value)}
-                options={shops.map((shop) => ({
-                  value: shop.id,
-                  label: `${shop.name} (${shop.code})`,
-                }))}
-              />
-            </div>
-            <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600">
-              <div>
-                <b>Kênh:</b> {tiktokChannel?.name || 'TikTok Shop'}
-              </div>
-              <div>
-                <b>Trạng thái:</b> {tiktokStatus?.apiStatusLabel || 'Chưa có dữ liệu'}
-              </div>
-            </div>
-          </div>
         </CardContent>
       </Card>
 
@@ -886,7 +829,7 @@ function OperatorApiView({
             </CardContent>
           </Card>
 
-          <div className="grid gap-5 lg:grid-cols-2">
+          <div className="space-y-5">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -1190,6 +1133,243 @@ function OperatorApiView({
           </Button>
         </CardContent>
       </Card>
+        </div>
+
+        <div className="space-y-5">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex flex-wrap items-center justify-between gap-3">
+            <span className="flex items-center gap-2">
+              <Wifi className="h-5 w-5 text-emerald-600" />
+              Kết nối Shopee
+            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                variant="primary"
+                size="sm"
+                disabled={!shopeeChannel || !canEdit || !shopeeOauthInfo?.oauthConnectUrl}
+                className={!canEdit ? 'hidden' : undefined}
+                onClick={startShopeeOAuth}
+              >
+                <Link2 className="mr-2 h-4 w-4" />
+                Kết nối Shopee
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={!shopeeOauthInfo?.oauthConnectUrl || !canEdit}
+                className={!canEdit ? 'hidden' : undefined}
+                onClick={startShopeeOAuth}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Làm mới ủy quyền
+              </Button>
+            </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Badge variant={shopeeConnection?.status === 'connected' ? 'success' : 'warning'}>
+            {shopeeConnection?.status === 'connected' ? 'Đã liên kết' : 'Chưa liên kết'}
+          </Badge>
+          <p className="text-sm text-gray-600">
+            {overview?.shopeeSnapshot?.detail ||
+              'Trạng thái kết nối và hoạt động Shopee của shop hiện tại sẽ hiển thị tại đây.'}
+          </p>
+          {(overview?.shopeeSnapshot?.alerts || []).length ? (
+            <div className="space-y-2">
+              {(overview?.shopeeSnapshot?.alerts || []).map((alert, index) => (
+                <div
+                  key={`${alert.level}-${index}`}
+                  className={`rounded-lg border px-3 py-2 text-sm ${
+                    alert.level === 'danger'
+                      ? 'border-red-200 bg-red-50 text-red-700'
+                      : alert.level === 'warning'
+                        ? 'border-amber-200 bg-amber-50 text-amber-700'
+                        : 'border-blue-200 bg-blue-50 text-blue-700'
+                  }`}
+                >
+                  {alert.text}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </CardContent>
+      </Card>
+
+      <div className="space-y-5">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Store className="h-5 w-5 text-slate-500" />
+              Cửa hàng
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-gray-700">
+            <div>
+              <span className="font-semibold">Tên hiển thị:</span>{' '}
+              {overview?.shopeeSnapshot?.shopName || overview?.shop?.name || 'Chưa xác định'}
+            </div>
+            <div>
+              <span className="font-semibold">Shop ID:</span>{' '}
+              {shopeeStatus?.merchantOrShopId || shopeeConnection?.shopIdRemote || '-'}
+            </div>
+            <div>
+              <span className="font-semibold">Trạng thái API:</span>{' '}
+              {shopeeStatus?.apiStatusLabel || 'Chưa có dữ liệu'}
+            </div>
+            <div>
+              <span className="font-semibold">Đồng bộ gần nhất:</span>{' '}
+              {shopeeConnection?.lastSyncAt
+                ? new Date(shopeeConnection.lastSyncAt).toLocaleString('vi-VN')
+                : '-'}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Thao tác nhanh</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
+              loading={testApiMutation.isPending}
+              onClick={() =>
+                shopeeChannel &&
+                testApiMutation.mutate({ channelId: shopeeChannel.id, shopId: effectiveShopId })
+              }
+            >
+              Kiểm tra Shopee
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
+              loading={syncOrdersMutation.isPending}
+              onClick={() =>
+                shopeeChannel &&
+                syncOrdersMutation.mutate({ channelId: shopeeChannel.id, shopId: effectiveShopId })
+              }
+            >
+              Đồng bộ đơn Shopee
+            </Button>
+            <Button
+              variant="outline"
+              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
+              loading={syncProductsMutation.isPending}
+              onClick={() =>
+                shopeeChannel &&
+                syncProductsMutation.mutate({ channelId: shopeeChannel.id, shopId: effectiveShopId })
+              }
+            >
+              Đồng bộ sản phẩm Shopee
+            </Button>
+            <Button
+              variant="danger"
+              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
+              loading={deleteConnectionMutation.isPending}
+              onClick={() => {
+                if (
+                  shopeeChannel &&
+                  window.confirm(
+                    'Xóa kết nối API Shopee? Token và bản ghi kết nối sẽ bị xóa khỏi hệ thống.'
+                  )
+                ) {
+                  deleteConnectionMutation.mutate({
+                    channelId: shopeeChannel.id,
+                    shopId: effectiveShopId,
+                  });
+                }
+              }}
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Xóa kết nối API
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="border-b border-gray-200">
+        <div className="flex flex-wrap items-center gap-1">{visibleShopeeTabs.map(renderShopeeTabButton)}</div>
+      </div>
+
+      {shopeeActiveTab === 'status' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Chi tiết kết nối Shopee</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-gray-700">
+            <div>
+              <b>Access:</b> {shopeeStatus?.accessTokenMasked || 'Chưa có'}
+            </div>
+            <div>
+              <b>Refresh:</b> {shopeeStatus?.refreshTokenMasked || 'Chưa có'}
+            </div>
+            <div>
+              <b>Cập nhật:</b> {formatDateTime(shopeeStatus?.updatedAt)}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {shopeeActiveTab === 'debug' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Debug Shopee OAuth</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm text-gray-700">
+            <div>
+              <b>Auth mode:</b> {shopeeDebugInfo?.authMode || '-'}
+            </div>
+            <div>
+              <b>Callback URL:</b> {shopeeDebugInfo?.callbackUrl || '-'}
+            </div>
+            <div>
+              <b>Connect URL:</b> {shopeeDebugInfo?.oauthConnectUrl || '-'}
+            </div>
+            <div>
+              <b>Partner ID:</b> {shopeeDebugInfo?.serviceIdConfigured ? 'Đã cấu hình' : 'Chưa cấu hình'}
+            </div>
+            <div>
+              <b>Partner Key:</b> {shopeeDebugInfo?.appSecretConfigured ? 'Đã cấu hình' : 'Chưa cấu hình'}
+            </div>
+            <div>
+              <b>Token exchange:</b> {shopeeDebugInfo?.tokenExchangeConfigured ? 'Sẵn sàng' : 'Chưa cấu hình'}
+            </div>
+            <div>
+              <b>Kết nối hiện tại:</b> {shopeeDebugInfo?.connection?.apiStatusLabel || 'Chưa có'}
+            </div>
+            <div>
+              <b>Shop đang debug:</b> {shopeeDebugInfo?.selectedShopId || '-'}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
+      {shopeeActiveTab === 'guide' ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Hướng dẫn Shopee</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-gray-700">
+            <p>1. Chọn đúng shop bạn đang vận hành.</p>
+            <p>2. Bấm "Kết nối Shopee" để đi qua trang ủy quyền Open Platform của Shopee.</p>
+            <p>3. Sau khi quay lại trang, bấm "Kiểm tra Shopee" để xác nhận access token và Shop ID.</p>
+            <p>4. Dùng "Đồng bộ đơn Shopee" / "Đồng bộ sản phẩm Shopee" để chủ động lấy dữ liệu mới nhất.</p>
+            <a
+              href={overview?.shopeeSnapshot?.helpUrl || 'https://open.shopee.com/'}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 font-medium text-emerald-700 hover:text-emerald-800"
+            >
+              <BookOpen className="h-4 w-4" />
+              Mở Shopee Open Platform
+            </a>
+          </CardContent>
+        </Card>
+      ) : null}
+        </div>
+      </div>
     </div>
   );
 }

@@ -424,9 +424,6 @@ export default function OrderDetailPage() {
       >
         {playableUrl ? (
           <div className="space-y-4">
-            <p className="break-all text-sm text-gray-600">
-              Đường dẫn file: <span className="font-mono">{playableUrl}</span>
-            </p>
             <a
               href={playableUrl}
               download

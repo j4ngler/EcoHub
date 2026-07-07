@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import prisma from '../../config/database';
 import { badRequest } from '../../middlewares/error.middleware';
+import { OrderStatus, ReturnReason, ReturnStatus } from '@prisma/client';
 
 type TikTokConnection = {
   id: string;
@@ -30,7 +31,7 @@ export type NormalizedOrder = {
   code: string;
   orderId: string;
   platform: string;
-  status: string;
+  status: OrderStatus;
   shippingStatus?: string;
   trackingCode?: string | null;
   customerName: string;
@@ -120,6 +121,16 @@ const ORDER_SYNC_PATH = (
   process.env.TIKTOK_ORDER_SYNC_PATH ||
   process.env.ECOHUB_ORDER_SYNC_ENDPOINT_PATH ||
   ORDER_LOOKUP_PATH
+).trim();
+
+// "Search Returns" endpoint — https://partner.tiktokshop.com/docv2/page/search-returns-202309
+// Path/field names below are best-effort based on the public TikTok Shop Open API convention
+// and are NOT verified field-by-field against the live doc (access was blocked when researched).
+// Override via env if your account's API version differs.
+const RETURN_SEARCH_PATH = (
+  process.env.TIKTOK_RETURN_SEARCH_PATH ||
+  process.env.ECOHUB_RETURN_SEARCH_ENDPOINT_PATH ||
+  '/return_refund/202309/returns/search'
 ).trim();
 
 const getOrderSearchPath = () => {
@@ -358,14 +369,36 @@ export const requestTikTok = async (
   }
 };
 
-const normalizeStatus = (raw: unknown) => {
+const normalizeStatus = (raw: unknown): OrderStatus => {
   const status = asString(raw).toUpperCase();
-  if (['CANCELLED', 'CANCELED', 'UNPAID_CANCELLED'].includes(status)) return 'cancelled';
-  if (['COMPLETED', 'DELIVERED'].includes(status)) return 'completed';
-  if (['SHIPPED', 'IN_TRANSIT', 'AWAITING_COLLECTION'].includes(status)) return 'shipping';
-  if (['READY_TO_SHIP', 'AWAITING_SHIPMENT', 'TO_SHIP', 'PROCESSED'].includes(status)) return 'confirmed';
-  if (['PACKED'].includes(status)) return 'packed';
-  return 'pending';
+  if (['CANCELLED', 'CANCELED', 'UNPAID_CANCELLED'].includes(status)) return OrderStatus.cancelled;
+  if (['COMPLETED', 'DELIVERED'].includes(status)) return OrderStatus.completed;
+  if (['SHIPPED', 'IN_TRANSIT', 'AWAITING_COLLECTION'].includes(status)) return OrderStatus.shipping;
+  if (['READY_TO_SHIP', 'AWAITING_SHIPMENT', 'TO_SHIP', 'PROCESSED'].includes(status)) return OrderStatus.confirmed;
+  if (['PACKED'].includes(status)) return OrderStatus.packed;
+  return OrderStatus.pending;
+};
+
+// Best-effort mapping of TikTok Shop return/refund status strings to EcoHub's ReturnStatus.
+// Not verified against the official field-level docs (access was blocked) — adjust the
+// substring rules below once you confirm the exact values from a real API response.
+const mapTikTokReturnStatus = (raw: unknown): ReturnStatus => {
+  const status = asString(raw).toUpperCase();
+  if (status.includes('COMPLETE') || status.includes('SUCCESS')) return ReturnStatus.completed;
+  if (status.includes('REJECT') || status.includes('DECLINE')) return ReturnStatus.rejected;
+  if (status.includes('CANCEL')) return ReturnStatus.rejected;
+  if (status.includes('ACCEPT') || status.includes('APPROVE')) return ReturnStatus.approved;
+  if (status.includes('PROCESS') || status.includes('HOLD') || status.includes('SHIPPING')) return ReturnStatus.processing;
+  return ReturnStatus.pending;
+};
+
+const mapReturnReason = (raw: unknown): ReturnReason => {
+  const text = asString(raw).toLowerCase();
+  if (/damage|broken|vỡ|hỏng/.test(text)) return ReturnReason.damaged;
+  if (/wrong|nhầm|sai (hàng|sản phẩm)/.test(text)) return ReturnReason.wrong_item;
+  if (/defect|lỗi|not working|hư/.test(text)) return ReturnReason.defective;
+  if (/not as described|khác mô tả|không đúng mô tả/.test(text)) return ReturnReason.not_as_described;
+  return ReturnReason.other;
 };
 
 const normalizeAddress = (raw: unknown) => {
@@ -682,7 +715,7 @@ export const upsertNormalizedOrder = async (
       subtotal: order.subtotal,
       discountAmount: order.discountAmount,
       totalAmount: order.totalAmount,
-      status: order.status as any,
+      status: order.status,
       paymentMethod: order.paymentMethod || null,
       notes: order.shippingStatus
         ? `${order.platform} shipping_status=${order.shippingStatus}`
@@ -725,6 +758,67 @@ export const upsertNormalizedOrder = async (
       where: { id: saved.id },
       include: { items: true, channel: true, shop: true },
     });
+  });
+};
+
+// Shared by both TikTok and Shopee return sync: maps a marketplace return/refund
+// back to its EcoHub order and keeps Order.status + ReturnRequest in sync inside
+// one transaction, so the two never drift apart.
+export const upsertReturnForOrder = async (params: {
+  orderLookupCode: string;
+  externalReturnId: string;
+  platform: string;
+  reason?: unknown;
+  status: ReturnStatus;
+  refundAmount?: number | null;
+  markOrderReturned: boolean;
+}) => {
+  const lookupCode = asString(params.orderLookupCode);
+  if (!lookupCode) return null;
+
+  return prisma.$transaction(async (tx) => {
+    const order = await tx.order.findFirst({
+      where: {
+        OR: [
+          { orderCode: lookupCode },
+          { channelOrderId: lookupCode },
+          { trackingCode: lookupCode },
+        ],
+      },
+      select: { id: true, status: true },
+    });
+    if (!order) return null;
+
+    await tx.returnRequest.upsert({
+      where: { externalReturnId: params.externalReturnId },
+      create: {
+        orderId: order.id,
+        externalReturnId: params.externalReturnId,
+        platform: params.platform,
+        reason: mapReturnReason(params.reason),
+        status: params.status,
+        refundAmount: params.refundAmount ?? undefined,
+        refundedAt: params.status === ReturnStatus.completed ? new Date() : undefined,
+      },
+      update: {
+        status: params.status,
+        refundAmount: params.refundAmount ?? undefined,
+        refundedAt: params.status === ReturnStatus.completed ? new Date() : undefined,
+      },
+    });
+
+    if (params.markOrderReturned && order.status !== OrderStatus.returned) {
+      await tx.order.update({ where: { id: order.id }, data: { status: OrderStatus.returned } });
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: OrderStatus.returned,
+          note: `Đồng bộ return từ ${params.platform}`,
+        },
+      });
+    }
+
+    return true;
   });
 };
 
@@ -794,6 +888,51 @@ export const syncOrdersForConnection = async (connection: TikTokConnection, user
   });
 
   return { synced: created + updated, created, updated, failed, lastSyncAt: new Date() };
+};
+
+export const syncReturnsForConnection = async (connection: TikTokConnection, userId: string) => {
+  const body = {
+    ...parseJsonObjectEnv('ECOHUB_RETURN_SYNC_BODY_TEMPLATE'),
+    page_size: Number.parseInt(process.env.TIKTOK_RETURN_SYNC_PAGE_SIZE || '50', 10),
+  };
+  const payload = await requestTikTok(connection, 'POST', RETURN_SEARCH_PATH, undefined, body);
+  const rows = collectRows(payload, ['returns', 'return_list', 'returnList', 'list']);
+  let processed = 0;
+  let failed = 0;
+
+  for (const row of rows) {
+    try {
+      const orderId = extractDeepFirst(row, ['order_id', 'orderId']);
+      const returnId = extractDeepFirst(row, ['id', 'return_id', 'returnId']);
+      if (!orderId || !returnId) continue;
+
+      const rawStatus = extractDeepFirst(row, ['return_status', 'status']);
+      const reasonText = extractDeepFirst(row, ['return_reason_text', 'reason_text', 'reason']);
+      const refundAmountRaw = extractDeepFirst(row, ['refund_amount', 'refund_amount_after_adjustment']);
+      const mappedStatus = mapTikTokReturnStatus(rawStatus);
+
+      const result = await upsertReturnForOrder({
+        orderLookupCode: orderId,
+        externalReturnId: `tiktok:${returnId}`,
+        platform: 'tiktok',
+        reason: reasonText,
+        status: mappedStatus,
+        refundAmount: refundAmountRaw ? asNumber(refundAmountRaw, 0) : undefined,
+        markOrderReturned: mappedStatus === ReturnStatus.completed,
+      });
+      if (result) processed += 1;
+    } catch (error) {
+      failed += 1;
+      console.warn('[TikTok sync] return upsert failed:', error instanceof Error ? error.message : error);
+    }
+  }
+
+  await prisma.shopChannelConnection.update({
+    where: { id: connection.id },
+    data: { lastSyncAt: new Date() },
+  });
+
+  return { processed, failed, lastSyncAt: new Date() };
 };
 
 export const syncProductsForConnection = async (connection: TikTokConnection, userId: string) => {

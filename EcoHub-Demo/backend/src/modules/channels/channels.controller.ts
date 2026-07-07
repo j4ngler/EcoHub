@@ -136,6 +136,15 @@ export const syncOrders = async (req: AuthRequest, res: Response, next: NextFunc
   }
 };
 
+export const syncReturns = async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await channelService.syncReturns(req.params.id, req.body.shopId, req.user!.userId);
+    success(res, result, 'Yêu cầu đồng bộ hoàn hàng đã được xử lý');
+  } catch (error) {
+    next(error);
+  }
+};
+
 export const testChannelApi = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const result = await channelService.testChannelApi(req.params.id, req.body.shopId, req.user!.userId);
@@ -147,7 +156,10 @@ export const testChannelApi = async (req: AuthRequest, res: Response, next: Next
 
 export const getChannelDebugInfo = async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    success(res, await channelService.getChannelDebugInfo(req.params.id, req.query.shopId as string));
+    success(
+      res,
+      await channelService.getChannelDebugInfo(req.params.id, req.query.shopId as string, req.user?.userId)
+    );
   } catch (error) {
     next(error);
   }
