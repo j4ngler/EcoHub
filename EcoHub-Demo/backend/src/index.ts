@@ -7,6 +7,7 @@ import { startShopeeTokenRefresh } from './services/shopee-token-refresh.service
 import { startTikTokTokenRefresh } from './services/tiktok-token-refresh.service';
 import { startReturnSyncScheduler } from './services/return-sync-scheduler.service';
 import { startOrderSyncScheduler } from './services/order-sync-scheduler.service';
+import { startVideoRetentionScheduler } from './services/video-retention-scheduler.service';
 import { initBarcodeMapCache } from './modules/capture/barcode-mapping.service';
 
 const PORT = process.env.PORT || 3000;
@@ -34,6 +35,9 @@ startReturnSyncScheduler();
 
 // Silently pull new orders/products from TikTok/Shopee — no manual "Đồng bộ" button needed anymore.
 startOrderSyncScheduler();
+
+// Xóa (soft-delete + xóa file S3) video đóng gói/mở hàng cũ hơn 30 ngày, chạy 1 lần/ngày.
+startVideoRetentionScheduler();
 
 app.listen(PORT, () => {
   console.log(`🚀 Server is running on port ${PORT}`);

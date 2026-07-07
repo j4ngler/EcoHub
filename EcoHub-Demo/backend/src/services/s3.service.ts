@@ -6,6 +6,7 @@ let AwsS3ClientClass: any;
 let AwsPutObjectCommandClass: any;
 let AwsGetObjectCommandClass: any;
 let AwsHeadObjectCommandClass: any;
+let AwsDeleteObjectCommandClass: any;
 let awsGetSignedUrlFn: any;
 let awsSdkLoaded = false;
 
@@ -20,6 +21,7 @@ const ensureAwsSdk = async () => {
     AwsPutObjectCommandClass = (s3Module as any).PutObjectCommand;
     AwsGetObjectCommandClass = (s3Module as any).GetObjectCommand;
     AwsHeadObjectCommandClass = (s3Module as any).HeadObjectCommand;
+    AwsDeleteObjectCommandClass = (s3Module as any).DeleteObjectCommand;
     awsGetSignedUrlFn = (presignerModule as any).getSignedUrl;
     awsSdkLoaded = true;
   } catch (err: any) {
@@ -142,6 +144,24 @@ export const encodeS3Key = (key: string) => Buffer.from(key, 'utf8').toString('b
 export const decodeS3Key = (encodedKey: string) => Buffer.from(encodedKey, 'base64url').toString('utf8');
 
 export const getS3ProxyUrl = (key: string) => `/api/videos/storage/${encodeS3Key(key)}`;
+
+export const deleteObject = async (key: string) => {
+  const client = await getS3Client();
+  const bucket = getS3Bucket();
+
+  try {
+    await client.send(
+      new AwsDeleteObjectCommandClass({
+        Bucket: bucket,
+        Key: key,
+      })
+    );
+  } catch (error: any) {
+    // Vật thể không tồn tại thì coi như đã xóa xong, không cần báo lỗi.
+    if (error?.$metadata?.httpStatusCode === 404 || error?.name === 'NotFound') return;
+    throw error;
+  }
+};
 
 export const headObject = async (key: string) => {
   const client = await getS3Client();
