@@ -1,10 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useMutation } from '@tanstack/react-query';
 import { Search, ScanLine, PackageSearch } from 'lucide-react';
-import toast from 'react-hot-toast';
-import { ordersApi } from '@/api/orders.api';
-import { getErrorMessage } from '@/api/axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -17,26 +13,20 @@ export default function OrderLookupPage() {
   const [mode, setMode] = useState<LookupMode>('manual');
   const [code, setCode] = useState('');
 
-  const lookupMutation = useMutation({
-    mutationFn: (value: string) => ordersApi.lookupByCode(value),
-    onSuccess: (order) => {
-      toast.success(`Đã tìm thấy đơn hàng ${order.orderCode}`);
-      navigate(`/orders/${order.id}`);
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
+  const goToTracking = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    navigate(`/tracking/${encodeURIComponent(trimmed)}`);
+  };
 
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const value = code.trim();
-    if (!value) return;
-    lookupMutation.mutate(value);
+    goToTracking(code);
   };
 
   const handleScan = (value: string) => {
-    if (lookupMutation.isPending) return;
     setCode(value);
-    lookupMutation.mutate(value);
+    goToTracking(value);
   };
 
   return (
@@ -84,24 +74,18 @@ export default function OrderLookupPage() {
                 placeholder="Mã đơn hàng hoặc mã vận đơn"
                 className="flex-1"
               />
-              <Button type="submit" loading={lookupMutation.isPending}>
-                Tra cứu
-              </Button>
+              <Button type="submit">Tra cứu</Button>
             </form>
           ) : (
             <QrCodeScanner onScan={handleScan} />
           )}
-
-          {lookupMutation.isPending ? (
-            <p className="mt-3 text-sm text-gray-500">Đang tìm đơn hàng...</p>
-          ) : null}
         </CardContent>
       </Card>
 
       <Card>
         <CardContent className="p-4 text-sm text-gray-600">
-          Bạn chỉ xem được đơn hàng thuộc về chính mình. Nếu mã không hợp lệ hoặc đơn hàng không
-          thuộc quyền truy cập, hệ thống sẽ báo lỗi tương ứng.
+          Không cần đăng nhập — chỉ cần đúng mã đơn hàng/mã vận đơn là xem được trạng thái đơn và
+          video đóng gói liên quan.
         </CardContent>
       </Card>
     </div>

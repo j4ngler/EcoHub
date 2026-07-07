@@ -23,7 +23,6 @@ import ShopsPage from '@/features/shops/pages/ShopsPage';
 import ReturnsPage from '@/features/returns/pages/ReturnsPage';
 import ShippingSettingsPage from '@/features/settings/pages/ShippingSettingsPage';
 import S3StoragePage from '@/features/settings/pages/S3StoragePage';
-import BarcodeMappingPage from '@/features/settings/pages/BarcodeMappingPage';
 import ApiManagementPage from '@/features/channels/pages/ApiManagementPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -80,6 +79,7 @@ function App() {
         </Route>
         <Route path="/tracking" element={<TrackingPage />} />
         <Route path="/tracking/:trackingCode" element={<TrackingPage />} />
+        <Route path="/order-lookup" element={<OrderLookupPage />} />
         
         {/* Protected routes */}
         <Route path="/" element={
@@ -91,14 +91,6 @@ function App() {
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="orders" element={<OrdersPage />} />
           <Route path="orders/:id" element={<OrderDetailPage />} />
-          <Route
-            path="order-lookup"
-            element={
-              <RoleRoute allowedRoles={['customer', 'shipper']}>
-                <OrderLookupPage />
-              </RoleRoute>
-            }
-          />
           <Route path="products" element={<ProductsPage />} />
           <Route path="inventory" element={<InventoryPage />} />
           <Route path="videos" element={<VideosPage />} />
@@ -126,14 +118,6 @@ function App() {
           <Route path="channel-management" element={<ApiManagementPage />} />
           <Route path="api-management" element={<Navigate to="/channel-management" replace />} />
           <Route path="settings/shipping" element={<ShippingSettingsPage />} />
-          <Route
-            path="settings/barcode-mapping"
-            element={
-              <RoleRoute disallowRoles={['customer', 'shipper']}>
-                <BarcodeMappingPage />
-              </RoleRoute>
-            }
-          />
           <Route
             path="settings/s3"
             element={

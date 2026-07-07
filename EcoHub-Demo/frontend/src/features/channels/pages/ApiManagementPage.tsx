@@ -558,26 +558,6 @@ function OperatorApiView({
     onError: (err) => toast.error(getErrorMessage(err)),
   });
 
-  const syncOrdersMutation = useMutation({
-    mutationFn: ({ channelId, shopId }: { channelId: string; shopId: string }) =>
-      channelsApi.syncOrders(channelId, shopId),
-    onSuccess: async (data: any) => {
-      toast.success(`Đã đồng bộ ${data.synced || 0} đơn hàng`);
-      await refreshChannelData();
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
-  const syncProductsMutation = useMutation({
-    mutationFn: ({ channelId, shopId }: { channelId: string; shopId: string }) =>
-      channelsApi.syncProducts(channelId, shopId),
-    onSuccess: async (data: any) => {
-      toast.success(`Đã đồng bộ ${data.synced || 0} sản phẩm`);
-      await refreshChannelData();
-    },
-    onError: (err) => toast.error(getErrorMessage(err)),
-  });
-
   const testApiMutation = useMutation({
     mutationFn: ({ channelId, shopId }: { channelId: string; shopId: string }) =>
       channelsApi.testApi(channelId, shopId),
@@ -1091,28 +1071,6 @@ function OperatorApiView({
         </CardHeader>
         <CardContent className="flex flex-wrap gap-3">
           <Button
-            variant="outline"
-            disabled={!tiktokChannel || !effectiveShopId || !isConnected}
-            className={!canEdit ? 'hidden' : undefined}
-            loading={syncOrdersMutation.isPending}
-            onClick={() => tiktokChannel && syncOrdersMutation.mutate({ channelId: tiktokChannel.id, shopId: effectiveShopId })}
-          >
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Đồng bộ đơn hàng
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!tiktokChannel || !effectiveShopId || !isConnected}
-            className={!canEdit ? 'hidden' : undefined}
-            loading={syncProductsMutation.isPending}
-            onClick={() =>
-              tiktokChannel && syncProductsMutation.mutate({ channelId: tiktokChannel.id, shopId: effectiveShopId })
-            }
-          >
-            <Zap className="mr-2 h-4 w-4" />
-            Đồng bộ sản phẩm
-          </Button>
-          <Button
             variant="danger"
             disabled={!tiktokChannel || !effectiveShopId || !tiktokConnection || !canEdit}
             className={!canEdit ? 'hidden' : undefined}
@@ -1243,28 +1201,6 @@ function OperatorApiView({
               Kiểm tra Shopee
             </Button>
             <Button
-              variant="outline"
-              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
-              loading={syncOrdersMutation.isPending}
-              onClick={() =>
-                shopeeChannel &&
-                syncOrdersMutation.mutate({ channelId: shopeeChannel.id, shopId: effectiveShopId })
-              }
-            >
-              Đồng bộ đơn Shopee
-            </Button>
-            <Button
-              variant="outline"
-              disabled={!shopeeChannel || !shopeeConnection || !canEdit}
-              loading={syncProductsMutation.isPending}
-              onClick={() =>
-                shopeeChannel &&
-                syncProductsMutation.mutate({ channelId: shopeeChannel.id, shopId: effectiveShopId })
-              }
-            >
-              Đồng bộ sản phẩm Shopee
-            </Button>
-            <Button
               variant="danger"
               disabled={!shopeeChannel || !shopeeConnection || !canEdit}
               loading={deleteConnectionMutation.isPending}
@@ -1355,7 +1291,7 @@ function OperatorApiView({
             <p>1. Chọn đúng shop bạn đang vận hành.</p>
             <p>2. Bấm "Kết nối Shopee" để đi qua trang ủy quyền Open Platform của Shopee.</p>
             <p>3. Sau khi quay lại trang, bấm "Kiểm tra Shopee" để xác nhận access token và Shop ID.</p>
-            <p>4. Dùng "Đồng bộ đơn Shopee" / "Đồng bộ sản phẩm Shopee" để chủ động lấy dữ liệu mới nhất.</p>
+            <p>4. Đơn hàng và sản phẩm sẽ tự động đồng bộ định kỳ, không cần bấm tay.</p>
             <a
               href={overview?.shopeeSnapshot?.helpUrl || 'https://open.shopee.com/'}
               target="_blank"
@@ -1477,26 +1413,12 @@ function ShopeeGlobalPanel({ channel }: { channel: SalesChannel | null }) {
   }, [queryClient, searchParams, setSearchParams]);
 
   const actionMutation = useMutation({
-    mutationFn: async ({
-      action,
-      shopId,
-    }: {
-      action: 'test' | 'orders' | 'products';
-      shopId: string;
-    }) => {
+    mutationFn: async ({ shopId }: { action: 'test'; shopId: string }) => {
       if (!channel) throw new Error('Không tìm thấy kênh Shopee');
-      if (action === 'test') return channelsApi.testApi(channel.id, shopId);
-      if (action === 'orders') return channelsApi.syncOrders(channel.id, shopId);
-      return channelsApi.syncProducts(channel.id, shopId);
+      return channelsApi.testApi(channel.id, shopId);
     },
-    onSuccess: (_, variables) => {
-      toast.success(
-        variables.action === 'test'
-          ? 'Kết nối Shopee sẵn sàng'
-          : variables.action === 'orders'
-            ? 'Đã đồng bộ đơn Shopee'
-            : 'Đã đồng bộ sản phẩm Shopee'
-      );
+    onSuccess: () => {
+      toast.success('Kết nối Shopee sẵn sàng');
     },
     onError: (error) => toast.error(getErrorMessage(error)),
   });
@@ -1561,18 +1483,6 @@ function ShopeeGlobalPanel({ channel }: { channel: SalesChannel | null }) {
                 onClick={() => actionMutation.mutate({ action: 'test', shopId: connection.shopId })}
               >
                 Kiểm tra
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => actionMutation.mutate({ action: 'orders', shopId: connection.shopId })}
-              >
-                Đồng bộ đơn
-              </Button>
-              <Button
-                variant="outline"
-                onClick={() => actionMutation.mutate({ action: 'products', shopId: connection.shopId })}
-              >
-                Đồng bộ sản phẩm
               </Button>
               <Button
                 variant="danger"

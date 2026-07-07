@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { AlertTriangle, Clock, HardDrive, PackageCheck, ShoppingCart, Truck, Users } from 'lucide-react';
+import { AlertTriangle, Clock, PackageCheck, ShoppingCart, Truck, Users } from 'lucide-react';
 import { Cell, Pie, PieChart, ResponsiveContainer } from 'recharts';
 import { reportsApi } from '@/api/reports.api';
 import { useAuthStore } from '@/store/authStore';
@@ -24,14 +24,6 @@ export default function DashboardPage() {
   const shippingReturnSummary = dashboard?.shippingReturnSummary ?? [];
   const storageSummary = summary?.storage;
   const ordersWithoutVideo = Math.max(0, (summary?.orders?.total ?? 0) - (summary?.videos?.total ?? 0));
-
-  const formatVideoStorage = (usedBytes: number, totalBytes: number) => {
-    const gb = 1024 ** 3;
-    const mb = 1024 ** 2;
-    const usedStr = usedBytes < gb ? `${(usedBytes / mb).toFixed(1)} MB` : `${(usedBytes / gb).toFixed(2)} GB`;
-    const totalStr = totalBytes < gb ? `${(totalBytes / mb).toFixed(0)} MB` : `${(totalBytes / gb).toFixed(1)} GB`;
-    return `${usedStr} / ${totalStr}`;
-  };
 
   const pieData = ordersByStatus.map((item, index) => ({
     name: ORDER_STATUS_BADGES[item.status]?.label || item.status,
@@ -84,17 +76,10 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard title="Tổng đơn hôm nay" value={summary?.orders?.total ?? 0} icon={ShoppingCart} color="emerald" trend="" />
         <StatCard title="Chưa đóng gói" value={summary?.videos?.unpacked ?? ordersWithoutVideo} icon={Clock} color="amber" trend="" />
         <StatCard title="Đã đóng gói" value={summary?.videos?.packed ?? 0} icon={PackageCheck} color="blue" trend="" />
-        <StatCard
-          title="Dung lượng video"
-          value={storageSummary ? formatVideoStorage(storageSummary.usedBytes, storageSummary.totalBytes) : '0.0 MB / 100.0 GB'}
-          icon={HardDrive}
-          color={storageSummary?.status === 'critical' ? 'rose' : storageSummary?.status === 'warning' ? 'amber' : 'indigo'}
-          trend={`${storageSummary?.usedPercent?.toFixed(1) || 0}%`}
-        />
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">

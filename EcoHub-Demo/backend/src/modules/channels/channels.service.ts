@@ -664,6 +664,60 @@ export const refreshExpiringShopeeConnections = async () => {
   return { checked: connections.length, refreshed, failed };
 };
 
+const refreshTikTokConnection = async (connection: { id: string; refreshToken: string | null }) => {
+  const refreshToken = String(connection.refreshToken || '').trim();
+  if (!refreshToken) {
+    return { _error: 'Kết nối TikTok thiếu refresh token' };
+  }
+
+  const refreshed = await refreshTikTokAccessToken(refreshToken);
+  const accessToken = extractFirstString(refreshed, ['access_token', 'accessToken']);
+  const newRefreshToken = extractFirstString(refreshed, ['refresh_token', 'refreshToken']);
+  const expiresInSec = extractFirstNumber(refreshed, ['expires_in', 'access_token_expire_in']);
+
+  if (!accessToken) {
+    await prisma.shopChannelConnection.update({
+      where: { id: connection.id },
+      data: { status: 'error' },
+    });
+    return refreshed;
+  }
+
+  await prisma.shopChannelConnection.update({
+    where: { id: connection.id },
+    data: {
+      accessToken,
+      refreshToken: newRefreshToken || refreshToken,
+      tokenExpiresAt: expiresInSec ? new Date(Date.now() + expiresInSec * 1000) : null,
+      status: 'connected',
+      lastSyncAt: new Date(),
+    },
+  });
+  return { access_token: accessToken };
+};
+
+export const refreshExpiringTikTokConnections = async () => {
+  const refreshBefore = new Date(Date.now() + 30 * 60 * 1000);
+  const connections = await prisma.shopChannelConnection.findMany({
+    where: {
+      channel: { code: 'tiktok' },
+      status: 'connected',
+      refreshToken: { not: null },
+      OR: [{ tokenExpiresAt: null }, { tokenExpiresAt: { lte: refreshBefore } }],
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  let refreshed = 0;
+  let failed = 0;
+  for (const connection of connections) {
+    const result = await refreshTikTokConnection(connection);
+    if ((result as any)._error) failed += 1;
+    else refreshed += 1;
+  }
+  return { checked: connections.length, refreshed, failed };
+};
+
 const getShopeeAutoShopCode = (shopeeShopId: string) => `SHOPEE_${shopeeShopId}`;
 
 const ensureShopeeShopForShopId = async (params: {

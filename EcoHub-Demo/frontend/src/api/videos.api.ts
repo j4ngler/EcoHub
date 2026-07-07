@@ -70,12 +70,14 @@ export interface PublicTrackingDetail {
     trackingCode?: string | null;
     status: string;
     customerName: string;
+    shopName?: string | null;
     carrier?: { name: string; code: string } | null;
     items: Array<{
       productName: string;
       productSku?: string | null;
       quantity: number;
     }>;
+    codAmount?: number | string;
     packedAt?: string | null;
     shippedAt?: string | null;
     deliveredAt?: string | null;

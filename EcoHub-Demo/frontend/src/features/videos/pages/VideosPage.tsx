@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Video, Search, Upload, Filter, Eye, Trash2, HardDrive, Clock, CheckCircle, GitCompare, Play, Download } from 'lucide-react';
+import { Video, Search, Upload, Eye, Trash2, HardDrive, Clock, CheckCircle, GitCompare, Play, Download } from 'lucide-react';
 import { videosApi, VideoQueryParams, PackageVideo } from '@/api/videos.api';
 import { getErrorMessage } from '@/api/axios';
 import { formatDateTime } from '@/utils/format';
@@ -73,15 +73,6 @@ export default function VideosPage() {
     if (window.confirm('Bạn có chắc muốn xóa video này?')) deleteMutation.mutate(id);
   };
 
-  const statusOptions = [
-    { value: '', label: 'Tất cả trạng thái' },
-    { value: 'uploaded', label: 'Đã upload' },
-    { value: 'processing', label: 'Đang xử lý' },
-    { value: 'completed', label: 'Hoàn thành' },
-    { value: 'failed', label: 'Thất bại' },
-  ];
-
-
   const videos = data?.data ?? [];
   const meta = data?.meta;
   const formatDuration = (seconds?: number | null) => {
@@ -123,20 +114,6 @@ export default function VideosPage() {
             />
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2">
-              <Filter className="text-gray-500 h-5 w-5" />
-              <select
-                value={filters.status || ''}
-                onChange={(e) => setFilters({ ...filters, status: e.target.value, page: 1 })}
-                className="border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                {statusOptions.map((o) => (
-                  <option key={o.value} value={o.value}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -164,7 +141,7 @@ export default function VideosPage() {
           </div>
           <h3 className="text-lg font-medium text-gray-900">Chưa có video</h3>
           <p className="mt-1 text-gray-500">
-            {filters.search || filters.status
+            {filters.search
               ? 'Không có video phù hợp bộ lọc.'
               : 'Hệ thống chưa ghi nhận video đóng gói nào.'}
           </p>
@@ -179,9 +156,6 @@ export default function VideosPage() {
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Mã vận đơn
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Trạng thái xử lý
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Dung lượng
@@ -200,21 +174,6 @@ export default function VideosPage() {
             <tbody className="bg-white divide-y divide-gray-200">
               {videos.map((video) => {
                 const order = video.order;
-                const statusLabelMap: Record<string, string> = {
-                  uploaded: 'Đã upload',
-                  processing: 'Đang xử lý',
-                  completed: 'Hoàn thành',
-                  failed: 'Thất bại',
-                };
-                const statusColorMap: Record<string, string> = {
-                  uploaded: 'bg-yellow-100 text-yellow-800',
-                  processing: 'bg-blue-100 text-blue-800',
-                  completed: 'bg-green-100 text-green-800',
-                  failed: 'bg-red-100 text-red-800',
-                };
-                const statusText = statusLabelMap[video.processingStatus] || video.processingStatus;
-                const statusColor =
-                  statusColorMap[video.processingStatus] || 'bg-gray-100 text-gray-800';
 
                 return (
                   <tr key={video.id}>
@@ -237,13 +196,6 @@ export default function VideosPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
                       {video.trackingCode}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColor}`}
-                      >
-                        {statusText}
-                      </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {(() => {
@@ -310,7 +262,7 @@ export default function VideosPage() {
                         )}
                         {!video.deletedAt && (
                           <>
-                            {!video.approvedAt && (video.processingStatus === 'completed' || video.processingStatus === 'uploaded') && (
+                            {!video.approvedAt && (
                               <button
                                 type="button"
                                 onClick={() => approveMutation.mutate(video.id)}

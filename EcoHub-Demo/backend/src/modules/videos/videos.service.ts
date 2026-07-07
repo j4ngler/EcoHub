@@ -438,6 +438,7 @@ export const getPublicTrackingDetail = async (code: string) => {
       ],
     },
     include: {
+      shop: { select: { name: true } },
       carrier: { select: { name: true, code: true } },
       items: {
         select: {
@@ -487,8 +488,10 @@ export const getPublicTrackingDetail = async (code: string) => {
       trackingCode: order.trackingCode,
       status: order.status,
       customerName: order.customerName,
+      shopName: order.shop?.name || null,
       carrier: order.carrier,
       items: order.items,
+      codAmount: order.codAmount,
       packedAt: order.packedAt,
       shippedAt: order.shippedAt,
       deliveredAt: order.deliveredAt,

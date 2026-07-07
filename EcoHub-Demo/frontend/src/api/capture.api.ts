@@ -120,38 +120,7 @@ export interface CaptureServiceInfo {
   };
 }
 
-export interface BarcodeMapping {
-  id: string;
-  barcode: string;
-  sku: string;
-  note: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export const captureApi = {
-  getBarcodeMappings: async (): Promise<BarcodeMapping[]> => {
-    const response = await api.get('/capture/barcode-mappings');
-    return response.data.data;
-  },
-
-  createBarcodeMapping: async (data: { barcode: string; sku: string; note?: string }): Promise<BarcodeMapping> => {
-    const response = await api.post('/capture/barcode-mappings', data);
-    return response.data.data;
-  },
-
-  updateBarcodeMapping: async (
-    id: string,
-    data: { barcode: string; sku: string; note?: string }
-  ): Promise<BarcodeMapping> => {
-    const response = await api.put(`/capture/barcode-mappings/${id}`, data);
-    return response.data.data;
-  },
-
-  deleteBarcodeMapping: async (id: string): Promise<void> => {
-    await api.delete(`/capture/barcode-mappings/${id}`);
-  },
-
   getServiceInfo: async () => {
     const response = await api.get('/capture/service-info');
     return response.data.data as CaptureServiceInfo;

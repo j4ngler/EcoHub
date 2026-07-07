@@ -1,17 +1,51 @@
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Camera, CheckCircle, Clock, Package, ScanLine, Search, Truck, Upload, Video } from 'lucide-react';
+import {
+  Camera,
+  CheckCircle,
+  CheckCircle2,
+  Clock,
+  Copy,
+  Package,
+  PackageCheck,
+  RotateCcw,
+  ScanLine,
+  Search,
+  Truck,
+  Upload,
+  Video,
+  XCircle,
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 import { videosApi } from '@/api/videos.api';
 import { getErrorMessage } from '@/api/axios';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import Badge, { ORDER_STATUS_BADGES } from '@/components/ui/Badge';
+import { ORDER_STATUS_BADGES } from '@/components/ui/Badge';
 import QrCodeScanner from '@/components/QrCodeScanner';
 import { formatDateTime } from '@/utils/format';
 
 type SearchMode = 'manual' | 'scan';
+
+const STEP_DEFS = [
+  { key: 'created', label: 'Đã đặt hàng', icon: Package },
+  { key: 'packed', label: 'Đã đóng gói', icon: PackageCheck },
+  { key: 'shipping', label: 'Đang vận chuyển', icon: Truck },
+  { key: 'delivered', label: 'Đã giao hàng', icon: CheckCircle2 },
+] as const;
+
+const HERO_STYLE: Record<string, { bg: string; icon: typeof Package }> = {
+  pending: { bg: 'from-amber-500 to-orange-500', icon: Clock },
+  confirmed: { bg: 'from-sky-500 to-blue-600', icon: CheckCircle2 },
+  packing: { bg: 'from-sky-500 to-blue-600', icon: Package },
+  packed: { bg: 'from-sky-500 to-blue-600', icon: PackageCheck },
+  shipping: { bg: 'from-indigo-500 to-blue-600', icon: Truck },
+  delivered: { bg: 'from-emerald-500 to-teal-600', icon: CheckCircle2 },
+  completed: { bg: 'from-emerald-500 to-teal-600', icon: CheckCircle2 },
+  cancelled: { bg: 'from-rose-500 to-red-600', icon: XCircle },
+  returned: { bg: 'from-rose-500 to-red-600', icon: RotateCcw },
+};
 
 export default function TrackingPage() {
   const { trackingCode: urlTrackingCode } = useParams();
@@ -24,6 +58,7 @@ export default function TrackingPage() {
   const [isRecording, setIsRecording] = useState(false);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [complaintNote, setComplaintNote] = useState('');
+  const [copied, setCopied] = useState(false);
   const previewRef = useRef<HTMLVideoElement | null>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -129,6 +164,32 @@ export default function TrackingPage() {
   const firstPackageVideo = data?.packageVideos?.[0];
   const recordedSizeMb = recordedBlob ? (recordedBlob.size / 1024 / 1024).toFixed(1) : null;
 
+  const status = data?.order.status || '';
+  const isCancelled = status === 'cancelled';
+  const isReturned = status === 'returned';
+  const hero = HERO_STYLE[status] || HERO_STYLE.pending;
+  const HeroIcon = hero.icon;
+
+  const stepTimes = data
+    ? [data.order.createdAt, data.order.packedAt, data.order.shippedAt, data.order.deliveredAt]
+    : [null, null, null, null];
+  const activeStep = stepTimes.reduce(
+    (acc, time, idx) => (time && idx > acc ? idx : acc),
+    0
+  );
+
+  const displayCode = data?.order.trackingCode || data?.order.orderCode || '';
+  const handleCopyCode = async () => {
+    if (!displayCode) return;
+    try {
+      await navigator.clipboard.writeText(displayCode);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast.error('Không sao chép được, hãy tự bôi đen mã.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-sky-100">
       <div className="border-b bg-white shadow-sm">
@@ -204,27 +265,105 @@ export default function TrackingPage() {
         ) : null}
 
         {data ? (
-          <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
+          <>
+            {/* Hero: trạng thái nổi bật + mã vận đơn có nút copy, kiểu GHN/J&T */}
+            <div className={`overflow-hidden rounded-2xl bg-gradient-to-r ${hero.bg} p-6 text-white shadow-lg`}>
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-white/20">
+                    <HeroIcon className="h-7 w-7" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-white/80">Trạng thái đơn hàng</p>
+                    <p className="text-2xl font-bold leading-tight">
+                      {statusConfig?.label || data.order.status}
+                    </p>
+                    {data.order.carrier?.name ? (
+                      <p className="mt-0.5 text-sm text-white/80">Vận chuyển bởi {data.order.carrier.name}</p>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-white/80">Mã vận đơn</p>
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    className="mt-0.5 flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 font-mono text-lg font-semibold transition hover:bg-white/20"
+                  >
+                    {displayCode || '-'}
+                    <Copy className="h-4 w-4" />
+                  </button>
+                  {copied ? <p className="mt-1 text-xs text-white/80">Đã sao chép</p> : null}
+                </div>
+              </div>
+
+              {/* Stepper tiến trình đơn hàng */}
+              {!isCancelled && !isReturned ? (
+                <div className="mt-6 flex items-start">
+                  {STEP_DEFS.map((step, idx) => (
+                    <div key={step.key} className="flex flex-1 flex-col items-center">
+                      <div className="flex w-full items-center">
+                        <div
+                          className={`h-0.5 flex-1 ${idx === 0 ? 'invisible' : idx <= activeStep ? 'bg-white' : 'bg-white/30'}`}
+                        />
+                        <div
+                          className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 ${
+                            idx <= activeStep
+                              ? 'border-white bg-white text-emerald-700'
+                              : 'border-white/40 bg-transparent text-white/60'
+                          }`}
+                        >
+                          <step.icon className="h-4 w-4" />
+                        </div>
+                        <div
+                          className={`h-0.5 flex-1 ${
+                            idx === STEP_DEFS.length - 1 ? 'invisible' : idx < activeStep ? 'bg-white' : 'bg-white/30'
+                          }`}
+                        />
+                      </div>
+                      <p className={`mt-2 text-center text-xs font-medium ${idx <= activeStep ? 'text-white' : 'text-white/60'}`}>
+                        {step.label}
+                      </p>
+                      <p className="text-center text-[11px] text-white/70">
+                        {stepTimes[idx] ? formatDateTime(stepTimes[idx]) : ''}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-4 text-sm text-white/90">
+                  {isCancelled
+                    ? 'Đơn hàng này đã bị hủy, không tiếp tục xử lý.'
+                    : 'Đơn hàng này đã được hoàn trả về người gửi.'}
+                </p>
+              )}
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <CardTitle className="flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      Thông tin đơn hàng
-                    </CardTitle>
-                    <Badge variant={statusConfig?.variant || 'default'}>
-                      {statusConfig?.label || data.order.status}
-                    </Badge>
-                  </div>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="h-5 w-5" />
+                    Thông tin đơn hàng
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="grid gap-3 sm:grid-cols-2">
                     <Info label="Mã đơn" value={data.order.orderCode} />
                     <Info label="Mã vận đơn" value={data.order.trackingCode || '-'} mono />
+                    <Info label="Người gửi" value={data.order.shopName || '-'} />
                     <Info label="Người nhận" value={data.order.customerName} />
                     <Info label="Đơn vị vận chuyển" value={data.order.carrier?.name || '-'} />
                   </div>
+                  {Number(data.order.codAmount) > 0 ? (
+                    <div className="flex items-center justify-between rounded-lg border bg-amber-50 px-4 py-3">
+                      <span className="text-sm font-medium text-gray-700">Tổng tiền thu hộ (COD)</span>
+                      <span className="text-lg font-bold text-amber-700">
+                        {Number(data.order.codAmount).toLocaleString('vi-VN')} đ
+                      </span>
+                    </div>
+                  ) : null}
                   <div>
                     <p className="mb-2 text-sm font-medium text-gray-500">Sản phẩm</p>
                     <div className="space-y-2">
@@ -359,6 +498,7 @@ export default function TrackingPage() {
               </Card>
             </div>
           </div>
+          </>
         ) : null}
       </div>
     </div>

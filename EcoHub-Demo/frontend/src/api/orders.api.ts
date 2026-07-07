@@ -105,11 +105,6 @@ export const ordersApi = {
     return response.data.data;
   },
 
-  lookupByCode: async (code: string): Promise<Order> => {
-    const response = await api.get(`/orders/lookup/${encodeURIComponent(code)}`);
-    return response.data.data;
-  },
-  
   createOrder: async (data: Partial<Order>): Promise<Order> => {
     const response = await api.post('/orders', data);
     return response.data.data;

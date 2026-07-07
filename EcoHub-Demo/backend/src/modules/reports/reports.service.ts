@@ -150,6 +150,10 @@ export const getDashboard = async (params: ReportParams, currentUser?: CurrentUs
     allTimeVideoWhere.order = { shopId: effectiveShopId };
   }
 
+  // Đơn "cần đóng gói quay video" = mọi đơn trong ngày trừ đơn đã hủy (đơn hủy không cần quay video).
+  // Không ghi đè nếu người gọi đã tự lọc theo 1 status cụ thể (params.orderStatus).
+  const packableWhere = params.orderStatus ? where : { ...where, status: { not: 'cancelled' } };
+
   // Get summary statistics
   const [
     totalOrders,
@@ -167,7 +171,7 @@ export const getDashboard = async (params: ReportParams, currentUser?: CurrentUs
     receivingStorageAgg,
     largestVideos,
   ] = await Promise.all([
-    prisma.order.count({ where }),
+    prisma.order.count({ where: packableWhere }),
     prisma.order.count({ where: { ...where, status: 'pending' } }),
     prisma.order.count({ where: { ...where, status: { in: ['packing', 'packed'] } } }),
     prisma.order.count({ where: { ...where, status: 'shipping' } }),
@@ -284,7 +288,7 @@ export const getDashboard = async (params: ReportParams, currentUser?: CurrentUs
   });
 
   const packedOrders = await prisma.order.count({
-    where: { ...where, packageVideos: { some: {} } },
+    where: { ...packableWhere, packageVideos: { some: {} } },
   });
   const unpackedOrders = Math.max(0, totalOrders - packedOrders);
 
